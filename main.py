@@ -27,6 +27,8 @@ parser.add_argument('--hidden_size', default=200, type=int, help='Hidden size of
 parser.add_argument('--hidden_layers', default=2, type=int, help='Number of RNN layers')
 parser.add_argument('--epochs', default=70, type=int, help='Number of training epochs')
 parser.add_argument('--cuda', default=False, type=Boolean, help='Use cuda to train model')
+parser.add_argument('--lr', '--learning-rate', default=3e-4, type=float, help='initial learning rate')
+parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
 
 args = parser.parse_args()
 sample_rate = args.sample_rate
@@ -64,6 +66,7 @@ hidden = Variable(torch.randn(2, minibatch_size, args.hidden_size))
 cell = Variable(torch.randn(2, minibatch_size, args.hidden_size))
 inputBuffer = torch.FloatTensor()
 targetBuffer = torch.FloatTensor()
+
 if args.cuda:
     model = torch.nn.DataParallel(model).cuda()
     inputBuffer = inputBuffer.cuda()
@@ -71,12 +74,17 @@ if args.cuda:
     hidden = hidden.cuda()
     cell = cell.cuda()
 
+optimizer = torch.optim.SGD(model.parameters(), args.lr,
+                            momentum=args.momentum)
+
 for x in xrange(args.epochs):
     model.train()
 
     for i, (data, target) in enumerate(train_loader):
         input = data[0].reshape(minibatch_size, 1, spect_size,
                                 -1)  # Puts the data into the form of batch x channels x freq x time
+        # TODO we could probably use the valid percentage to find out the real size
+        label_lengths = torch.FloatTensor(data[2].get().astype(dtype=np.float32))
 
         # refresh the tape for input and cell states for the new epoch
         input = torch.FloatTensor(input.get().astype(dtype=np.float32))
@@ -92,8 +100,10 @@ for x in xrange(args.epochs):
 
         out = model(input, hidden, cell)
 
-        label_lengths = torch.FloatTensor(data[2].get().astype(dtype=np.float32))
-        # TODO we could probably use the valid percentage to find out the real size
         sizes = Variable(torch.FloatTensor(out.size(1)).fill_(out.size(0)), requires_grad=False)
         loss = ctc_loss(out, target, sizes, label_lengths)
-        grads = loss.backward()
+
+        # compute gradient and do SGD step
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
