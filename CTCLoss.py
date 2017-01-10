@@ -19,7 +19,7 @@ class CPU_CTC(Function):
         act_lens = sizes
         acts = input.cpu().numpy()
         act_lens = act_lens.numpy()
-        labels = labels.numpy()
+        labels = target.numpy()
         label_lens = label_lens.numpy()
         self.cost, self.grads = cpu_ctc_np(acts, act_lens, labels, label_lens)
         self.grads = torch.FloatTensor(self.grads)
@@ -33,5 +33,5 @@ class CPU_CTC(Function):
         return self.grads, self.target, self.sizes, self.label_lens
 
 
-def ctc_loss(input, target, sizes):
-    return CPU_CTC()(input, target, sizes)
+def ctc_loss(input, target, sizes, label_lens):
+    return CPU_CTC()(input, target, sizes, label_lens)

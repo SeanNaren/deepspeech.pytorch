@@ -3,83 +3,97 @@ from aeon import DataLoader
 from neon.backends import gen_backend
 import numpy as np
 from torch.autograd import Variable
+import argparse
 
 from CTCLoss import ctc_loss
 from model import DeepSpeech
 
-'''
-Game plan:
+parser = argparse.ArgumentParser(description='DeepSpeech pytorch params')
+parser.add_argument('--noise_manifest', metavar='DIR',
+                    help='path to noise manifest csv', default='noise_manifest.csv')
+parser.add_argument('--train_manifest', metavar='DIR',
+                    help='path to train manifest csv', default='train_manifest.csv')
+parser.add_argument('--sample_rate', default=16000, type=int, help='Sample rate')
+parser.add_argument('--batch_size', default=3, type=int, help='Batch size for training')
+parser.add_argument('--max_transcript_length', default=1300, type=int, help='Maximum size of transcript in training')
+parser.add_argument('--frame_length', default=.02, type=float, help='Window size for spectrogram in seconds')
+parser.add_argument('--frame_stride', default=.01, type=float, help='Window stride for spectrogram in seconds')
+parser.add_argument('--max_duration', default=15, type=float, help='The maximum duration of the training data in seconds')
+parser.add_argument('--window', default='hamming', help='Window type for spectrogram generation')
+parser.add_argument('--noise_probability', default=0.4, type=float, help='Window type for spectrogram generation')
+parser.add_argument('--noise_min', default=0.5, type=float, help='Minimum noise to add')
+parser.add_argument('--noise_max', default=1, type=float, help='Maximum noise to add (1 is an SNR of 0 (pure noise)')
+parser.add_argument('--hidden_size', default=200, type=int, help='Hidden size of RNNs')
+parser.add_argument('--hidden_layers', default=2, type=int, help='Number of RNN layers')
+parser.add_argument('--epochs', default=70, type=int, help='Number of training epochs')
+parser.add_argument('--cuda', default=False, type=Boolean, help='Use cuda to train model')
 
-Two parts, the data loading, and the actual training of the neural network.
-
-Data loading: Once we have this, it should be scalable to the entire dataset.
-
-Assume data is in the format of dataset/wav, dataset/txt, where the name is sample.{wav,txt}. Create manifest files by doing find on all wav
-then assuming the transcript is in a folder called txt.
-
-Using pytorch, we need to replicate the deepspeech architecture here. We should be able to pass a tensor through it, and get predictions out of it.
-
-Next we need to use the python bindings for warp-ctc to train on it correctly.
-
-Data has to be processed to 16 bit like this find . -name '*.wav'  | parallel 'sox {} -b 16 {} channels 1 rate 16k'
-'''
-sample_rate = 16000
-home_path = '/home/sean/Work/deepspeech.pytorch/'
-minibatch_size = 3
+args = parser.parse_args()
+sample_rate = args.sample_rate
+minibatch_size = args.batch_size
 alphabet = "_'ABCDEFGHIJKLMNOPQRSTUVWXYZ "
 nout = len(alphabet)
-max_transcript_length = 1300
-frame_length = .02
-frame_stride = .01
-spect_size = (frame_length * sample_rate / 2) + 1
+spect_size = (args.frame_length * sample_rate / 2) + 1
 be = gen_backend(batch_size=minibatch_size)
 
 audio_config = dict(sample_freq_hz=sample_rate,
-                    max_duration="7 seconds",
-                    frame_length="%f seconds" % frame_length,
-                    frame_stride="%f seconds" % frame_stride,
-                    window_type='hamming',
-                    noise_index_file="%smanifest_noise.csv" % home_path,
-                    add_noise_probability=0.5,
-                    noise_level=(0.5, 1.0)
+                    max_duration="%f seconds" % args.max_duration,
+                    frame_length="%f seconds" % args.frame_length,
+                    frame_stride="%f seconds" % args.frame_stride,
+                    window_type=args.window,
+                    noise_index_file=args.noise_manifest,
+                    add_noise_probability=args.noise_probability,
+                    noise_level=(args.noise_min, args.noise_max)
                     )
 
 transcription_config = dict(alphabet=alphabet,
-                            max_length=max_transcript_length,
+                            max_length=args.max_transcript_length,
                             pack_for_ctc=True)
 
 dataloader_config = dict(type="audio,transcription",
                          audio=audio_config,
                          transcription=transcription_config,
-                         manifest_filename="%smanifest_train.csv" % home_path,
+                         manifest_filename=args.train_manifest,
                          macrobatch_size=be.bsz,
                          minibatch_size=be.bsz)
 
-train = DataLoader(dataloader_config, be)
-data = train.next()
-input = data[0].reshape(minibatch_size, 1, spect_size,
-                        -1)  # Puts the data into the form of batch x channels x freq x time
-input = Variable(torch.FloatTensor(input.get().astype(dtype=np.float32)))
-target = Variable(torch.FloatTensor(data[1].get().astype(dtype=np.float32)))
-label_lengths = torch.FloatTensor(data[2].get().astype(dtype=np.float32))
+train_loader = DataLoader(dataloader_config, be)
 
-rnn_hidden_size = 200
-batch_size = 1
-model = DeepSpeech(rnn_hidden_size=rnn_hidden_size)
-hidden = Variable(torch.randn(2, batch_size, rnn_hidden_size))
-cell = Variable(torch.randn(2, batch_size, rnn_hidden_size))
-print(model)
-model = model.cuda()
-input = input.cuda()
-hidden = hidden.cuda()
-cell = cell.cuda()
+model = DeepSpeech(rnn_hidden_size=args.hidden_size, nb_layers=args.hidden_layers)
+hidden = Variable(torch.randn(2, minibatch_size, args.hidden_size))
+cell = Variable(torch.randn(2, minibatch_size, args.hidden_size))
+inputBuffer = torch.FloatTensor()
+targetBuffer = torch.FloatTensor()
+if args.cuda:
+    model = torch.nn.DataParallel(model).cuda()
+    inputBuffer = inputBuffer.cuda()
+    targetBuffer = targetBuffer.cuda()
+    hidden = hidden.cuda()
+    cell = cell.cuda()
 
-out = model(input, hidden, cell)
+for x in xrange(args.epochs):
+    model.train()
 
-print(out.size())
+    for i, (data, target) in enumerate(train_loader):
+        input = data[0].reshape(minibatch_size, 1, spect_size,
+                                -1)  # Puts the data into the form of batch x channels x freq x time
 
-sizes = Variable(torch.FloatTensor(out.size(1)).fill_(out.size(0)), requires_grad=False) # TODO we could probably use
-#   the valid percentage to find out the real size
+        # refresh the tape for input and cell states for the new epoch
+        input = torch.FloatTensor(input.get().astype(dtype=np.float32))
+        inputBuffer.resizeAs(input).copy(input)
+        input = Variable(inputBuffer)
+        target = torch.FloatTensor(data[1].get().astype(dtype=np.float32))
+        targetBuffer.resizeAs(target).copy(target)
+        target = Variable(targetBuffer)
 
-loss = ctc_loss(out, target, sizes, label_lengths)
-grads = loss.backward()
+        # refresh the tape for the hidden and cell states for the new epoch
+        hidden = Variable(hidden.data)
+        cell = Variable(cell.data)
+
+        out = model(input, hidden, cell)
+
+        label_lengths = torch.FloatTensor(data[2].get().astype(dtype=np.float32))
+        # TODO we could probably use the valid percentage to find out the real size
+        sizes = Variable(torch.FloatTensor(out.size(1)).fill_(out.size(0)), requires_grad=False)
+        loss = ctc_loss(out, target, sizes, label_lengths)
+        grads = loss.backward()

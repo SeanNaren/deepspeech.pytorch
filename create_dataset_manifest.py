@@ -11,7 +11,7 @@ test_path = args.root_path + '/test/'
 
 
 def create_manifest(data_path, tag):
-    manifest_path = 'manifest_%s.csv' % tag
+    manifest_path = '%s_manifest.csv' % tag
     with os.popen('find %s -type f -name "*.wav"' % data_path) as pipe:
         with io.FileIO(manifest_path, "w") as file:
             for wav_path in pipe:
