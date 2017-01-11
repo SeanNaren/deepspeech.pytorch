@@ -5,13 +5,13 @@
 Several libraries are needed to be installed for training to work. I will assume that everything is being installed in
 an Anaconda installation on Ubuntu.
 
-Follow instructions [here](https://aeon.nervanasys.com/index.html/getting_started.html) to install Nervanas' dataloader aeon. Instructions for Anaconda/Ubuntu below:
+The dataloader relies on Neon, as a result Neon has to be installed. Installation instructions can be seen [here](docs.continuum.io/anaconda/install) Instructions to install Neon for Anaconda/Ubuntu below:
 
 ```
 sudo apt-get install libcurl4-openssl-dev clang libopencv-dev libsox-dev
-git clone https://github.com/NervanaSystems/aeon.git
-cd aeon
-python setup.py install
+sudo apt-get install ffmpeg
+git clone https://github.com/NervanaSystems/neon.git
+cd neon && make sysinstall
 ```
 Install pytorch if you haven't already:
 
