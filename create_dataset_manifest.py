@@ -4,10 +4,6 @@ import os
 
 parser = argparse.ArgumentParser(description='Creates training and testing manifests')
 parser.add_argument('--root_path', default='dataset', help='Path to the dataset')
-args = parser.parse_args()
-
-train_path = args.root_path + '/train/'
-test_path = args.root_path + '/test/'
 
 
 def create_manifest(data_path, tag):
@@ -21,5 +17,13 @@ def create_manifest(data_path, tag):
                 file.write(sample)
 
 
-create_manifest(train_path, 'train')
-create_manifest(train_path, 'test')
+def main():
+    args = parser.parse_args()
+    train_path = args.root_path + '/train/'
+    test_path = args.root_path + '/test/'
+    create_manifest(train_path, 'train')
+    create_manifest(test_path, 'test')
+
+
+if __name__ == '__main__':
+    main()

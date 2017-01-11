@@ -6,13 +6,6 @@ import shutil
 parser = argparse.ArgumentParser(description='Processes and downloads an4.')
 parser.add_argument('--an4_path', default='dataset/', help='Path to save dataset')
 parser.add_argument('--sample_rate', default=16000, type=int, help='Sample rate')
-args = parser.parse_args()
-
-root_path = 'an4/'
-name = 'an4'
-os.system('wget http://www.speech.cs.cmu.edu/databases/an4/an4_raw.bigendian.tar.gz')
-os.system('tar -xzvf an4_raw.bigendian.tar.gz')
-os.makedirs(args.an4_path)
 
 
 def format_data(data_tag, name, wav_folder):
@@ -64,8 +57,19 @@ def process_transcript(transcripts, x):
     return extracted_transcript
 
 
-format_data('train', name, 'an4_clstk')
-format_data('test', name, 'an4test_clstk')
+def main():
+    global args, root_path
+    args = parser.parse_args()
+    root_path = 'an4/'
+    name = 'an4'
+    os.system('wget http://www.speech.cs.cmu.edu/databases/an4/an4_raw.bigendian.tar.gz')
+    os.system('tar -xzvf an4_raw.bigendian.tar.gz')
+    os.makedirs(args.an4_path)
+    format_data('train', name, 'an4_clstk')
+    format_data('test', name, 'an4test_clstk')
+    shutil.rmtree(root_path)
+    os.remove('an4_raw.bigendian.tar.gz')
 
-shutil.rmtree(root_path)
-os.remove('an4_raw.bigendian.tar.gz')
+
+if __name__ == '__main__':
+    main()
