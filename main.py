@@ -31,6 +31,7 @@ parser.add_argument('--epochs', default=70, type=int, help='Number of training e
 parser.add_argument('--cuda', default=True, type=bool, help='Use cuda to train model')
 parser.add_argument('--lr', '--learning-rate', default=3e-4, type=float, help='initial learning rate')
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
+parser.add_argument('--max_norm', default=0.9, type=float, help='momentum')
 
 args = parser.parse_args()
 sample_rate = args.sample_rate
@@ -75,10 +76,10 @@ if args.cuda:
     targetBuffer = targetBuffer.cuda()
     hidden = hidden.cuda()
     cell = cell.cuda()
-
-optimizer = torch.optim.SGD(model.parameters(), args.lr,
+    
+parameters = model.parameters()
+optimizer = torch.optim.SGD(parameters, args.lr,
                             momentum=args.momentum)
-
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""
@@ -134,6 +135,9 @@ for epoch in xrange(args.epochs - 1):
         # compute gradient and do SGD step
         optimizer.zero_grad()
         loss.backward()
+        norm = parameters.grad.norm()
+        if norm > args.max_norm:
+          parameters.grad.mul_(args.max_norm / norm)
         optimizer.step()
 
         # measure elapsed time
