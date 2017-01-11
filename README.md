@@ -1,5 +1,14 @@
 # deepspeech.pytorch
 
+# TODO
+* Add validation via a second loader
+* Refactor code, add useful comments if necessary
+* Finalise tests for CTC calculations
+* Multi-gpu support, how do we get around passing hidden,cell states for data parallel?
+* Best path decoding then validation for WER/CER
+* Support LibriSpeech via multi-processed scripts
+* Sometimes gradients go boom, add inf check to prevent meter from measuring this (and going boom as well)
+
 Implementation of [Baidu Warp-CTC](https://github.com/baidu-research/warp-ctc) using pytorch.
 Creates a network based on the [DeepSpeech2](http://arxiv.org/pdf/1512.02595v1.pdf) architecture, trained with the CTC activation function.
 

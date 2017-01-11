@@ -1,10 +1,7 @@
 from collections import OrderedDict
 
-import torch
 import torch.nn as nn
 from torch.autograd import Variable
-
-from CTCLoss import ctc_loss
 
 
 class SequenceWise(nn.Container):
@@ -32,10 +29,10 @@ class BatchLSTM(nn.Container):
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.batch_norm_activate = batch_norm
+        self.batch_norm = SequenceWise(nn.BatchNorm1d(hidden_size))
         self.rnn = nn.LSTM(input_size=input_size, hidden_size=hidden_size,
                            bidirectional=bidirectional)
         self.num_directions = 2 if bidirectional else 1
-        self.batch_norm = SequenceWise(nn.BatchNorm1d(hidden_size))
 
     def forward(self, x, (h0, c0)):
         h0 = Variable(h0.data.resize_(1 * self.num_directions, x.size(1), self.hidden_size).zero_())

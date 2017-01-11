@@ -31,7 +31,7 @@ parser.add_argument('--epochs', default=70, type=int, help='Number of training e
 parser.add_argument('--cuda', default=True, type=bool, help='Use cuda to train model')
 parser.add_argument('--lr', '--learning-rate', default=3e-4, type=float, help='initial learning rate')
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
-parser.add_argument('--max_norm', default=0.9, type=float, help='momentum')
+parser.add_argument('--max_norm', default=400, type=int, help='Norm cutoff to prevent explosion of gradients')
 
 args = parser.parse_args()
 sample_rate = args.sample_rate
@@ -76,7 +76,7 @@ if args.cuda:
     targetBuffer = targetBuffer.cuda()
     hidden = hidden.cuda()
     cell = cell.cuda()
-    
+print(model)
 parameters = model.parameters()
 optimizer = torch.optim.SGD(parameters, args.lr,
                             momentum=args.momentum)
@@ -114,7 +114,6 @@ for epoch in xrange(args.epochs - 1):
                                 -1)  # Puts the data into the form of batch x channels x freq x time
         # TODO we could probably use the valid percentage to find out the real size
         label_lengths = Variable(torch.FloatTensor(data[2].get().astype(dtype=np.float32)).view(-1))
-
         # refresh the tape for input and cell states for the new epoch
         input = torch.FloatTensor(input.get().astype(dtype=np.float32))
         inputBuffer.resize_(input.size()).copy_(input)
@@ -128,16 +127,24 @@ for epoch in xrange(args.epochs - 1):
         cell = Variable(cell.data)
 
         out = model(input, hidden, cell)
-
-        sizes = Variable(torch.FloatTensor(out.size(1)).fill_(out.size(0)), requires_grad=False)
+        max_seq_length = out.size(0)
+        seq_percentage = torch.FloatTensor(data[3].get().astype(dtype=np.float32)).view(-1)
+        sizes = Variable(seq_percentage.mul_(int(out.size(0)) / 100))
         loss = ctc_loss(out, target, sizes, label_lengths)
+        loss = loss / input.size(0) # average the loss
         losses.update(loss.data[0], input.size(0))
         # compute gradient and do SGD step
         optimizer.zero_grad()
         loss.backward()
-        norm = parameters.grad.norm()
-        if norm > args.max_norm:
-          parameters.grad.mul_(args.max_norm / norm)
+
+        totalNorm = torch.FloatTensor([0])
+        for param in model.parameters():
+            param = Variable(param.data)
+            totalNorm.add_(param.norm().pow(2).data.cpu())
+        totalNorm = totalNorm.sqrt()
+        if totalNorm[0] > args.max_norm:
+            for param in model.parameters():
+                param.grad.mul_(args.max_norm / totalNorm[0])
         optimizer.step()
 
         # measure elapsed time
@@ -148,5 +155,5 @@ for epoch in xrange(args.epochs - 1):
               'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
               'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
               'Loss {loss.val:.4f} ({loss.avg:.4f})\t'.format(
-            epoch, i, train_loader.nbatches, batch_time=batch_time,
+            (epoch + 1), (i + 1), train_loader.nbatches, batch_time=batch_time,
             data_time=data_time, loss=losses))
