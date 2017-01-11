@@ -18,12 +18,12 @@ class CPU_CTC(Function):
         self.label_lens = label_lens
         act_lens = sizes
         acts = input.cpu().numpy()
-        act_lens = act_lens.numpy()
-        labels = target.numpy()
-        label_lens = label_lens.numpy()
+        act_lens = act_lens.cpu().numpy()
+        labels = target.cpu().numpy()
+        label_lens = label_lens.cpu().numpy()
         self.cost, self.grads = cpu_ctc_np(acts, act_lens, labels, label_lens)
         self.grads = torch.FloatTensor(self.grads)
-        self.cost = torch.FloatTensor(self.cost)
+        self.cost = torch.FloatTensor([torch.sum(torch.FloatTensor(self.cost))])
         if is_cuda:
             self.grads = self.grads.cuda()
             self.cost = self.cost.cuda()

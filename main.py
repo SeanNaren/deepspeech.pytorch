@@ -14,7 +14,7 @@ parser.add_argument('--noise_manifest', metavar='DIR',
 parser.add_argument('--train_manifest', metavar='DIR',
                     help='path to train manifest csv', default='train_manifest.csv')
 parser.add_argument('--sample_rate', default=16000, type=int, help='Sample rate')
-parser.add_argument('--batch_size', default=3, type=int, help='Batch size for training')
+parser.add_argument('--batch_size', default=20, type=int, help='Batch size for training')
 parser.add_argument('--max_transcript_length', default=1300, type=int, help='Maximum size of transcript in training')
 parser.add_argument('--frame_length', default=.02, type=float, help='Window size for spectrogram in seconds')
 parser.add_argument('--frame_stride', default=.01, type=float, help='Window stride for spectrogram in seconds')
@@ -26,7 +26,7 @@ parser.add_argument('--noise_max', default=1, type=float, help='Maximum noise to
 parser.add_argument('--hidden_size', default=200, type=int, help='Hidden size of RNNs')
 parser.add_argument('--hidden_layers', default=2, type=int, help='Number of RNN layers')
 parser.add_argument('--epochs', default=70, type=int, help='Number of training epochs')
-parser.add_argument('--cuda', default=False, type=Boolean, help='Use cuda to train model')
+parser.add_argument('--cuda', default=True, type=bool, help='Use cuda to train model')
 parser.add_argument('--lr', '--learning-rate', default=3e-4, type=float, help='initial learning rate')
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
 
@@ -68,7 +68,7 @@ inputBuffer = torch.FloatTensor()
 targetBuffer = torch.FloatTensor()
 
 if args.cuda:
-    model = torch.nn.DataParallel(model).cuda()
+    model = model.cuda()
     inputBuffer = inputBuffer.cuda()
     targetBuffer = targetBuffer.cuda()
     hidden = hidden.cuda()
@@ -77,21 +77,21 @@ if args.cuda:
 optimizer = torch.optim.SGD(model.parameters(), args.lr,
                             momentum=args.momentum)
 
-for x in xrange(args.epochs):
+for x in xrange(args.epochs - 1):
     model.train()
 
-    for i, (data, target) in enumerate(train_loader):
+    for i, (data) in enumerate(train_loader):
         input = data[0].reshape(minibatch_size, 1, spect_size,
                                 -1)  # Puts the data into the form of batch x channels x freq x time
         # TODO we could probably use the valid percentage to find out the real size
-        label_lengths = torch.FloatTensor(data[2].get().astype(dtype=np.float32))
+        label_lengths = Variable(torch.FloatTensor(data[2].get().astype(dtype=np.float32)).view(-1))
 
         # refresh the tape for input and cell states for the new epoch
         input = torch.FloatTensor(input.get().astype(dtype=np.float32))
-        inputBuffer.resizeAs(input).copy(input)
+        inputBuffer.resize_(input.size()).copy_(input)
         input = Variable(inputBuffer)
-        target = torch.FloatTensor(data[1].get().astype(dtype=np.float32))
-        targetBuffer.resizeAs(target).copy(target)
+        target = torch.FloatTensor(data[1].get().astype(dtype=np.float32)).view(-1)
+        targetBuffer.resize_(target.size()).copy_(target)
         target = Variable(targetBuffer)
 
         # refresh the tape for the hidden and cell states for the new epoch
@@ -102,7 +102,7 @@ for x in xrange(args.epochs):
 
         sizes = Variable(torch.FloatTensor(out.size(1)).fill_(out.size(0)), requires_grad=False)
         loss = ctc_loss(out, target, sizes, label_lengths)
-
+        print(x, loss)
         # compute gradient and do SGD step
         optimizer.zero_grad()
         loss.backward()
