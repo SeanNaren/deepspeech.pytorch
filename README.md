@@ -28,6 +28,7 @@ mkdir build
 cd build
 cmake ..
 make
+cd ../python
 sudo /home/<your.name>/anaconda2/bin/python setup.py install # e.g sudo /home/sean.narenthiran/anaconda2/bin/python setup.py install
 ```
 
