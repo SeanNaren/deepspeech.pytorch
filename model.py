@@ -27,10 +27,11 @@ class SequenceWise(nn.Container):
 
 
 class BatchLSTM(nn.Container):
-    def __init__(self, input_size, hidden_size, bidirectional=False):
+    def __init__(self, input_size, hidden_size, bidirectional=False, batch_norm=True):
         super(BatchLSTM, self).__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
+        self.batch_norm_activate = batch_norm
         self.rnn = nn.LSTM(input_size=input_size, hidden_size=hidden_size,
                            bidirectional=bidirectional)
         self.num_directions = 2 if bidirectional else 1
@@ -39,9 +40,10 @@ class BatchLSTM(nn.Container):
     def forward(self, x, (h0, c0)):
         h0 = Variable(h0.data.resize_(1 * self.num_directions, x.size(1), self.hidden_size).zero_())
         c0 = Variable(c0.data.resize_(1 * self.num_directions, x.size(1), self.hidden_size).zero_())
+        if self.batch_norm_activate:
+            x = self.batch_norm(x)
         x, _ = self.rnn(x, (h0, c0))
         x = x.view(x.size(0), x.size(1), 2, -1).sum(2).view(x.size(0), x.size(1), -1)
-        x = self.batch_norm(x)
         return x, (h0, c0)
 
 
@@ -64,7 +66,7 @@ class StateSequential(nn.Container):
 
 
 class DeepSpeech(nn.Container):
-    def __init__(self, num_classes=29, rnn_hidden_size=200, nb_layers=2, bidirectional=True):
+    def __init__(self, num_classes=29, rnn_hidden_size=400, nb_layers=4, bidirectional=True):
         super(DeepSpeech, self).__init__()
         rnn_input_size = 32 * 41
         self.rnn_hidden_size = rnn_hidden_size
@@ -78,7 +80,7 @@ class DeepSpeech(nn.Container):
         )
         rnns = []
         rnn = BatchLSTM(input_size=rnn_input_size, hidden_size=self.rnn_hidden_size,
-                        bidirectional=bidirectional)
+                        bidirectional=bidirectional, batch_norm=False)
         rnns.append(('0', rnn))
         for x in xrange(nb_layers - 1):
             rnn = BatchLSTM(input_size=rnn_hidden_size, hidden_size=self.rnn_hidden_size,
@@ -102,5 +104,5 @@ class DeepSpeech(nn.Container):
 
         x, _ = self.rnns(x, (hidden, cell))
 
-        x = self.fc(x) # seqLength x batch x features
+        x = self.fc(x)  # seqLength x batch x features
         return x

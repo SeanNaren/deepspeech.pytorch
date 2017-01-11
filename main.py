@@ -63,7 +63,7 @@ dataloader_config = dict(type="audio,transcription",
 
 train_loader = DataLoader(dataloader_config, be)
 
-model = DeepSpeech(rnn_hidden_size=args.hidden_size, nb_layers=args.hidden_layers)
+model = DeepSpeech(rnn_hidden_size=args.hidden_size, nb_layers=args.hidden_layers, num_classes=nout)
 hidden = Variable(torch.randn(2, minibatch_size, args.hidden_size))
 cell = Variable(torch.randn(2, minibatch_size, args.hidden_size))
 inputBuffer = torch.FloatTensor()
