@@ -7,6 +7,7 @@ from torch.autograd import Variable
 import argparse
 
 from CTCLoss import ctc_loss
+from decoder import ArgMaxDecoder
 from model import DeepSpeech
 
 parser = argparse.ArgumentParser(description='DeepSpeech pytorch params')
@@ -14,6 +15,8 @@ parser.add_argument('--noise_manifest', metavar='DIR',
                     help='path to noise manifest csv', default='noise_manifest.csv')
 parser.add_argument('--train_manifest', metavar='DIR',
                     help='path to train manifest csv', default='train_manifest.csv')
+parser.add_argument('--test_manifest', metavar='DIR',
+                    help='path to test manifest csv', default='test_manifest.csv')
 parser.add_argument('--sample_rate', default=16000, type=int, help='Sample rate')
 parser.add_argument('--batch_size', default=20, type=int, help='Batch size for training')
 parser.add_argument('--max_transcript_length', default=1300, type=int, help='Maximum size of transcript in training')
@@ -32,6 +35,26 @@ parser.add_argument('--cuda', default=True, type=bool, help='Use cuda to train m
 parser.add_argument('--lr', '--learning-rate', default=3e-4, type=float, help='initial learning rate')
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
 parser.add_argument('--max_norm', default=400, type=int, help='Norm cutoff to prevent explosion of gradients')
+
+
+class AverageMeter(object):
+    """Computes and stores the average and current value"""
+
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.val = 0
+        self.avg = 0
+        self.sum = 0
+        self.count = 0
+
+    def update(self, val, n=1):
+        self.val = val
+        self.sum += val * n
+        self.count += n
+        self.avg = self.sum / self.count
+
 
 def main():
     args = parser.parse_args()
@@ -52,14 +75,23 @@ def main():
     transcription_config = dict(alphabet=alphabet,
                                 max_length=args.max_transcript_length,
                                 pack_for_ctc=True)
-    dataloader_config = dict(type="audio,transcription",
-                             audio=audio_config,
-                             transcription=transcription_config,
-                             manifest_filename=args.train_manifest,
-                             macrobatch_size=be.bsz,
-                             minibatch_size=be.bsz)
-    train_loader = DataLoader(dataloader_config, be)
+    train_dataloader_config = dict(type="audio,transcription",
+                                   audio=audio_config,
+                                   transcription=transcription_config,
+                                   manifest_filename=args.train_manifest,
+                                   macrobatch_size=be.bsz,
+                                   minibatch_size=be.bsz)
+    test_dataloader_config = dict(type="audio,transcription",
+                                  audio=audio_config,
+                                  transcription=transcription_config,
+                                  manifest_filename=args.test_manifest,
+                                  macrobatch_size=be.bsz,
+                                  minibatch_size=be.bsz)
+    train_loader = DataLoader(train_dataloader_config, be)
+    test_loader = DataLoader(test_dataloader_config, be)
+
     model = DeepSpeech(rnn_hidden_size=args.hidden_size, nb_layers=args.hidden_layers, num_classes=nout)
+    decoder = ArgMaxDecoder(alphabet=alphabet)
     if args.cuda:
         model = model.cuda()
     print(model)
@@ -67,31 +99,14 @@ def main():
     optimizer = torch.optim.SGD(parameters, args.lr,
                                 momentum=args.momentum)
 
-    class AverageMeter(object):
-        """Computes and stores the average and current value"""
-
-        def __init__(self):
-            self.reset()
-
-        def reset(self):
-            self.val = 0
-            self.avg = 0
-            self.sum = 0
-            self.count = 0
-
-        def update(self, val, n=1):
-            self.val = val
-            self.sum += val * n
-            self.count += n
-            self.avg = self.sum / self.count
-
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
     for epoch in xrange(args.epochs - 1):
         model.train()
         end = time.time()
-        for i, (data) in enumerate(train_loader):
+        avg_loss = 0
+        for i, (data) in enumerate(train_loader):  # train
             # measure data loading time
             data_time.update(time.time() - end)
             input = data[0].reshape(minibatch_size, 1, spect_size,
@@ -111,25 +126,30 @@ def main():
                 cell = cell.cuda()
 
             out = model(input, hidden, cell)
+
             max_seq_length = out.size(0)
             seq_percentage = torch.FloatTensor(data[3].get().astype(dtype=np.float32)).view(-1)
-            sizes = Variable(seq_percentage.mul_(int(out.size(0)) / 100))
+            sizes = Variable(seq_percentage.mul_(int(max_seq_length) / 100))
+
             loss = ctc_loss(out, target, sizes, label_lengths)
             loss = loss / input.size(0)  # average the loss by minibatch
+            avg_loss = avg_loss + loss.data[0]
+
             losses.update(loss.data[0], input.size(0))
+
             # compute gradient
             optimizer.zero_grad()
             loss.backward()
 
             # rescale gradients if necessary
-            totalNorm = torch.FloatTensor([0])
+            total_norm = torch.FloatTensor([0])
             for param in model.parameters():
                 param = Variable(param.data).cpu()
-                totalNorm.add_(param.norm().pow(2).data)
-            totalNorm = totalNorm.sqrt()
-            if totalNorm[0] > args.max_norm:
+                total_norm.add_(param.norm().pow(2).data)
+            total_norm = total_norm.sqrt()
+            if total_norm[0] > args.max_norm:
                 for param in model.parameters():
-                    param.grad.mul_(args.max_norm / totalNorm[0])
+                    param.grad.mul_(args.max_norm / total_norm[0])
 
             # SGD step
             optimizer.step()
@@ -144,6 +164,59 @@ def main():
                   'Loss {loss.val:.4f} ({loss.avg:.4f})\t'.format(
                 (epoch + 1), (i + 1), train_loader.nbatches, batch_time=batch_time,
                 data_time=data_time, loss=losses))
+
+        avg_loss = avg_loss / train_loader.nbatches
+        print('Training Summary Epoch: [{0}]\t'
+              'Average Loss {loss:.3f}\t'.format(
+            (epoch + 1), loss=avg_loss))
+
+        avg_loss, total_cer, total_wer = 0, 0, 0
+        for i, (data) in enumerate(test_loader):  # test
+            input = data[0].reshape(minibatch_size, 1, spect_size,
+                                    -1)  # batch x channels x freq x time
+            label_lengths = Variable(torch.FloatTensor(data[2].get().astype(dtype=np.float32)).view(-1))
+
+            input = Variable(torch.FloatTensor(input.get().astype(dtype=np.float32)))
+            target = Variable(torch.FloatTensor(data[1].get().astype(dtype=np.float32)).view(-1))
+
+            hidden = Variable(torch.FloatTensor(2, minibatch_size, args.hidden_size))
+            cell = Variable(torch.FloatTensor(2, minibatch_size, args.hidden_size))
+
+            if args.cuda:
+                input = input.cuda()
+                target = target.cuda()
+                hidden = hidden.cuda()
+                cell = cell.cuda()
+
+            out = model(input, hidden, cell)
+
+            max_seq_length = out.size(0)
+            seq_percentage = torch.FloatTensor(data[3].get().astype(dtype=np.float32)).view(-1)
+            sizes = Variable(seq_percentage.mul_(int(max_seq_length) / 100))
+
+            loss = ctc_loss(out, target, sizes, label_lengths)
+            loss = loss / input.size(0)  # average the loss by minibatch
+            avg_loss = avg_loss + loss.data[0]
+
+            decoded_output = decoder.decode(out)
+            formatted_targets = target.view(minibatch_size, args.max_transcript_length)
+            target_strings = decoder.process_string(decoder.convert_to_string(formatted_targets))
+
+            for x in xrange(target_strings):
+                total_wer = total_wer + decoder.wer(decoded_output[x], target_strings[x])
+                total_cer = total_cer + decoder.cer(decoded_output[x], target_strings[x])
+
+        avg_loss = avg_loss / test_loader.nbatches
+        wer = total_wer / test_loader.ndata
+        cer = total_cer / test_loader.ndata
+
+        # We need to format the targets into actual sentences
+        print('Validation Summary Epoch: [{0}]\t'
+              'Average Loss {loss:.3f}\t'
+              'Average WER {wer:.0f}\t'
+              'Average CER {cer:.0f}\t'.format(
+            (epoch + 1), loss=avg_loss, wer=wer, cer=cer))
+
 
 if __name__ == '__main__':
     main()

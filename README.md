@@ -1,9 +1,7 @@
 # deepspeech.pytorch
 
 # TODO
-* Add validation via a second loader
 * Multi-gpu support, how do we get around passing hidden,cell states for data parallel?
-* Best path decoding then validation for WER/CER
 * Support LibriSpeech via multi-processed scripts
 * Sometimes gradients go boom, add inf check to prevent meter from measuring this (and going boom as well)
 * Similar convergence as to torch7 version on an4
@@ -40,6 +38,12 @@ cmake ..
 make
 cd ../python
 sudo /home/<your.name>/anaconda2/bin/python setup.py install # e.g sudo /home/sean.narenthiran/anaconda2/bin/python setup.py install
+```
+
+Finally:
+
+```
+pip install python-levenshtein
 ```
 
 # Usage
