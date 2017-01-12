@@ -1,7 +1,6 @@
 import time
 import torch
-from aeon import DataLoader
-from neon.backends import gen_backend
+from aeon import DataLoader, gen_backend
 import numpy as np
 from torch.autograd import Variable
 import argparse
