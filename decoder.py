@@ -41,7 +41,7 @@ class Decoder(object):
         "Given a numeric sequence, returns the corresponding string"
         strings = []
         for sequence in sequences:
-            strings.append(''.join([self.int_to_char[i[0]] for i in sequence]))
+            strings.append(''.join([self.int_to_char[i] for i in sequence]))
         return strings
 
     def process_string(self, sequences, remove_repetitions=False):
@@ -123,5 +123,5 @@ class ArgMaxDecoder(Decoder):
         repeated elements in the sequence, as well as blanks.
         """
         _, max_probs = torch.max(probs.transpose(0, 1), 2)
-        strings = self.convert_to_string(max_probs)
+        strings = self.convert_to_string(max_probs.view(max_probs.size(0), max_probs.size(1)))
         return self.process_string(strings, remove_repetitions=True)

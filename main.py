@@ -4,6 +4,7 @@ from aeon import DataLoader, gen_backend
 import numpy as np
 from torch.autograd import Variable
 import argparse
+import progressbar
 
 from CTCLoss import ctc_loss
 from decoder import ArgMaxDecoder
@@ -61,7 +62,7 @@ def main():
     alphabet = "_'ABCDEFGHIJKLMNOPQRSTUVWXYZ "
     nout = len(alphabet)
     spect_size = (args.frame_length * args.sample_rate / 2) + 1
-    be = gen_backend(batch_size=minibatch_size)
+    be = gen_backend()
     audio_config = dict(sample_freq_hz=args.sample_rate,
                         max_duration="%f seconds" % args.max_duration,
                         frame_length="%f seconds" % args.frame_length,
@@ -78,14 +79,17 @@ def main():
                                    audio=audio_config,
                                    transcription=transcription_config,
                                    manifest_filename=args.train_manifest,
-                                   macrobatch_size=be.bsz,
-                                   minibatch_size=be.bsz)
+                                   macrobatch_size=minibatch_size,
+                                   minibatch_size=minibatch_size)
+    transcription_config = dict(alphabet=alphabet,
+                                max_length=args.max_transcript_length,
+                                pack_for_ctc=False)
     test_dataloader_config = dict(type="audio,transcription",
                                   audio=audio_config,
                                   transcription=transcription_config,
                                   manifest_filename=args.test_manifest,
-                                  macrobatch_size=be.bsz,
-                                  minibatch_size=be.bsz)
+                                  macrobatch_size=minibatch_size,
+                                  minibatch_size=minibatch_size)
     train_loader = DataLoader(train_dataloader_config, be)
     test_loader = DataLoader(test_dataloader_config, be)
 
@@ -110,24 +114,19 @@ def main():
             data_time.update(time.time() - end)
             input = data[0].reshape(minibatch_size, 1, spect_size,
                                     -1)  # batch x channels x freq x time
-            label_lengths = Variable(torch.FloatTensor(data[2].get().astype(dtype=np.float32)).view(-1))
+            label_lengths = Variable(torch.FloatTensor(data[2].astype(dtype=np.float32)).view(-1))
 
-            input = Variable(torch.FloatTensor(input.get().astype(dtype=np.float32)))
-            target = Variable(torch.FloatTensor(data[1].get().astype(dtype=np.float32)).view(-1))
-
-            hidden = Variable(torch.FloatTensor(2, minibatch_size, args.hidden_size))
-            cell = Variable(torch.FloatTensor(2, minibatch_size, args.hidden_size))
+            input = Variable(torch.FloatTensor(input.astype(dtype=np.float32)))
+            target = Variable(torch.FloatTensor(data[1].astype(dtype=np.float32)).view(-1))
 
             if args.cuda:
                 input = input.cuda()
                 target = target.cuda()
-                hidden = hidden.cuda()
-                cell = cell.cuda()
 
-            out = model(input, hidden, cell)
+            out = model(input)
 
             max_seq_length = out.size(0)
-            seq_percentage = torch.FloatTensor(data[3].get().astype(dtype=np.float32)).view(-1)
+            seq_percentage = torch.FloatTensor(data[3].astype(dtype=np.float32)).view(-1)
             sizes = Variable(seq_percentage.mul_(int(max_seq_length) / 100))
 
             loss = ctc_loss(out, target, sizes, label_lengths)
@@ -169,52 +168,46 @@ def main():
               'Average Loss {loss:.3f}\t'.format(
             (epoch + 1), loss=avg_loss))
 
-        avg_loss, total_cer, total_wer = 0, 0, 0
+        total_cer, total_wer = 0, 0
+
         for i, (data) in enumerate(test_loader):  # test
             input = data[0].reshape(minibatch_size, 1, spect_size,
                                     -1)  # batch x channels x freq x time
-            label_lengths = Variable(torch.FloatTensor(data[2].get().astype(dtype=np.float32)).view(-1))
 
-            input = Variable(torch.FloatTensor(input.get().astype(dtype=np.float32)))
-            target = Variable(torch.FloatTensor(data[1].get().astype(dtype=np.float32)).view(-1))
-
-            hidden = Variable(torch.FloatTensor(2, minibatch_size, args.hidden_size))
-            cell = Variable(torch.FloatTensor(2, minibatch_size, args.hidden_size))
+            input = Variable(torch.FloatTensor(input.astype(dtype=np.float32)))
+            target = Variable(torch.FloatTensor(
+                data[1].astype(dtype=np.float32).reshape(args.max_transcript_length, minibatch_size, order='F').T))
 
             if args.cuda:
                 input = input.cuda()
                 target = target.cuda()
-                hidden = hidden.cuda()
-                cell = cell.cuda()
 
-            out = model(input, hidden, cell)
+            out = model(input)
 
-            max_seq_length = out.size(0)
-            seq_percentage = torch.FloatTensor(data[3].get().astype(dtype=np.float32)).view(-1)
-            sizes = Variable(seq_percentage.mul_(int(max_seq_length) / 100))
+            decoded_output = decoder.decode(out.data)
+            target_strings = decoder.process_string(decoder.convert_to_string(target.data))
+            wer, cer = 0, 0
+            for x in xrange(len(target_strings)):
+                wer += decoder.wer(decoded_output[x], target_strings[x])
+                cer += decoder.cer(decoded_output[x], target_strings[x])
+            total_cer += cer
+            total_wer += wer
+            batch_size = input.size(0)
+            wer = wer / batch_size
+            cer = cer / batch_size
 
-            loss = ctc_loss(out, target, sizes, label_lengths)
-            loss = loss / input.size(0)  # average the loss by minibatch
-            avg_loss = avg_loss + loss.data[0]
-
-            decoded_output = decoder.decode(out)
-            formatted_targets = target.view(minibatch_size, args.max_transcript_length)
-            target_strings = decoder.process_string(decoder.convert_to_string(formatted_targets))
-
-            for x in xrange(target_strings):
-                total_wer = total_wer + decoder.wer(decoded_output[x], target_strings[x])
-                total_cer = total_cer + decoder.cer(decoded_output[x], target_strings[x])
-
-        avg_loss = avg_loss / test_loader.nbatches
+            print('Validation Epoch: [{0}][{1}/{2}]\t'
+                  'Average WER {wer:.0f}\t'
+                  'Average CER {cer:.0f}\t'.format(
+                (epoch + 1), (i + 1), test_loader.nbatches, wer=wer, cer=cer))
         wer = total_wer / test_loader.ndata
         cer = total_cer / test_loader.ndata
 
         # We need to format the targets into actual sentences
         print('Validation Summary Epoch: [{0}]\t'
-              'Average Loss {loss:.3f}\t'
               'Average WER {wer:.0f}\t'
               'Average CER {cer:.0f}\t'.format(
-            (epoch + 1), loss=avg_loss, wer=wer, cer=cer))
+            (epoch + 1), wer=wer, cer=cer))
 
 
 if __name__ == '__main__':

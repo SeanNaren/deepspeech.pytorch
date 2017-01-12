@@ -1,5 +1,6 @@
 from collections import OrderedDict
 
+import torch
 import torch.nn as nn
 from torch.autograd import Variable
 
@@ -92,7 +93,10 @@ class DeepSpeech(nn.Container):
             SequenceWise(fully_connected),
         )
 
-    def forward(self, x, hidden, cell):
+    def forward(self, x):
+        hidden = Variable(torch.FloatTensor(2, x.size(0), self.rnn_hidden_size).type(type(x.data)))
+        cell = Variable(torch.FloatTensor(2, x.size(0), self.rnn_hidden_size).type(type(x.data)))
+
         x = self.conv(x)
 
         sizes = x.size()
