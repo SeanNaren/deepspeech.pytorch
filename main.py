@@ -4,7 +4,6 @@ from aeon import DataLoader, gen_backend
 import numpy as np
 from torch.autograd import Variable
 import argparse
-import progressbar
 
 from CTCLoss import ctc_loss
 from decoder import ArgMaxDecoder

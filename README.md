@@ -14,18 +14,19 @@ Creates a network based on the [DeepSpeech2](http://arxiv.org/pdf/1512.02595v1.p
 Several libraries are needed to be installed for training to work. I will assume that everything is being installed in
 an Anaconda installation on Ubuntu.
 
-The dataloader relies on Neon, as a result Neon has to be installed. Installation instructions can be seen [here](docs.continuum.io/anaconda/install) Instructions to install Neon for Anaconda/Ubuntu below:
-
-```
-sudo apt-get install libcurl4-openssl-dev clang libopencv-dev libsox-dev
-sudo apt-get install ffmpeg
-git clone https://github.com/NervanaSystems/neon.git
-cd neon && make sysinstall
-```
 
 Install pytorch if you haven't already:
 ```
 conda install pytorch -c https://conda.anaconda.org/t/6N-MsQ4WZ7jo/soumith
+```
+
+Install the Nervana Aeon dataloader. Installation instructions can be seen [here](https://aeon.nervanasys.com/index.html/getting_started.html) Instructions to install for Anaconda/Ubuntu below:
+
+```
+sudo apt-get install libcurl4-openssl-dev clang libopencv-dev libsox-dev
+git clone https://github.com/NervanaSystems/aeon.git
+cd aeon
+python setup.py install
 ```
 
 Install this fork for Warp-CTC bindings:
