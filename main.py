@@ -95,7 +95,7 @@ def main():
     model = DeepSpeech(rnn_hidden_size=args.hidden_size, nb_layers=args.hidden_layers, num_classes=nout)
     decoder = ArgMaxDecoder(alphabet=alphabet)
     if args.cuda:
-        model = model.cuda()
+        model = torch.nn.DataParallel(model).cuda()
     print(model)
     parameters = model.parameters()
     optimizer = torch.optim.SGD(parameters, args.lr,
@@ -130,9 +130,17 @@ def main():
 
             loss = ctc_loss(out, target, sizes, label_lengths)
             loss = loss / input.size(0)  # average the loss by minibatch
-            avg_loss = avg_loss + loss.data[0]
 
-            losses.update(loss.data[0], input.size(0))
+            loss_sum = loss.data.sum()
+            inf = float("inf")
+            if loss_sum == inf or loss_sum == -inf:
+                print("WARNING: received an inf loss, setting loss value to 0")
+                loss_value = 0
+            else:
+                loss_value = loss.data[0]
+
+            avg_loss = avg_loss + loss_value
+            losses.update(loss_value, input.size(0))
 
             # compute gradient
             optimizer.zero_grad()

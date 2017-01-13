@@ -66,7 +66,7 @@ class StateSequential(nn.Container):
 class DeepSpeech(nn.Container):
     def __init__(self, num_classes=29, rnn_hidden_size=400, nb_layers=4, bidirectional=True):
         super(DeepSpeech, self).__init__()
-        rnn_input_size = 32 * 41
+        rnn_input_size = 32 * 41  # TODO this is only for 16khz, work this out for any window_size/stride/sample_rate
         self.rnn_hidden_size = rnn_hidden_size
         self.conv = nn.Sequential(
             nn.Conv2d(1, 32, kernel_size=(41, 11), stride=(2, 2)),

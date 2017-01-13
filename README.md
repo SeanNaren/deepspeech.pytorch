@@ -1,10 +1,10 @@
 # deepspeech.pytorch
 
 # TODO
-* Multi-gpu support, how do we get around passing hidden,cell states for data parallel?
-* Support LibriSpeech via multi-processed scripts
-* Sometimes gradients go boom, add inf check to prevent meter from measuring this (and going boom as well)
 * Similar convergence as to torch7 version on an4
+* Sometimes gradients go boom, add inf check to prevent meter from measuring this (and going boom as well)
+* Support LibriSpeech via multi-processed scripts
+* Cleaner Warp-CTC bindings that does not rely on numpy
 
 Implementation of [Baidu Warp-CTC](https://github.com/baidu-research/warp-ctc) using pytorch.
 Creates a network based on the [DeepSpeech2](http://arxiv.org/pdf/1512.02595v1.pdf) architecture, trained with the CTC activation function.
