@@ -37,20 +37,20 @@ class Decoder(object):
         self.blank_index = blank_index
         self.space_index = space_index
 
-    def convert_to_string(self, sequences):
-        "Given a numeric sequence, returns the corresponding string"
+    def convert_to_strings(self, sequences):
+        """Given a list of numeric sequences, returns the corresponding strings"""
         strings = []
         for sequence in sequences:
             strings.append(''.join([self.int_to_char[i] for i in sequence]))
         return strings
 
-    def process_string(self, sequences, remove_repetitions=False):
+    def process_strings(self, sequences, remove_repetitions=False):
         """
-        Given a string, removes blanks and replace space character with space.
+        Given a list of strings, removes blanks and replace space character with space.
         Option to remove repetitions (e.g. 'abbca' -> 'abca').
 
         Arguments:
-            sequence (array of int): 1-d array of integers
+            sequences: list of 1-d array of integers
             remove_repetitions (boolean, optional): If true, repeating characters
                 are removed. Defaults to False.
         """
@@ -107,7 +107,7 @@ class Decoder(object):
         best guess of the transcription
 
         Arguments:
-            probs: Matrix of character probabilities, where probs[c,t]
+            probs: Tensor of character probabilities, where probs[c,t]
                             is the probability of character c at time t
         Returns:
             string: sequence of the model's best guess for the transcription
@@ -121,7 +121,10 @@ class ArgMaxDecoder(Decoder):
         """
         Returns the argmax decoding given the probability matrix. Removes
         repeated elements in the sequence, as well as blanks.
+
+        Arguments:
+            probs: Tensor of character probabilities from the network. Expected shape of seq_length x batch x output_dim
         """
         _, max_probs = torch.max(probs.transpose(0, 1), 2)
-        strings = self.convert_to_string(max_probs.view(max_probs.size(0), max_probs.size(1)))
-        return self.process_string(strings, remove_repetitions=True)
+        strings = self.convert_to_strings(max_probs.view(max_probs.size(0), max_probs.size(1)))
+        return self.process_strings(strings, remove_repetitions=True)

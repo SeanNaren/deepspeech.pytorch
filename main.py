@@ -184,7 +184,7 @@ def main():
             out = model(input)
 
             decoded_output = decoder.decode(out.data)
-            target_strings = decoder.process_string(decoder.convert_to_string(target.data))
+            target_strings = decoder.process_strings(decoder.convert_to_strings(target.data))
             wer, cer = 0, 0
             for x in xrange(len(target_strings)):
                 wer += decoder.wer(decoded_output[x], target_strings[x])
