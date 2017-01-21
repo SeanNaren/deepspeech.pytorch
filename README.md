@@ -2,7 +2,7 @@
 
 # TODO
 * Similar convergence as to torch7 version on an4
-* Sometimes gradients go boom, add inf check to prevent meter from measuring this (and going boom as well)
+* The WER and CER are really strange, a lot less higher than I was expecting.
 * Support LibriSpeech via multi-processed scripts
 * Cleaner Warp-CTC bindings that does not rely on numpy
 

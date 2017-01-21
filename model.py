@@ -5,7 +5,7 @@ import torch.nn as nn
 from torch.autograd import Variable
 
 
-class SequenceWise(nn.Container):
+class SequenceWise(nn.Module):
     def __init__(self, module):
         super(SequenceWise, self).__init__()
         self.module = module
@@ -24,50 +24,33 @@ class SequenceWise(nn.Container):
         return tmpstr
 
 
-class BatchLSTM(nn.Container):
+class BatchLSTM(nn.Module):
     def __init__(self, input_size, hidden_size, bidirectional=False, batch_norm=True):
         super(BatchLSTM, self).__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.batch_norm_activate = batch_norm
-        self.batch_norm = SequenceWise(nn.BatchNorm1d(hidden_size))
+        self.bidirectional = bidirectional
+        self.batch_norm = SequenceWise(nn.BatchNorm1d(input_size))
         self.rnn = nn.LSTM(input_size=input_size, hidden_size=hidden_size,
                            bidirectional=bidirectional)
         self.num_directions = 2 if bidirectional else 1
 
-    def forward(self, x, (h0, c0)):
-        h0 = Variable(h0.data.resize_(1 * self.num_directions, x.size(1), self.hidden_size).zero_())
-        c0 = Variable(c0.data.resize_(1 * self.num_directions, x.size(1), self.hidden_size).zero_())
+    def forward(self, x):
+        h0 = Variable(torch.zeros(self.num_directions, x.size(1), self.hidden_size).type(type(x.data)))
+        c0 = Variable(torch.zeros(self.num_directions, x.size(1), self.hidden_size).type(type(x.data)))
         if self.batch_norm_activate:
             x = self.batch_norm(x)
         x, _ = self.rnn(x, (h0, c0))
-        x = x.view(x.size(0), x.size(1), 2, -1).sum(2).view(x.size(0), x.size(1), -1)
-        return x, (h0, c0)
+        if self.bidirectional:
+            x = x.view(x.size(0), x.size(1), 2, -1).sum(2).view(x.size(0), x.size(1), -1)  # (TxNxD*2) -> (TxNxD) by sum
+        return x
 
 
-class StateSequential(nn.Container):
-    def __init__(self, *args):
-        super(StateSequential, self).__init__()
-        if len(args) == 1 and isinstance(args[0], OrderedDict):
-            for key, module in args[0].items():
-                self.add_module(key, module)
-        else:
-            idx = 0
-            for module in args:
-                self.add_module(str(idx), module)
-                idx += 1
-
-    def forward(self, input, (h0, c0)):
-        for module in self._modules.values():
-            input, (h0, c0) = module(input, (h0, c0))
-        return input, (h0, c0)
-
-
-class DeepSpeech(nn.Container):
+class DeepSpeech(nn.Module):
     def __init__(self, num_classes=29, rnn_hidden_size=400, nb_layers=4, bidirectional=True):
         super(DeepSpeech, self).__init__()
         rnn_input_size = 32 * 41  # TODO this is only for 16khz, work this out for any window_size/stride/sample_rate
-        self.rnn_hidden_size = rnn_hidden_size
         self.conv = nn.Sequential(
             nn.Conv2d(1, 32, kernel_size=(41, 11), stride=(2, 2)),
             nn.BatchNorm2d(32),
@@ -77,33 +60,30 @@ class DeepSpeech(nn.Container):
             nn.Hardtanh(0, 20, inplace=True)
         )
         rnns = []
-        rnn = BatchLSTM(input_size=rnn_input_size, hidden_size=self.rnn_hidden_size,
-                        bidirectional=bidirectional, batch_norm=False)
+        rnn = BatchLSTM(input_size=rnn_input_size, hidden_size=rnn_hidden_size,
+                        bidirectional=bidirectional)
         rnns.append(('0', rnn))
-        for x in xrange(nb_layers - 1):
-            rnn = BatchLSTM(input_size=rnn_hidden_size, hidden_size=self.rnn_hidden_size,
+        for x in range(nb_layers - 1):
+            rnn = BatchLSTM(input_size=rnn_hidden_size, hidden_size=rnn_hidden_size,
                             bidirectional=bidirectional)
             rnns.append(('%d' % (x + 1), rnn))
-        self.rnns = StateSequential(OrderedDict(rnns))
+        self.rnns = nn.Sequential(OrderedDict(rnns))
         fully_connected = nn.Sequential(
-            nn.BatchNorm1d(self.rnn_hidden_size),
-            nn.Linear(self.rnn_hidden_size, num_classes)
+            nn.BatchNorm1d(rnn_hidden_size),
+            nn.Linear(rnn_hidden_size, num_classes)
         )
         self.fc = nn.Sequential(
             SequenceWise(fully_connected),
         )
 
     def forward(self, x):
-        hidden = Variable(torch.FloatTensor(2, x.size(0), self.rnn_hidden_size).type(type(x.data)))
-        cell = Variable(torch.FloatTensor(2, x.size(0), self.rnn_hidden_size).type(type(x.data)))
-
         x = self.conv(x)
 
         sizes = x.size()
         x = x.view(sizes[0], sizes[1] * sizes[2], sizes[3])  # Collapse feature dimension
-        x = x.transpose(1, 2).transpose(0, 1)  # seqLength x batch x features
+        x = x.transpose(1, 2).transpose(0, 1).contiguous()  # seqLength x batch x features
 
-        x, _ = self.rnns(x, (hidden, cell))
+        x = self.rnns(x)
 
         x = self.fc(x)  # seqLength x batch x features
         return x

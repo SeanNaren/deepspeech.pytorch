@@ -2,7 +2,7 @@ import torch
 import unittest
 from torch.autograd import Variable
 
-from CTCLoss import ctc_loss
+from CTCLoss import CTC
 from decoder import ArgMaxDecoder
 
 precision = 1e-5
@@ -10,6 +10,7 @@ precision = 1e-5
 
 class TestCases(unittest.TestCase):
     def test_ctc(self):
+        ctc_loss = CTC()
         input = Variable(torch.FloatTensor([[[1, 2, 3, 4, 5], [6, 7, 8, 9, 10], [11, 12, 13, 14, 15]]]).transpose(0, 1))
         target = Variable(torch.FloatTensor([3, 3]))
         sizes = Variable(torch.FloatTensor(input.size(1)).fill_(input.size(0)))
@@ -44,7 +45,7 @@ class TestCases(unittest.TestCase):
                  [[0, 0, 0, 0, 0, 1], [0, 0, 0, 0, 0, 1], [0, 0, 0, 0, 0, 1]]])
                 .transpose(0, 1))  # seqLength x batch x outputDim
         decoder = ArgMaxDecoder(alphabet="_'ABCDEFGHIJKLMNOPQRSTUVWXYZ ")
-        decoded = decoder.decode(input.data)
+        decoded = decoder.decode(input.data, None)
         expected_decoding = ['BAD', 'D']
         self.assertItemsEqual(expected_decoding, decoded)
 
