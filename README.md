@@ -1,8 +1,7 @@
 # deepspeech.pytorch
 
 # TODO
-* Similar convergence as to torch7 version on an4
-* The WER and CER are really strange, a lot less higher than I was expecting.
+* Convergence on AN4 is not occurring. Suspect model implementation (transposes/views).
 * Support LibriSpeech via multi-processed scripts
 * Cleaner Warp-CTC bindings that does not rely on numpy
 

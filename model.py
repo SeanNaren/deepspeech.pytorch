@@ -6,12 +6,15 @@ from torch.autograd import Variable
 
 
 class SequenceWise(nn.Module):
-    def __init__(self, module):
+    def __init__(self, module, batch_first=False):
         super(SequenceWise, self).__init__()
         self.module = module
+        self.batch_first = batch_first
 
     def forward(self, x):
         sizes = x.size()
+        if not self.batch_first:
+            x = x.transpose(0, 1).contiguous()
         x = x.view(sizes[0] * sizes[1], -1)
         x = self.module(x)
         x = x.view(sizes[0], sizes[1], -1)
@@ -33,12 +36,12 @@ class BatchLSTM(nn.Module):
         self.bidirectional = bidirectional
         self.batch_norm = SequenceWise(nn.BatchNorm1d(input_size))
         self.rnn = nn.LSTM(input_size=input_size, hidden_size=hidden_size,
-                           bidirectional=bidirectional)
+                           bidirectional=bidirectional, bias=False)
         self.num_directions = 2 if bidirectional else 1
 
     def forward(self, x):
-        h0 = Variable(torch.zeros(self.num_directions, x.size(1), self.hidden_size).type(type(x.data)))
-        c0 = Variable(torch.zeros(self.num_directions, x.size(1), self.hidden_size).type(type(x.data)))
+        h0 = Variable(torch.zeros(self.num_directions, x.size(1), self.hidden_size).type_as(x.data))
+        c0 = Variable(torch.zeros(self.num_directions, x.size(1), self.hidden_size).type_as(x.data))
         if self.batch_norm_activate:
             x = self.batch_norm(x)
         x, _ = self.rnn(x, (h0, c0))
@@ -70,10 +73,10 @@ class DeepSpeech(nn.Module):
         self.rnns = nn.Sequential(OrderedDict(rnns))
         fully_connected = nn.Sequential(
             nn.BatchNorm1d(rnn_hidden_size),
-            nn.Linear(rnn_hidden_size, num_classes)
+            nn.Linear(rnn_hidden_size, num_classes, bias=False)
         )
         self.fc = nn.Sequential(
-            SequenceWise(fully_connected),
+            SequenceWise(fully_connected, batch_first=True),
         )
 
     def forward(self, x):
@@ -85,5 +88,5 @@ class DeepSpeech(nn.Module):
 
         x = self.rnns(x)
 
-        x = self.fc(x)  # seqLength x batch x features
+        x = self.fc(x)
         return x

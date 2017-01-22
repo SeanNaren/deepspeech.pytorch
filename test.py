@@ -18,7 +18,7 @@ parser.add_argument('--train_manifest', metavar='DIR',
 parser.add_argument('--test_manifest', metavar='DIR',
                     help='path to test manifest csv', default='test_manifest.csv')
 parser.add_argument('--sample_rate', default=16000, type=int, help='Sample rate')
-parser.add_argument('--batch_size', default=5, type=int, help='Batch size for training')
+parser.add_argument('--batch_size', default=20, type=int, help='Batch size for training')
 parser.add_argument('--max_transcript_length', default=1300, type=int, help='Maximum size of transcript in training')
 parser.add_argument('--frame_length', default=.02, type=float, help='Window size for spectrogram in seconds')
 parser.add_argument('--frame_stride', default=.01, type=float, help='Window stride for spectrogram in seconds')
@@ -36,7 +36,7 @@ parser.add_argument('--lr', '--learning-rate', default=3e-4, type=float, help='i
 parser.add_argument('--momentum', default=0.90, type=float, help='momentum')
 parser.add_argument('--max_norm', default=400, type=int, help='Norm cutoff to prevent explosion of gradients')
 
-iterations = 70
+iterations = 100
 
 
 class AverageMeter(object):
@@ -83,8 +83,8 @@ def main():
                         window_type=args.window,
                         noise_index_file=args.noise_manifest,
                         add_noise_probability=args.noise_probability,
-                        noise_level=(args.noise_min, args.noise_max)
-                        )
+                        noise_level=(args.noise_min, args.noise_max))
+
     transcription_config = dict(alphabet=alphabet,
                                 max_length=args.max_transcript_length,
                                 pack_for_ctc=True)
@@ -102,9 +102,10 @@ def main():
         label_lengths = Variable(torch.FloatTensor(data[2].astype(dtype=np.float32)).view(-1))
         input = data[0].reshape(int(minibatch_size), 1, int(spect_size),
                                 -1)  # batch x channels x freq x time
-        input = Variable(torch.FloatTensor(input.astype(dtype=np.float32)))
-        target = Variable(torch.FloatTensor(data[1].astype(dtype=np.float32)).view(
-            -1))
+        input = torch.FloatTensor(input.astype(dtype=np.float32))
+        input.div_(255 / 2).add_(-1)  # normalize spectrogram image
+        input = Variable(input)
+        target = Variable(torch.FloatTensor(data[1].astype(dtype=np.float32)).view(-1))
 
         if args.cuda:
             input = input.cuda()
@@ -134,8 +135,8 @@ def main():
         # rescale gradients if necessary
         total_norm = torch.FloatTensor([0])
         for param in model.parameters():
-            param = Variable(param.data).cpu()
-            total_norm.add_(param.norm().pow(2).data)
+            param = param.norm().pow(2).data.cpu()
+            total_norm.add_(param)
         total_norm = total_norm.sqrt()
         if total_norm[0] > args.max_norm:
             for param in model.parameters():
@@ -149,6 +150,7 @@ def main():
             (x + 1), 1, loss=loss_value))
     decoded_output = decoder.decode(out.data, sizes)
     print(decoded_output)
+
 
 if __name__ == '__main__':
     main()

@@ -4,6 +4,7 @@ from ctc import cpu_ctc_np
 from torch.autograd import Function
 from torch.nn import Module
 
+
 def _assert_no_grad(variable):
     assert not variable.requires_grad, \
         "nn criterions don't compute the gradient w.r.t. targets - please " \
@@ -35,7 +36,6 @@ class CPUCTC(Function):
 
 
 class CTC(Module):
-
     def __init__(self):
         super(CTC, self).__init__()
 

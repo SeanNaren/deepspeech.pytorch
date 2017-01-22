@@ -34,6 +34,7 @@ parser.add_argument('--cuda', default=True, type=bool, help='Use cuda to train m
 parser.add_argument('--lr', '--learning-rate', default=3e-4, type=float, help='initial learning rate')
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
 parser.add_argument('--max_norm', default=400, type=int, help='Norm cutoff to prevent explosion of gradients')
+parser.add_argument('--silent', default=True, type=bool, help='Turn off progress tracking per iteration')
 
 
 class AverageMeter(object):
@@ -110,13 +111,15 @@ def main():
         end = time.time()
         avg_loss = 0
         for i, (data) in enumerate(train_loader):  # train
+            if i == 1: break
             # measure data loading time
             data_time.update(time.time() - end)
             input = data[0].reshape(int(minibatch_size), 1, int(spect_size),
                                     -1)  # batch x channels x freq x time
+            input = torch.FloatTensor(input.astype(dtype=np.float32))
+            input.div_(255 / 2).add_(-1)  # normalize spectrogram image
+            input = Variable(input)
             label_lengths = Variable(torch.FloatTensor(data[2].astype(dtype=np.float32)).view(-1))
-
-            input = Variable(torch.FloatTensor(input.astype(dtype=np.float32)))
             target = Variable(torch.FloatTensor(data[1].astype(dtype=np.float32)).view(-1))
 
             if args.cuda:
@@ -150,8 +153,8 @@ def main():
             # rescale gradients if necessary
             total_norm = torch.FloatTensor([0])
             for param in model.parameters():
-                param = Variable(param.data).cpu()
-                total_norm.add_(param.norm().pow(2).data)
+                param = param.norm().pow(2).data.cpu()
+                total_norm.add_(param)
             total_norm = total_norm.sqrt()
             if total_norm[0] > args.max_norm:
                 for param in model.parameters():
@@ -163,13 +166,13 @@ def main():
             # measure elapsed time
             batch_time.update(time.time() - end)
             end = time.time()
-
-            print('Epoch: [{0}][{1}/{2}]\t'
-                  'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
-                  'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
-                  'Loss {loss.val:.4f} ({loss.avg:.4f})\t'.format(
-                (epoch + 1), (i + 1), train_loader.nbatches, batch_time=batch_time,
-                data_time=data_time, loss=losses))
+            if not args.silent:
+                print('Epoch: [{0}][{1}/{2}]\t'
+                      'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
+                      'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
+                      'Loss {loss.val:.4f} ({loss.avg:.4f})\t'.format(
+                    (epoch + 1), (i + 1), train_loader.nbatches, batch_time=batch_time,
+                    data_time=data_time, loss=losses))
 
         avg_loss = avg_loss / train_loader.nbatches
         print('Training Summary Epoch: [{0}]\t'
