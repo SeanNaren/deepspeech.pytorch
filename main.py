@@ -24,7 +24,7 @@ parser.add_argument('--frame_stride', default=.01, type=float, help='Window stri
 parser.add_argument('--max_duration', default=6.4, type=float,
                     help='The maximum duration of the training data in seconds')
 parser.add_argument('--window', default='hamming', help='Window type for spectrogram generation')
-parser.add_argument('--noise_probability', default=0.4, type=float, help='Window type for spectrogram generation')
+parser.add_argument('--noise_probability', default=0, type=float, help='Window type for spectrogram generation')
 parser.add_argument('--noise_min', default=0.5, type=float, help='Minimum noise to add')
 parser.add_argument('--noise_max', default=1, type=float, help='Maximum noise to add (1 is an SNR of 0 (pure noise)')
 parser.add_argument('--hidden_size', default=512, type=int, help='Hidden size of RNNs')
@@ -111,7 +111,7 @@ def main():
         end = time.time()
         avg_loss = 0
         for i, (data) in enumerate(train_loader):  # train
-            if i == 1: break
+            if i == 4: break
             # measure data loading time
             data_time.update(time.time() - end)
             input = data[0].reshape(int(minibatch_size), 1, int(spect_size),
@@ -143,7 +143,7 @@ def main():
             else:
                 loss_value = loss.data[0]
 
-            avg_loss = avg_loss + loss_value
+            avg_loss += loss_value
             losses.update(loss_value, input.size(0))
 
             # compute gradient
