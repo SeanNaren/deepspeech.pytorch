@@ -5,7 +5,7 @@ import numpy as np
 from torch.autograd import Variable
 import argparse
 
-from CTCLoss import CTC
+from warpctc_pytorch import CTCLoss
 from decoder import ArgMaxDecoder
 from model import DeepSpeech
 
@@ -34,6 +34,7 @@ parser.add_argument('--cuda', default=True, type=bool, help='Use cuda to train m
 parser.add_argument('--lr', '--learning-rate', default=3e-4, type=float, help='initial learning rate')
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
 parser.add_argument('--max_norm', default=400, type=int, help='Norm cutoff to prevent explosion of gradients')
+parser.add_argument('--learning_anneal', default=1.1, type=float, help='Annealing applied to learning rate every epoch')
 parser.add_argument('--silent', default=True, type=bool, help='Turn off progress tracking per iteration')
 
 
@@ -63,7 +64,7 @@ def main():
     nout = len(alphabet)
     spect_size = (args.frame_length * args.sample_rate / 2) + 1
     be = gen_backend()
-    criterion = CTC()
+    criterion = CTCLoss()
     audio_config = dict(sample_freq_hz=args.sample_rate,
                         max_duration="%f seconds" % args.max_duration,
                         frame_length="%f seconds" % args.frame_length,
@@ -82,6 +83,11 @@ def main():
                                    manifest_filename=args.train_manifest,
                                    macrobatch_size=minibatch_size,
                                    minibatch_size=minibatch_size)
+    audio_config = dict(sample_freq_hz=args.sample_rate,
+                        max_duration="%f seconds" % args.max_duration,
+                        frame_length="%f seconds" % args.frame_length,
+                        frame_stride="%f seconds" % args.frame_stride,
+                        window_type=args.window)
     transcription_config = dict(alphabet=alphabet,
                                 max_length=args.max_transcript_length,
                                 pack_for_ctc=False)
@@ -106,33 +112,35 @@ def main():
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
+    # TODO nervanas' data-loader weird, for now we store into memory, iterate through them. new data-loader in progress
+    batches = []
+    for i, (data) in enumerate(train_loader):
+        batches.append((i, data))
+
     for epoch in range(args.epochs - 1):
         model.train()
         end = time.time()
         avg_loss = 0
-        for i, (data) in enumerate(train_loader):  # train
-            if i == 4: break
+        for i, (data) in batches:  # train
             # measure data loading time
             data_time.update(time.time() - end)
             input = data[0].reshape(int(minibatch_size), 1, int(spect_size),
                                     -1)  # batch x channels x freq x time
-            input = torch.FloatTensor(input.astype(dtype=np.float32))
-            input.div_(255 / 2).add_(-1)  # normalize spectrogram image
-            input = Variable(input)
+            input = Variable(torch.FloatTensor(input.astype(dtype=np.float32)))
             label_lengths = Variable(torch.FloatTensor(data[2].astype(dtype=np.float32)).view(-1))
             target = Variable(torch.FloatTensor(data[1].astype(dtype=np.float32)).view(-1))
 
             if args.cuda:
                 input = input.cuda()
-                target = target.cuda()
 
             out = model(input)
+            out = out.transpose(0, 1)  # seqLength x batchSize x alphabet
 
             seq_length = out.size(0)
             seq_percentage = torch.FloatTensor(data[3].astype(dtype=np.float32)).view(-1)
             sizes = Variable(seq_percentage.mul_(int(seq_length)) / 100)
 
-            loss = criterion(out, target, sizes, label_lengths)
+            loss = criterion(out, target.int(), sizes.int(), label_lengths.int())
             loss = loss / input.size(0)  # average the loss by minibatch
 
             loss_sum = loss.data.sum()
@@ -179,38 +187,44 @@ def main():
               'Average Loss {loss:.3f}\t'.format(
             (epoch + 1), loss=avg_loss))
 
-        # total_cer, total_wer = 0, 0
-        # for i, (data) in enumerate(test_loader):  # test
-        #     input = data[0].reshape(int(minibatch_size), 1, int(spect_size),
-        #                             -1)  # batch x channels x freq x time
-        #
-        #     input = Variable(torch.FloatTensor(input.astype(dtype=np.float32)))
-        #     target = Variable(torch.FloatTensor(
-        #         data[1].astype(dtype=np.float32).reshape(args.max_transcript_length, minibatch_size, order='F').T))
-        #
-        #     if args.cuda:
-        #         input = input.cuda()
-        #         target = target.cuda()
-        #
-        #     out = model(input)
-        #
-        #     decoded_output = decoder.decode(out.data)
-        #     target_strings = decoder.process_strings(decoder.convert_to_strings(target.data))
-        #     wer, cer = 0, 0
-        #     for x in range(len(target_strings)):
-        #         wer += decoder.wer(decoded_output[x], target_strings[x])
-        #         cer += decoder.cer(decoded_output[x], target_strings[x])
-        #     total_cer += cer
-        #     total_wer += wer
-        #
-        # wer = total_wer / test_loader.ndata
-        # cer = total_cer / test_loader.ndata
-        #
-        # # We need to format the targets into actual sentences
-        # print('Validation Summary Epoch: [{0}]\t'
-        #       'Average WER {wer:.0f}\t'
-        #       'Average CER {cer:.0f}\t'.format(
-        #     (epoch + 1), wer=wer * 100, cer=cer * 100))
+        total_cer, total_wer = 0, 0
+        for i, (data) in enumerate(test_loader):  # test
+            input = data[0].reshape(int(minibatch_size), 1, int(spect_size),
+                                    -1)  # batch x channels x freq x time
+
+            input = Variable(torch.FloatTensor(input.astype(dtype=np.float32)))
+            target = Variable(torch.FloatTensor(
+                data[1].astype(dtype=np.float32).reshape(args.max_transcript_length, minibatch_size, order='F').T))
+
+            if args.cuda:
+                input = input.cuda()
+                target = target.cuda()
+
+            out = model(input)
+            out = out.transpose(0, 1)  # seqLength x batchSize x alphabet
+            seq_length = out.size(0)
+            seq_percentage = torch.FloatTensor(data[3].astype(dtype=np.float32)).view(-1)
+            sizes = Variable(seq_percentage.mul_(int(seq_length)) / 100)
+
+            decoded_output = decoder.decode(out.data, sizes)
+            target_strings = decoder.process_strings(decoder.convert_to_strings(target.data))
+            wer, cer = 0, 0
+            for x in range(len(target_strings)):
+                wer += decoder.wer(decoded_output[x], target_strings[x])
+                cer += decoder.cer(decoded_output[x], target_strings[x])
+            total_cer += cer
+            total_wer += wer
+
+        wer = total_wer / test_loader.ndata
+        cer = total_cer / test_loader.ndata
+
+        # We need to format the targets into actual sentences
+        print('Validation Summary Epoch: [{0}]\t'
+              'Average WER {wer:.0f}\t'
+              'Average CER {cer:.0f}\t'.format(
+            (epoch + 1), wer=wer * 100, cer=cer * 100))
+        decoded_output = decoder.decode(out.data, sizes)
+        print (decoded_output)
 
 
 if __name__ == '__main__':

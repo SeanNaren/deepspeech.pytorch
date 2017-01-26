@@ -1,7 +1,8 @@
 # deepspeech.pytorch
 
 # TODO
-* Convergence on AN4 is not occurring. Suspect model implementation (transposes/views).
+* Create data-loader separate from aeon. This is due to dependency and just some strange implementations that could be handled with some more pre-processing
+* WER/CER are not in line with what is expected
 * Support LibriSpeech via multi-processed scripts
 * Cleaner Warp-CTC bindings that does not rely on numpy
 
@@ -12,7 +13,6 @@ Creates a network based on the [DeepSpeech2](http://arxiv.org/pdf/1512.02595v1.p
 
 Several libraries are needed to be installed for training to work. I will assume that everything is being installed in
 an Anaconda installation on Ubuntu.
-
 
 Install pytorch if you haven't already:
 ```
@@ -30,14 +30,14 @@ python setup.py install
 
 Install this fork for Warp-CTC bindings:
 ```
-git clone https://github.com/SeanNaren/ctc.git
-cd ctc
-mkdir build
-cd build
+git clone https://github.com/SeanNaren/warp-ctc.git
+cd warp-ctc
+mkdir build; cd build
 cmake ..
 make
-cd ../python
-sudo /home/<your.name>/anaconda2/bin/python setup.py install # e.g sudo /home/sean.narenthiran/anaconda2/bin/python setup.py install
+export CUDA_HOME="/usr/local/cuda"
+cd pytorch_binding
+python setup.py install
 ```
 
 Finally:

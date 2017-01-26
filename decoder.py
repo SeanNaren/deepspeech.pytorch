@@ -37,7 +37,7 @@ class Decoder(object):
         self.blank_index = blank_index
         self.space_index = space_index
 
-    def convert_to_strings(self, sequences, sizes):
+    def convert_to_strings(self, sequences, sizes=None):
         """Given a list of numeric sequences, returns the corresponding strings"""
         strings = []
         for x in xrange(len(sequences)):
@@ -61,7 +61,7 @@ class Decoder(object):
         """
         processed_strings = []
         for sequence in sequences:
-            string = self.process_string(remove_repetitions, sequence)
+            string = self.process_string(remove_repetitions, sequence).strip()
             processed_strings.append(string)
         return processed_strings
 
@@ -109,7 +109,7 @@ class Decoder(object):
         """
         return Lev.distance(s1, s2)
 
-    def decode(self, probs, sizes):
+    def decode(self, probs, sizes=None):
         """
         Given a matrix of character probabilities, returns the decoder's
         best guess of the transcription
@@ -117,6 +117,7 @@ class Decoder(object):
         Arguments:
             probs: Tensor of character probabilities, where probs[c,t]
                             is the probability of character c at time t
+            sizes(optional): Size of each sequence in the mini-batch
         Returns:
             string: sequence of the model's best guess for the transcription
 
@@ -125,13 +126,16 @@ class Decoder(object):
 
 
 class ArgMaxDecoder(Decoder):
-    def decode(self, probs, sizes):
+    def decode(self, probs, sizes=None):
         """
         Returns the argmax decoding given the probability matrix. Removes
         repeated elements in the sequence, as well as blanks.
 
         Arguments:
             probs: Tensor of character probabilities from the network. Expected shape of seq_length x batch x output_dim
+            sizes(optional): Size of each sequence in the mini-batch
+        Returns:
+            strings: sequences of the model's best guess for the transcription on inputs
         """
         _, max_probs = torch.max(probs.transpose(0, 1), 2)
         strings = self.convert_to_strings(max_probs.view(max_probs.size(0), max_probs.size(1)), sizes)

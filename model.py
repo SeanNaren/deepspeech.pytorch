@@ -42,9 +42,10 @@ class BatchLSTM(nn.Module):
         h0 = Variable(torch.zeros(self.num_directions, x.size(1), self.hidden_size).type_as(x.data))
         if self.batch_norm_activate:
             t, n = x.size(0), x.size(1)
-            x = x.view(n, -1, t)
+            x = x.view(n * t, -1)
             x = self.batch_norm(x)
-            x = x.transpose(1, 2).transpose(0, 1)
+            x = x.view(t, n, -1)
+
             x = x.contiguous()
         x, _ = self.rnn(x, h0)
         if self.bidirectional:
@@ -66,7 +67,7 @@ class DeepSpeech(nn.Module):
         )
         rnns = []
         rnn = BatchLSTM(input_size=rnn_input_size, hidden_size=rnn_hidden_size,
-                        bidirectional=bidirectional, batch_norm=True)
+                        bidirectional=bidirectional, batch_norm=False)
         rnns.append(('0', rnn))
         for x in range(nb_layers - 1):
             rnn = BatchLSTM(input_size=rnn_hidden_size, hidden_size=rnn_hidden_size,
@@ -91,4 +92,5 @@ class DeepSpeech(nn.Module):
         x = self.rnns(x)
 
         x = self.fc(x)
+        x = x.transpose(0, 1)  # Transpose for multi-gpu concat
         return x
