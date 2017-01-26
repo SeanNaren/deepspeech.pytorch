@@ -40,7 +40,7 @@ def format_files(file_ids, new_transcript_path, new_wav_path, transcripts, wav_p
         with open(transcripts, 'r') as t:
             paths = f.readlines()
             transcripts = t.readlines()
-            for x in xrange(len(paths)):
+            for x in range(len(paths)):
                 path = wav_path + paths[x].strip() + '.wav'
                 filename = path.split('/')[-1]
                 extracted_transcript = process_transcript(transcripts, x)

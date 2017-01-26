@@ -37,12 +37,17 @@ class Decoder(object):
         self.blank_index = blank_index
         self.space_index = space_index
 
-    def convert_to_strings(self, sequences):
+    def convert_to_strings(self, sequences, sizes=None):
         """Given a list of numeric sequences, returns the corresponding strings"""
         strings = []
-        for sequence in sequences:
-            strings.append(''.join([self.int_to_char[i] for i in sequence]))
+        for x in xrange(len(sequences)):
+            string = self.convert_to_string(sequences[x])
+            string = string[0:int(sizes.data[x])] if sizes else string
+            strings.append(string)
         return strings
+
+    def convert_to_string(self, sequence):
+        return ''.join([self.int_to_char[i] for i in sequence])
 
     def process_strings(self, sequences, remove_repetitions=False):
         """
@@ -56,20 +61,23 @@ class Decoder(object):
         """
         processed_strings = []
         for sequence in sequences:
-            string = ''
-
-            for i, char in enumerate(sequence):
-                if char != self.int_to_char[self.blank_index]:
-                    # if this char is a repetition and remove_repetitions=true,
-                    # skip.
-                    if remove_repetitions and i != 0 and char == sequence[i - 1]:
-                        pass
-                    elif char == self.alphabet[self.space_index]:
-                        string += ' '
-                    else:
-                        string = string + char
+            string = self.process_string(remove_repetitions, sequence).strip()
             processed_strings.append(string)
         return processed_strings
+
+    def process_string(self, remove_repetitions, sequence):
+        string = ''
+        for i, char in enumerate(sequence):
+            if char != self.int_to_char[self.blank_index]:
+                # if this char is a repetition and remove_repetitions=true,
+                # skip.
+                if remove_repetitions and i != 0 and char == sequence[i - 1]:
+                    pass
+                elif char == self.alphabet[self.space_index]:
+                    string += ' '
+                else:
+                    string = string + char
+        return string
 
     def wer(self, s1, s2):
         """
@@ -101,7 +109,7 @@ class Decoder(object):
         """
         return Lev.distance(s1, s2)
 
-    def decode(self, probs):
+    def decode(self, probs, sizes=None):
         """
         Given a matrix of character probabilities, returns the decoder's
         best guess of the transcription
@@ -109,6 +117,7 @@ class Decoder(object):
         Arguments:
             probs: Tensor of character probabilities, where probs[c,t]
                             is the probability of character c at time t
+            sizes(optional): Size of each sequence in the mini-batch
         Returns:
             string: sequence of the model's best guess for the transcription
 
@@ -117,14 +126,17 @@ class Decoder(object):
 
 
 class ArgMaxDecoder(Decoder):
-    def decode(self, probs):
+    def decode(self, probs, sizes=None):
         """
         Returns the argmax decoding given the probability matrix. Removes
         repeated elements in the sequence, as well as blanks.
 
         Arguments:
             probs: Tensor of character probabilities from the network. Expected shape of seq_length x batch x output_dim
+            sizes(optional): Size of each sequence in the mini-batch
+        Returns:
+            strings: sequences of the model's best guess for the transcription on inputs
         """
         _, max_probs = torch.max(probs.transpose(0, 1), 2)
-        strings = self.convert_to_strings(max_probs.view(max_probs.size(0), max_probs.size(1)))
+        strings = self.convert_to_strings(max_probs.view(max_probs.size(0), max_probs.size(1)), sizes)
         return self.process_strings(strings, remove_repetitions=True)
