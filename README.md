@@ -13,10 +13,7 @@ Creates a network based on the [DeepSpeech2](http://arxiv.org/pdf/1512.02595v1.p
 Several libraries are needed to be installed for training to work. I will assume that everything is being installed in
 an Anaconda installation on Ubuntu.
 
-Install pytorch if you haven't already:
-```
-conda install pytorch -c https://conda.anaconda.org/t/6N-MsQ4WZ7jo/soumith
-```
+Install [PyTorch](https://github.com/pytorch/pytorch#installation) if you haven't already.
 
 Install this fork for Warp-CTC bindings:
 ```
