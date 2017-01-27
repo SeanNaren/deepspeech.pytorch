@@ -42,10 +42,9 @@ class BatchLSTM(nn.Module):
         h0 = Variable(torch.zeros(self.num_directions, x.size(1), self.hidden_size).type_as(x.data))
         if self.batch_norm_activate:
             t, n = x.size(0), x.size(1)
-            x = x.view(n * t, -1)
+            x = x.view(n, -1, t)
             x = self.batch_norm(x)
-            x = x.view(t, n, -1)
-
+            x = x.transpose(1, 2).transpose(0, 1)
             x = x.contiguous()
         x, _ = self.rnn(x, h0)
         if self.bidirectional:

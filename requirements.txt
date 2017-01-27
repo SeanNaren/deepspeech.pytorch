@@ -1,0 +1,3 @@
+python-levenshtein
+librosa
+torch
