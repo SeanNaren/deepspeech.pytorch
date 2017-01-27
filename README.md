@@ -2,7 +2,7 @@
 
 * Fix WER/CER measurements
 * Add tests for dataloading
-* Script to download an4 and create manifests
+* Script to download an4 and create manifests (streamline rather than 2 separate scripts)
 * Support LibriSpeech via multi-processed scripts
 
 Implementation of [Baidu Warp-CTC](https://github.com/baidu-research/warp-ctc) using pytorch.
@@ -33,8 +33,7 @@ python setup.py install
 Finally:
 
 ```
-pip install python-levenshtein
-pip install librosa
+pip install -r requirements.txt
 ```
 
 # Usage

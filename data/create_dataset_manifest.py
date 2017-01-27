@@ -3,7 +3,7 @@ import io
 import os
 
 parser = argparse.ArgumentParser(description='Creates training and testing manifests')
-parser.add_argument('--root_path', default='dataset', help='Path to the dataset')
+parser.add_argument('--root_path', default='an4_dataset', help='Path to the dataset')
 
 
 def create_manifest(data_path, tag):

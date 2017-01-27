@@ -7,7 +7,7 @@ from warpctc_pytorch import CTCLoss
 
 from decoder import ArgMaxDecoder
 from model import DeepSpeech
-from torchaudio.data_loader import AudioDataLoader, AudioDataset
+from data.data_loader import AudioDataLoader, AudioDataset
 
 parser = argparse.ArgumentParser(description='DeepSpeech pytorch params')
 parser.add_argument('--train_manifest', metavar='DIR',
