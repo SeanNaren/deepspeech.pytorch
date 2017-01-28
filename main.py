@@ -17,10 +17,10 @@ parser.add_argument('--test_manifest', metavar='DIR',
 parser.add_argument('--sample_rate', default=16000, type=int, help='Sample rate')
 parser.add_argument('--batch_size', default=20, type=int, help='Batch size for training')
 parser.add_argument('--num_workers', default=4, type=int, help='Number of workers used in dataloading')
-parser.add_argument('--frame_length', default=.02, type=float, help='Window size for spectrogram in seconds')
-parser.add_argument('--frame_stride', default=.01, type=float, help='Window stride for spectrogram in seconds')
+parser.add_argument('--window_size', default=.02, type=float, help='Window size for spectrogram in seconds')
+parser.add_argument('--window_stride', default=.01, type=float, help='Window stride for spectrogram in seconds')
 parser.add_argument('--window', default='hamming', help='Window type for spectrogram generation')
-parser.add_argument('--hidden_size', default=512, type=int, help='Hidden size of RNNs')
+parser.add_argument('--hidden_size', default=400, type=int, help='Hidden size of RNNs')
 parser.add_argument('--hidden_layers', default=4, type=int, help='Number of RNN layers')
 parser.add_argument('--epochs', default=70, type=int, help='Number of training epochs')
 parser.add_argument('--cuda', default=True, type=bool, help='Use cuda to train model')
@@ -56,25 +56,18 @@ def main():
     criterion = CTCLoss()
     alphabet = "_'ABCDEFGHIJKLMNOPQRSTUVWXYZ "
 
-    audio_config = dict(sample_rate=16000,
-                        window_size=0.02,
-                        window_stride=0.01,
-                        window_type='hamming',
-                        )
+    audio_conf = dict(sample_rate=args.sample_rate,
+                      window_size=args.window_size,
+                      window_stride=args.window_stride,
+                      window_type=args.window)
 
-    train_dataloader_config = dict(type="audio,transcription",
-                                   audio=audio_config,
-                                   manifest_filename=args.train_manifest,
-                                   alphabet=alphabet,
-                                   normalize=True)
-    test_dataloader_config = dict(type="audio,transcription",
-                                  audio=audio_config,
-                                  manifest_filename=args.test_manifest,
-                                  alphabet=alphabet,
-                                  normalize=True)
-    train_loader = AudioDataLoader(AudioDataset(train_dataloader_config), args.batch_size,
+    train_dataset = AudioDataset(audio_conf=audio_conf, manifest_filepath=args.train_manifest, alphabet=alphabet,
+                                 normalize=True)
+    test_dataset = AudioDataset(audio_conf=audio_conf, manifest_filepath=args.test_manifest, alphabet=alphabet,
+                                normalize=True)
+    train_loader = AudioDataLoader(train_dataset, batch_size=args.batch_size,
                                    num_workers=args.num_workers)
-    test_loader = AudioDataLoader(AudioDataset(test_dataloader_config), args.batch_size,
+    test_loader = AudioDataLoader(test_dataset, batch_size=args.batch_size,
                                   num_workers=args.num_workers)
 
     model = DeepSpeech(rnn_hidden_size=args.hidden_size, nb_layers=args.hidden_layers, num_classes=len(alphabet))
@@ -197,7 +190,6 @@ def main():
               'Average CER {cer:.0f}\t'.format(
             (epoch + 1), wer=wer * 100, cer=cer * 100))
         decoded_output = decoder.decode(out.data, sizes)
-        print (decoded_output)
 
 
 if __name__ == '__main__':
