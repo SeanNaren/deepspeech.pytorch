@@ -1,8 +1,7 @@
 # deepspeech.pytorch
 
-* Fix WER/CER measurements
 * Add tests for dataloading
-* Script to download an4 and create manifests (streamline rather than 2 separate scripts)
+* Fix validation. Assume problems with SequenceWise module and using batch norm in 3d mode.
 * Support LibriSpeech via multi-processed scripts
 
 Implementation of [Baidu Warp-CTC](https://github.com/baidu-research/warp-ctc) using pytorch.

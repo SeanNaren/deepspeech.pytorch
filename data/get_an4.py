@@ -3,8 +3,12 @@ import os
 import io
 import shutil
 
+import subprocess
+
+from data.utils import create_manifest
+
 parser = argparse.ArgumentParser(description='Processes and downloads an4.')
-parser.add_argument('--an4_path', default='dataset/', help='Path to save dataset')
+parser.add_argument('--an4_path', default='an4_dataset/', help='Path to save dataset')
 parser.add_argument('--sample_rate', default=16000, type=int, help='Sample rate')
 
 
@@ -62,13 +66,18 @@ def main():
     args = parser.parse_args()
     root_path = 'an4/'
     name = 'an4'
-    os.system('wget http://www.speech.cs.cmu.edu/databases/an4/an4_raw.bigendian.tar.gz')
-    os.system('tar -xzvf an4_raw.bigendian.tar.gz')
+    subprocess.call(['wget http://www.speech.cs.cmu.edu/databases/an4/an4_raw.bigendian.tar.gz'], shell=True)
+    subprocess.call(['tar -xzvf an4_raw.bigendian.tar.gz'], stdout=open(os.devnull, 'wb'), shell=True)
     os.makedirs(args.an4_path)
     format_data('train', name, 'an4_clstk')
     format_data('test', name, 'an4test_clstk')
     shutil.rmtree(root_path)
     os.remove('an4_raw.bigendian.tar.gz')
+    train_path = args.an4_path + '/train/'
+    test_path = args.an4_path + '/test/'
+    print ('Creating manifests...')
+    create_manifest(train_path, 'train')
+    create_manifest(test_path, 'test')
 
 
 if __name__ == '__main__':

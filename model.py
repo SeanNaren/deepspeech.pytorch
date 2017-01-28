@@ -34,11 +34,12 @@ class BatchLSTM(nn.Module):
         self.batch_norm_activate = batch_norm
         self.bidirectional = bidirectional
         self.batch_norm = nn.BatchNorm1d(input_size)
-        self.rnn = nn.GRU(input_size=input_size, hidden_size=hidden_size,
-                          bidirectional=bidirectional, bias=False)
+        self.rnn = nn.LSTM(input_size=input_size, hidden_size=hidden_size,
+                           bidirectional=bidirectional, bias=False)
         self.num_directions = 2 if bidirectional else 1
 
     def forward(self, x):
+        c0 = Variable(torch.zeros(self.num_directions, x.size(1), self.hidden_size).type_as(x.data))
         h0 = Variable(torch.zeros(self.num_directions, x.size(1), self.hidden_size).type_as(x.data))
         if self.batch_norm_activate:
             t, n = x.size(0), x.size(1)
@@ -46,7 +47,7 @@ class BatchLSTM(nn.Module):
             x = self.batch_norm(x)
             x = x.transpose(1, 2).transpose(0, 1)
             x = x.contiguous()
-        x, _ = self.rnn(x, h0)
+        x, _ = self.rnn(x, (c0, h0))
         if self.bidirectional:
             x = x.view(x.size(0), x.size(1), 2, -1).sum(2).view(x.size(0), x.size(1), -1)  # (TxNxD*2) -> (TxNxD) by sum
         return x

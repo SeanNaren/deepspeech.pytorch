@@ -11,9 +11,9 @@ from data.data_loader import AudioDataLoader, AudioDataset
 
 parser = argparse.ArgumentParser(description='DeepSpeech pytorch params')
 parser.add_argument('--train_manifest', metavar='DIR',
-                    help='path to train manifest csv', default='train_manifest.csv')
+                    help='path to train manifest csv', default='data/train_manifest.csv')
 parser.add_argument('--test_manifest', metavar='DIR',
-                    help='path to test manifest csv', default='test_manifest.csv')
+                    help='path to test manifest csv', default='data/test_manifest.csv')
 parser.add_argument('--sample_rate', default=16000, type=int, help='Sample rate')
 parser.add_argument('--batch_size', default=20, type=int, help='Batch size for training')
 parser.add_argument('--num_workers', default=4, type=int, help='Number of workers used in dataloading')
@@ -64,12 +64,12 @@ def main():
 
     train_dataloader_config = dict(type="audio,transcription",
                                    audio=audio_config,
-                                   manifest_filename='train_manifest.csv',
+                                   manifest_filename=args.train_manifest,
                                    alphabet=alphabet,
                                    normalize=True)
     test_dataloader_config = dict(type="audio,transcription",
                                   audio=audio_config,
-                                  manifest_filename='test_manifest.csv',
+                                  manifest_filename=args.test_manifest,
                                   alphabet=alphabet,
                                   normalize=True)
     train_loader = AudioDataLoader(AudioDataset(train_dataloader_config), args.batch_size,
@@ -183,8 +183,8 @@ def main():
             target_strings = decoder.process_strings(decoder.convert_to_strings(split_targets))
             wer, cer = 0, 0
             for x in range(len(target_strings)):
-                wer += decoder.wer(decoded_output[x], target_strings[x])
-                cer += decoder.cer(decoded_output[x], target_strings[x])
+                wer += decoder.wer(decoded_output[x], target_strings[x]) / float(len(target_strings[x].split()))
+                cer += decoder.cer(decoded_output[x], target_strings[x]) / float(len(target_strings[x]))
             total_cer += cer
             total_wer += wer
 
