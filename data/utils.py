@@ -1,4 +1,6 @@
 from __future__ import print_function
+
+import fnmatch
 import io
 import os
 
@@ -13,13 +15,15 @@ def _update_progress(progress):
 def create_manifest(data_path, tag, ordered=True):
     manifest_path = '%s_manifest.csv' % tag
     file_paths = []
-    size = int(subprocess.check_output(['find %s -type f -name "*.wav" | wc -l' % data_path], shell=True))
+    wav_files = [os.path.join(dirpath, f)
+                 for dirpath, dirnames, files in os.walk(data_path)
+                 for f in fnmatch.filter(files, '*.wav')]
+    size = len(wav_files)
     counter = 0
-    with os.popen('find %s -type f -name "*.wav"' % data_path) as pipe:
-        for file_path in pipe:
-            file_paths.append(file_path.strip())
-            counter += 1
-            _update_progress(counter / float(size))
+    for file_path in wav_files:
+        file_paths.append(file_path.strip())
+        counter += 1
+        _update_progress(counter / float(size))
     print('\n')
     if ordered:
         _order_files(file_paths)

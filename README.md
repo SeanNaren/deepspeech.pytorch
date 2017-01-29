@@ -1,10 +1,5 @@
 # deepspeech.pytorch
 
-* Add tests for dataloading
-* Support LibriSpeech via multi-processed scripts
-* Option to save model after epoch finished, save model at the end
-* Reload model, prediction script on input audio
-
 Implementation of [Baidu Warp-CTC](https://github.com/baidu-research/warp-ctc) using pytorch.
 Creates a network based on the [DeepSpeech2](http://arxiv.org/pdf/1512.02595v1.pdf) architecture, trained with the CTC activation function.
 
@@ -50,6 +45,6 @@ This will generate csv manifests files used to load the data for training.
 
 
 ```
-python main.py --train_manifest train_manifest.csv --test_manifest test_manifest.csv
+python train.py --train_manifest train_manifest.csv --val_manifest val_manifest.csv
 ```
 

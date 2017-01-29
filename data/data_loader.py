@@ -9,8 +9,24 @@ windows = {'hamming': scipy.signal.hamming, 'hann': scipy.signal.hann, 'blackman
            'bartlett': scipy.signal.bartlett}
 
 
-class AudioDataset(Dataset):
-    def __init__(self, audio_conf, manifest_filepath, alphabet, normalize=False):
+class AudioParser(object):
+    def parse_transcript(self, transcript_path):
+        """
+        :param transcript_path: Path where transcript is stored from the manifest file
+        :return: Transcript in training/testing format
+        """
+        raise NotImplementedError
+
+    def parse_audio(self, audio_path):
+        """
+        :param audio_path: Path where audio is stored from the manifest file
+        :return: Audio in training/testing format
+        """
+        raise NotImplementedError
+
+
+class SpectrogramDataset(Dataset, AudioParser):
+    def __init__(self, audio_conf, manifest_filepath, labels, normalize=False):
         """
         Dataset that loads tensors via a csv containing file paths to audio files and transcripts separated by
         a comma. Each new line is a different sample. Example below:
@@ -18,12 +34,12 @@ class AudioDataset(Dataset):
         /path/to/audio.wav,/path/to/audio.txt
         ...
 
-        :param audio_conf: Dictionary containing the sample rate, window type and the window length/stride in seconds
+        :param audio_conf: Dictionary containing the sample rate, window and the window length/stride in seconds
         :param manifest_filepath: Path to manifest csv as describe above
-        :param alphabet: String containing all the possible characters to map to
+        :param labels: String containing all the possible characters to map to
         :param normalize: Apply standard mean and deviation normalization to audio tensor
         """
-        super(AudioDataset, self).__init__()
+        super(SpectrogramDataset, self).__init__()
         with open(manifest_filepath) as f:
             ids = f.readlines()
         ids = [x.strip().split(',') for x in ids]
@@ -31,23 +47,23 @@ class AudioDataset(Dataset):
         self.size = len(ids)
         self.audio_conf = audio_conf
         self.window = windows.get(audio_conf['window'], windows['hamming'])
-        self.alphabet_map = dict([(alphabet[i], i) for i in range(len(alphabet))])
+        self.labels_map = dict([(labels[i], i) for i in range(len(labels))])
         self.normalize = normalize
 
     def __getitem__(self, index):
         sample = self.ids[index]
         audio_path, transcript_path = sample[0], sample[1]
-        spect = self._spectrogram(audio_path)
-        transcript = self._parse_transcript(transcript_path)
+        spect = self.parse_audio(audio_path)
+        transcript = self.parse_transcript(transcript_path)
         return spect, transcript
 
-    def _parse_transcript(self, transcript_path):
+    def parse_transcript(self, transcript_path):
         with open(transcript_path, 'r') as transcript_file:
             transcript = transcript_file.read().replace('\n', '')
-        transcript = [self.alphabet_map[x] for x in list(transcript)]
+        transcript = [self.labels_map[x] for x in list(transcript)]
         return transcript
 
-    def _spectrogram(self, audio_path):
+    def parse_audio(self, audio_path):
         y, _ = librosa.core.load(audio_path, sr=self.audio_conf['sample_rate'])
         n_fft = int(self.audio_conf['sample_rate'] * self.audio_conf['window_size'])
         win_length = n_fft

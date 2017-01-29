@@ -7,13 +7,13 @@ from warpctc_pytorch import CTCLoss
 
 from decoder import ArgMaxDecoder
 from model import DeepSpeech
-from data.data_loader import AudioDataLoader, AudioDataset
+from data.data_loader import AudioDataLoader, SpectrogramDataset
 
 parser = argparse.ArgumentParser(description='DeepSpeech pytorch params')
 parser.add_argument('--train_manifest', metavar='DIR',
                     help='path to train manifest csv', default='data/train_manifest.csv')
-parser.add_argument('--test_manifest', metavar='DIR',
-                    help='path to test manifest csv', default='data/test_manifest.csv')
+parser.add_argument('--val_manifest', metavar='DIR',
+                    help='path to validation manifest csv', default='data/val_manifest.csv')
 parser.add_argument('--sample_rate', default=16000, type=int, help='Sample rate')
 parser.add_argument('--batch_size', default=20, type=int, help='Batch size for training')
 parser.add_argument('--num_workers', default=4, type=int, help='Number of workers used in dataloading')
@@ -54,24 +54,24 @@ def main():
     args = parser.parse_args()
 
     criterion = CTCLoss()
-    alphabet = "_'ABCDEFGHIJKLMNOPQRSTUVWXYZ "
+    labels = "_'ABCDEFGHIJKLMNOPQRSTUVWXYZ "
 
     audio_conf = dict(sample_rate=args.sample_rate,
                       window_size=args.window_size,
                       window_stride=args.window_stride,
-                      window_type=args.window)
+                      window=args.window)
 
-    train_dataset = AudioDataset(audio_conf=audio_conf, manifest_filepath=args.train_manifest, alphabet=alphabet,
-                                 normalize=True)
-    test_dataset = AudioDataset(audio_conf=audio_conf, manifest_filepath=args.test_manifest, alphabet=alphabet,
-                                normalize=True)
+    train_dataset = SpectrogramDataset(audio_conf=audio_conf, manifest_filepath=args.train_manifest, labels=labels,
+                                       normalize=True)
+    test_dataset = SpectrogramDataset(audio_conf=audio_conf, manifest_filepath=args.val_manifest, labels=labels,
+                                      normalize=True)
     train_loader = AudioDataLoader(train_dataset, batch_size=args.batch_size,
                                    num_workers=args.num_workers)
     test_loader = AudioDataLoader(test_dataset, batch_size=args.batch_size,
                                   num_workers=args.num_workers)
 
-    model = DeepSpeech(rnn_hidden_size=args.hidden_size, nb_layers=args.hidden_layers, num_classes=len(alphabet))
-    decoder = ArgMaxDecoder(alphabet=alphabet)
+    model = DeepSpeech(rnn_hidden_size=args.hidden_size, nb_layers=args.hidden_layers, num_classes=len(labels))
+    decoder = ArgMaxDecoder(labels=labels)
     if args.cuda:
         model = torch.nn.DataParallel(model).cuda()
     print(model)
@@ -83,7 +83,7 @@ def main():
     data_time = AverageMeter()
     losses = AverageMeter()
 
-    for epoch in range(args.epochs - 1):
+    for epoch in range(args.epochs):
         model.train()
         end = time.time()
         avg_loss = 0
@@ -99,7 +99,7 @@ def main():
                 inputs = inputs.cuda()
 
             out = model(inputs)
-            out = out.transpose(0, 1)  # seqLength x batchSize x alphabet
+            out = out.transpose(0, 1)  # TxNxH
 
             seq_length = out.size(0)
             sizes = Variable(input_percentages.mul_(int(seq_length)).int())
@@ -168,7 +168,7 @@ def main():
                 inputs = inputs.cuda()
 
             out = model(inputs)
-            out = out.transpose(0, 1)  # seqLength x batchSize x alphabet
+            out = out.transpose(0, 1)  # TxNxH
             seq_length = out.size(0)
             sizes = Variable(input_percentages.mul_(int(seq_length)).int())
 
@@ -184,12 +184,10 @@ def main():
         wer = total_wer / len(test_loader.dataset)
         cer = total_cer / len(test_loader.dataset)
 
-        # We need to format the targets into actual sentences
         print('Validation Summary Epoch: [{0}]\t'
               'Average WER {wer:.0f}\t'
               'Average CER {cer:.0f}\t'.format(
             (epoch + 1), wer=wer * 100, cer=cer * 100))
-        decoded_output = decoder.decode(out.data, sizes)
 
 
 if __name__ == '__main__':
