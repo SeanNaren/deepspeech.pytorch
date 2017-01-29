@@ -1,15 +1,18 @@
 import argparse
+import errno
+import json
+import os
 import time
 
 import torch
 from torch.autograd import Variable
 from warpctc_pytorch import CTCLoss
 
+from data.data_loader import AudioDataLoader, SpectrogramDataset
 from decoder import ArgMaxDecoder
 from model import DeepSpeech
-from data.data_loader import AudioDataLoader, SpectrogramDataset
 
-parser = argparse.ArgumentParser(description='DeepSpeech pytorch params')
+parser = argparse.ArgumentParser(description='DeepSpeech training')
 parser.add_argument('--train_manifest', metavar='DIR',
                     help='path to train manifest csv', default='data/train_manifest.csv')
 parser.add_argument('--val_manifest', metavar='DIR',
@@ -17,6 +20,7 @@ parser.add_argument('--val_manifest', metavar='DIR',
 parser.add_argument('--sample_rate', default=16000, type=int, help='Sample rate')
 parser.add_argument('--batch_size', default=20, type=int, help='Batch size for training')
 parser.add_argument('--num_workers', default=4, type=int, help='Number of workers used in dataloading')
+parser.add_argument('--labels_path', default='labels.json', help='Contains all characters for prediction')
 parser.add_argument('--window_size', default=.02, type=float, help='Window size for spectrogram in seconds')
 parser.add_argument('--window_stride', default=.01, type=float, help='Window stride for spectrogram in seconds')
 parser.add_argument('--window', default='hamming', help='Window type for spectrogram generation')
@@ -29,6 +33,10 @@ parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
 parser.add_argument('--max_norm', default=400, type=int, help='Norm cutoff to prevent explosion of gradients')
 parser.add_argument('--learning_anneal', default=1.1, type=float, help='Annealing applied to learning rate every epoch')
 parser.add_argument('--silent', default=True, type=bool, help='Turn off progress tracking per iteration')
+parser.add_argument('--epoch_save', default=False, type=bool, help='Save model every epoch')
+parser.add_argument('--save_folder', default='models/', help='Location to save epoch models')
+parser.add_argument('--final_model_path', default='models/deepspeech_final.pth.tar',
+                    help='Location to save final model')
 
 
 class AverageMeter(object):
@@ -50,11 +58,31 @@ class AverageMeter(object):
         self.avg = self.sum / self.count
 
 
+def checkpoint(model, args, nout, epoch=None):
+    package = {
+        'epoch': epoch if epoch else 'N/A',
+        'hidden_size': args.hidden_size,
+        'hidden_layers': args.hidden_layers,
+        'nout': nout,
+        'state_dict': model.state_dict(),
+    }
+    return package
+
+
 def main():
     args = parser.parse_args()
-
+    save_folder = args.save_folder
+    try:
+        os.makedirs(save_folder)
+    except OSError as e:
+        if e.errno == errno.EEXIST:
+            print('Directory already exists.')
+        else:
+            raise
     criterion = CTCLoss()
-    labels = "_'ABCDEFGHIJKLMNOPQRSTUVWXYZ "
+
+    with open(args.labels_path) as label_file:
+        labels = str(''.join(json.load(label_file)))
 
     audio_conf = dict(sample_rate=args.sample_rate,
                       window_size=args.window_size,
@@ -71,7 +99,7 @@ def main():
                                   num_workers=args.num_workers)
 
     model = DeepSpeech(rnn_hidden_size=args.hidden_size, nb_layers=args.hidden_layers, num_classes=len(labels))
-    decoder = ArgMaxDecoder(labels=labels)
+    decoder = ArgMaxDecoder(labels)
     if args.cuda:
         model = torch.nn.DataParallel(model).cuda()
     print(model)
@@ -188,6 +216,10 @@ def main():
               'Average WER {wer:.0f}\t'
               'Average CER {cer:.0f}\t'.format(
             (epoch + 1), wer=wer * 100, cer=cer * 100))
+        if args.epoch_save:
+            file_path = '%s/deepspeech_%d.pth.tar' % (save_folder, epoch)
+            torch.save(checkpoint(model, args, len(labels), epoch), file_path)
+    torch.save(checkpoint(model, args, len(labels)), args.final_model_path)
 
 
 if __name__ == '__main__':
