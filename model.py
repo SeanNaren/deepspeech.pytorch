@@ -1,9 +1,7 @@
+import math
 from collections import OrderedDict
 
-import torch
 import torch.nn as nn
-from torch.autograd import Variable
-import math
 
 
 class SequenceWise(nn.Module):
@@ -37,20 +35,17 @@ class BatchLSTM(nn.Module):
         self.hidden_size = hidden_size
         self.batch_norm_activate = batch_norm
         self.bidirectional = bidirectional
-        self.batch_norm = nn.Sequential(
+        self.batch_norm = SequenceWise(nn.Sequential(
             nn.Linear(input_size, hidden_size, bias=False),
-            SequenceWise(nn.BatchNorm1d(hidden_size))
-        )
+            nn.BatchNorm1d(hidden_size)))
         self.rnn = nn.LSTM(input_size=hidden_size if batch_norm else input_size, hidden_size=hidden_size,
-                           bidirectional=bidirectional, bias=False, skip_input=batch_norm)
+                           bidirectional=bidirectional, bias=False)
         self.num_directions = 2 if bidirectional else 1
 
     def forward(self, x):
-        c0 = Variable(torch.zeros(self.num_directions, x.size(1), self.hidden_size).type_as(x.data))
-        h0 = Variable(torch.zeros(self.num_directions, x.size(1), self.hidden_size).type_as(x.data))
         if self.batch_norm_activate:
             x = self.batch_norm(x)
-        x, _ = self.rnn(x, (c0, h0))
+        x, _ = self.rnn(x)
         if self.bidirectional:
             x = x.view(x.size(0), x.size(1), 2, -1).sum(2).view(x.size(0), x.size(1), -1)  # (TxNxH*2) -> (TxNxH) by sum
         return x

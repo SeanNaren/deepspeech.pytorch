@@ -61,3 +61,4 @@ The first path is to the audio file, and the second path is to a text file conta
 python train.py --train_manifest data/train_manifest.csv --val_manifest data/val_manifest.csv
 ```
 
+Use `python train.py --help` for more parameters and options.

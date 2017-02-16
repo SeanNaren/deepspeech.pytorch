@@ -32,7 +32,7 @@ parser.add_argument('--lr', '--learning-rate', default=3e-4, type=float, help='i
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
 parser.add_argument('--max_norm', default=400, type=int, help='Norm cutoff to prevent explosion of gradients')
 parser.add_argument('--learning_anneal', default=1.1, type=float, help='Annealing applied to learning rate every epoch')
-parser.add_argument('--silent', default=True, type=bool, help='Turn off progress tracking per iteration')
+parser.add_argument('--silent', default=False, type=bool, help='Turn off progress tracking per iteration')
 parser.add_argument('--epoch_save', default=False, type=bool, help='Save model every epoch')
 parser.add_argument('--save_folder', default='models/', help='Location to save epoch models')
 parser.add_argument('--final_model_path', default='models/deepspeech_final.pth.tar',
