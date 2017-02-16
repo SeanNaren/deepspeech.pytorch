@@ -25,15 +25,15 @@ class Decoder(object):
     helper functions. Subclasses should implement the decode() method.
 
     Arguments:
-        alphabet (string): mapping from integers to characters.
+        labels (string): mapping from integers to characters.
         blank_index (int, optional): index for the blank '_' character. Defaults to 0.
         space_index (int, optional): index for the space ' ' character. Defaults to 28.
     """
 
-    def __init__(self, alphabet, blank_index=0, space_index=1):
-        # e.g. alphabet = "_'ABCDEFGHIJKLMNOPQRSTUVWXYZ#"
-        self.alphabet = alphabet
-        self.int_to_char = dict([(i, c) for (i, c) in enumerate(alphabet)])
+    def __init__(self, labels, blank_index=0, space_index=1):
+        # e.g. labels = "_'ABCDEFGHIJKLMNOPQRSTUVWXYZ#"
+        self.labels = labels
+        self.int_to_char = dict([(i, c) for (i, c) in enumerate(labels)])
         self.blank_index = blank_index
         self.space_index = space_index
 
@@ -73,7 +73,7 @@ class Decoder(object):
                 # skip.
                 if remove_repetitions and i != 0 and char == sequence[i - 1]:
                     pass
-                elif char == self.alphabet[self.space_index]:
+                elif char == self.labels[self.space_index]:
                     string += ' '
                 else:
                     string = string + char

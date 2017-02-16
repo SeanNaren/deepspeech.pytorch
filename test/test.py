@@ -12,7 +12,7 @@ class TestCases(unittest.TestCase):
                 [[[0, 0, 0, 1, 0, 0], [0, 0, 1, 0, 0, 0], [0, 0, 0, 0, 0, 1]],
                  [[0, 0, 0, 0, 0, 1], [0, 0, 0, 0, 0, 1], [0, 0, 0, 0, 0, 1]]])
                 .transpose(0, 1))  # seqLength x batch x outputDim
-        decoder = ArgMaxDecoder(alphabet="_'ABCDEFGHIJKLMNOPQRSTUVWXYZ ")
+        decoder = ArgMaxDecoder(labels="_'ABCDEFGHIJKLMNOPQRSTUVWXYZ ")
         decoded = decoder.decode(input.data, None)
         expected_decoding = ['BAD', 'D']
         self.assertItemsEqual(expected_decoding, decoded)
