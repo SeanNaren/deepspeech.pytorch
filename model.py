@@ -39,7 +39,7 @@ class BatchLSTM(nn.Module):
             nn.Linear(input_size, hidden_size, bias=False),
             nn.BatchNorm1d(hidden_size)))
         self.rnn = nn.LSTM(input_size=hidden_size if batch_norm else input_size, hidden_size=hidden_size,
-                           bidirectional=bidirectional, bias=False, skip_input=batch_norm)
+                           bidirectional=bidirectional, bias=False)
         self.num_directions = 2 if bidirectional else 1
 
     def forward(self, x):
