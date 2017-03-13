@@ -105,7 +105,7 @@ def main():
     print(model)
     parameters = model.parameters()
     optimizer = torch.optim.SGD(parameters, lr=args.lr,
-                                momentum=args.momentum)
+                                momentum=args.momentum, nesterov=True)
 
     batch_time = AverageMeter()
     data_time = AverageMeter()
