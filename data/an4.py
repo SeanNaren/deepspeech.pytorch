@@ -5,7 +5,7 @@ import shutil
 
 import subprocess
 
-from data.utils import create_manifest
+from utils import create_manifest
 
 parser = argparse.ArgumentParser(description='Processes and downloads an4.')
 parser.add_argument('--an4_path', default='an4_dataset/', help='Path to save dataset')
@@ -53,7 +53,7 @@ def _format_files(file_ids, new_transcript_path, new_wav_path, transcripts, wav_
                 new_path = new_wav_path + filename
                 text_path = new_transcript_path + filename.replace('.wav', '.txt')
                 with io.FileIO(text_path, "w") as file:
-                    file.write(extracted_transcript)
+                    file.write(extracted_transcript.encode('utf-8'))
                 os.rename(current_path, new_path)
 
 
