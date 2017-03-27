@@ -11,6 +11,7 @@ from warpctc_pytorch import CTCLoss
 from data.data_loader import AudioDataLoader, SpectrogramDataset
 from decoder import ArgMaxDecoder
 from model import DeepSpeech
+from visdom import Visdom
 
 parser = argparse.ArgumentParser(description='DeepSpeech training')
 parser.add_argument('--train_manifest', metavar='DIR',
@@ -110,6 +111,11 @@ def main():
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
+    viz = Visdom()
+    loss_window, cer_window, wer_window = None, None, None
+    loss_results, cer_results, wer_results = torch.Tensor(args.epochs), torch.Tensor(args.epochs), torch.Tensor(
+        args.epochs)
+    epochs = torch.range(1, args.epochs)
 
     for epoch in range(args.epochs):
         model.train()
@@ -175,9 +181,10 @@ def main():
                     data_time=data_time, loss=losses))
 
         avg_loss /= len(train_loader)
+        epoch += 1
         print('Training Summary Epoch: [{0}]\t'
               'Average Loss {loss:.3f}\t'.format(
-            (epoch + 1), loss=avg_loss))
+            (epoch), loss=avg_loss))
 
         total_cer, total_wer = 0, 0
         for i, (data) in enumerate(test_loader):  # test
@@ -211,11 +218,62 @@ def main():
 
         wer = total_wer / len(test_loader.dataset)
         cer = total_cer / len(test_loader.dataset)
+        wer *= 100
+        cer *= 100
 
         print('Validation Summary Epoch: [{0}]\t'
               'Average WER {wer:.0f}\t'
               'Average CER {cer:.0f}\t'.format(
-            (epoch + 1), wer=wer * 100, cer=cer * 100))
+            (epoch), wer=wer, cer=cer))
+
+        loss_results[epoch - 1] = avg_loss
+        wer_results[epoch - 1] = wer
+        cer_results[epoch - 1] = cer
+        if not loss_window:
+            loss_window = viz.line(
+                X=epochs[0:epoch],
+                Y=loss_results[0:epoch],
+                opts=dict(
+                    title='Loss',
+                ),
+            )
+            wer_window = viz.line(
+                X=epochs[0:epoch],
+                Y=wer_results[0:epoch],
+                opts=dict(
+                    title='WER',
+                ),
+            )
+
+            cer_window = viz.line(
+                X=epochs[0:epoch],
+                Y=cer_results[0:epoch],
+                opts=dict(
+                    title='CER',
+                ),
+            )
+        else:
+            viz.line(
+                X=epochs[0:epoch],
+                Y=loss_results[0:epoch],
+                win=loss_window,
+                update='replace',
+            )
+
+            viz.line(
+                X=epochs[0:epoch],
+                Y=wer_results[0:epoch],
+                win=wer_window,
+                update='replace',
+            )
+
+            viz.line(
+                X=epochs[0:epoch],
+                Y=cer_results[0:epoch],
+                win=cer_window,
+                update='replace'
+            )
+
         if args.epoch_save:
             file_path = '%s/deepspeech_%d.pth.tar' % (save_folder, epoch)
             torch.save(checkpoint(model, args, len(labels), epoch), file_path)
