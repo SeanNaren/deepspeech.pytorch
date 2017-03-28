@@ -235,6 +235,8 @@ def main():
                 Y=loss_results[0:epoch],
                 opts=dict(
                     title='Loss',
+                    ylabel='Loss',
+                    xlabel='Epoch'
                 ),
             )
             wer_window = viz.line(
@@ -242,6 +244,8 @@ def main():
                 Y=wer_results[0:epoch],
                 opts=dict(
                     title='WER',
+                    ylabel='WER',
+                    xlabel='Epoch'
                 ),
             )
 
@@ -250,6 +254,8 @@ def main():
                 Y=cer_results[0:epoch],
                 opts=dict(
                     title='CER',
+                    ylabel='CER',
+                    xlabel='Epoch'
                 ),
             )
         else:
