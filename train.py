@@ -11,7 +11,6 @@ from warpctc_pytorch import CTCLoss
 from data.data_loader import AudioDataLoader, SpectrogramDataset
 from decoder import ArgMaxDecoder
 from model import DeepSpeech
-from visdom import Visdom
 
 parser = argparse.ArgumentParser(description='DeepSpeech training')
 parser.add_argument('--train_manifest', metavar='DIR',
@@ -35,6 +34,7 @@ parser.add_argument('--max_norm', default=400, type=int, help='Norm cutoff to pr
 parser.add_argument('--learning_anneal', default=1.1, type=float, help='Annealing applied to learning rate every epoch')
 parser.add_argument('--silent', default=False, type=bool, help='Turn off progress tracking per iteration')
 parser.add_argument('--epoch_save', default=False, type=bool, help='Save model every epoch')
+parser.add_argument('--visdom', default=False, type=bool, help='Turn on visdom graphing')
 parser.add_argument('--save_folder', default='models/', help='Location to save epoch models')
 parser.add_argument('--final_model_path', default='models/deepspeech_final.pth.tar',
                     help='Location to save final model')
@@ -72,6 +72,41 @@ def checkpoint(model, args, nout, epoch=None):
 
 def main():
     args = parser.parse_args()
+
+    if args.visdom:
+        from visdom import Visdom
+        viz = Visdom()
+        loss_results, cer_results, wer_results = torch.zeros(args.epochs), torch.zeros(args.epochs), torch.zeros(
+            args.epochs)
+        epochs = torch.range(1, args.epochs)
+        loss_window = viz.line(
+            X=epochs,
+            Y=loss_results,
+            opts=dict(
+                title='Loss',
+                ylabel='Loss',
+                xlabel='Epoch'
+            ),
+        )
+        wer_window = viz.line(
+            X=epochs,
+            Y=wer_results,
+            opts=dict(
+                title='WER',
+                ylabel='WER',
+                xlabel='Epoch'
+            ),
+        )
+        cer_window = viz.line(
+            X=epochs,
+            Y=cer_results,
+            opts=dict(
+                title='CER',
+                ylabel='CER',
+                xlabel='Epoch'
+            ),
+        )
+
     save_folder = args.save_folder
     try:
         os.makedirs(save_folder)
@@ -111,11 +146,6 @@ def main():
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
-    viz = Visdom()
-    loss_window, cer_window, wer_window = None, None, None
-    loss_results, cer_results, wer_results = torch.Tensor(args.epochs), torch.Tensor(args.epochs), torch.Tensor(
-        args.epochs)
-    epochs = torch.range(1, args.epochs)
 
     for epoch in range(args.epochs):
         model.train()
@@ -226,39 +256,10 @@ def main():
               'Average CER {cer:.0f}\t'.format(
             (epoch), wer=wer, cer=cer))
 
-        loss_results[epoch - 1] = avg_loss
-        wer_results[epoch - 1] = wer
-        cer_results[epoch - 1] = cer
-        if not loss_window:
-            loss_window = viz.line(
-                X=epochs[0:epoch],
-                Y=loss_results[0:epoch],
-                opts=dict(
-                    title='Loss',
-                    ylabel='Loss',
-                    xlabel='Epoch'
-                ),
-            )
-            wer_window = viz.line(
-                X=epochs[0:epoch],
-                Y=wer_results[0:epoch],
-                opts=dict(
-                    title='WER',
-                    ylabel='WER',
-                    xlabel='Epoch'
-                ),
-            )
-
-            cer_window = viz.line(
-                X=epochs[0:epoch],
-                Y=cer_results[0:epoch],
-                opts=dict(
-                    title='CER',
-                    ylabel='CER',
-                    xlabel='Epoch'
-                ),
-            )
-        else:
+        if args.visdom:
+            loss_results[epoch - 1] = avg_loss
+            wer_results[epoch - 1] = wer
+            cer_results[epoch - 1] = cer
             viz.line(
                 X=epochs[0:epoch],
                 Y=loss_results[0:epoch],
