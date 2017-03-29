@@ -78,6 +78,15 @@ def main():
         from visdom import Visdom
         viz = Visdom()
 
+        opts = [dict(title='Loss', ylabel='Loss', xlabel='Epoch'),
+                dict(title='WER', ylabel='WER', xlabel='Epoch'),
+                dict(title='CER', ylabel='CER', xlabel='Epoch')]
+
+        viz_windows = [None, None, None]
+        loss_results, cer_results, wer_results = torch.Tensor(args.epochs), torch.Tensor(args.epochs), torch.Tensor(
+            args.epochs)
+        epochs = torch.range(1, args.epochs)
+
     try:
         os.makedirs(save_folder)
     except OSError as e:
@@ -116,10 +125,6 @@ def main():
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
-    loss_window, cer_window, wer_window = None, None, None
-    loss_results, cer_results, wer_results = torch.Tensor(args.epochs), torch.Tensor(args.epochs), torch.Tensor(
-        args.epochs)
-    epochs = torch.range(1, args.epochs)
 
     for epoch in range(args.epochs):
         model.train()
@@ -229,62 +234,27 @@ def main():
               'Average CER {cer:.0f}\t'.format(
             epoch + 1, wer=wer, cer=cer))
 
-        loss_results[epoch] = avg_loss
-        wer_results[epoch] = wer
-        cer_results[epoch] = cer
         if args.visdom:
+            loss_results[epoch] = avg_loss
+            wer_results[epoch] = wer
+            cer_results[epoch] = cer
             epoch += 1
-            if not loss_window:
-                loss_window = viz.line(
-                    X=epochs[0:epoch],
-                    Y=loss_results[0:epoch],
-                    opts=dict(
-                        title='Loss',
-                        ylabel='Loss',
-                        xlabel='Epoch'
-                    ),
-                )
-                wer_window = viz.line(
-                    X=epochs[0:epoch],
-                    Y=wer_results[0:epoch],
-                    opts=dict(
-                        title='WER',
-                        ylabel='WER',
-                        xlabel='Epoch'
-                    ),
-                )
-
-                cer_window = viz.line(
-                    X=epochs[0:epoch],
-                    Y=cer_results[0:epoch],
-                    opts=dict(
-                        title='CER',
-                        ylabel='CER',
-                        xlabel='Epoch'
-                    ),
-                )
-            else:
-                viz.line(
-                    X=epochs[0:epoch],
-                    Y=loss_results[0:epoch],
-                    win=loss_window,
-                    update='replace',
-                )
-
-                viz.line(
-                    X=epochs[0:epoch],
-                    Y=wer_results[0:epoch],
-                    win=wer_window,
-                    update='replace',
-                )
-
-                viz.line(
-                    X=epochs[0:epoch],
-                    Y=cer_results[0:epoch],
-                    win=cer_window,
-                    update='replace'
-                )
-
+            X = epochs[0:epoch]
+            Y = [loss_results[0:epoch], wer_results[0:epoch], cer_results[0:epoch]]
+            for x in range(len(viz_windows)):
+                if viz_windows[x] is None:
+                    viz_windows[x] = viz.line(
+                        X=X,
+                        Y=Y[x],
+                        opts=opts[x],
+                    )
+                else:
+                    viz.line(
+                        X=X,
+                        Y=Y[x],
+                        win=viz_windows[x],
+                        update='replace',
+                    )
         if args.epoch_save:
             file_path = '%s/deepspeech_%d.pth.tar' % (save_folder, epoch)
             torch.save(checkpoint(model, args, len(labels), epoch), file_path)
