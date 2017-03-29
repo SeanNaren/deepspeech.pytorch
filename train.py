@@ -239,19 +239,19 @@ def main():
             wer_results[epoch] = wer
             cer_results[epoch] = cer
             epoch += 1
-            X = epochs[0:epoch]
-            Y = [loss_results[0:epoch], wer_results[0:epoch], cer_results[0:epoch]]
+            x_axis = epochs[0:epoch]
+            y_axis = [loss_results[0:epoch], wer_results[0:epoch], cer_results[0:epoch]]
             for x in range(len(viz_windows)):
                 if viz_windows[x] is None:
                     viz_windows[x] = viz.line(
-                        X=X,
-                        Y=Y[x],
+                        X=x_axis,
+                        Y=y_axis[x],
                         opts=opts[x],
                     )
                 else:
                     viz.line(
-                        X=X,
-                        Y=Y[x],
+                        X=x_axis,
+                        Y=y_axis[x],
                         win=viz_windows[x],
                         update='replace',
                     )
