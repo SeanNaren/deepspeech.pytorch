@@ -233,6 +233,7 @@ def main():
         wer_results[epoch] = wer
         cer_results[epoch] = cer
         if args.visdom:
+            epoch += 1
             if not loss_window:
                 loss_window = viz.line(
                     X=epochs[0:epoch],
