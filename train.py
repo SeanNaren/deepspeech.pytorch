@@ -11,7 +11,6 @@ from warpctc_pytorch import CTCLoss
 from data.data_loader import AudioDataLoader, SpectrogramDataset
 from decoder import ArgMaxDecoder
 from model import DeepSpeech
-from visdom import Visdom
 
 parser = argparse.ArgumentParser(description='DeepSpeech training')
 parser.add_argument('--train_manifest', metavar='DIR',
@@ -35,6 +34,7 @@ parser.add_argument('--max_norm', default=400, type=int, help='Norm cutoff to pr
 parser.add_argument('--learning_anneal', default=1.1, type=float, help='Annealing applied to learning rate every epoch')
 parser.add_argument('--silent', default=False, type=bool, help='Turn off progress tracking per iteration')
 parser.add_argument('--epoch_save', default=False, type=bool, help='Save model every epoch')
+parser.add_argument('--visdom', default=False, type=bool, help='Turn on visdom graphing')
 parser.add_argument('--save_folder', default='models/', help='Location to save epoch models')
 parser.add_argument('--final_model_path', default='models/deepspeech_final.pth.tar',
                     help='Location to save final model')
@@ -73,6 +73,11 @@ def checkpoint(model, args, nout, epoch=None):
 def main():
     args = parser.parse_args()
     save_folder = args.save_folder
+
+    if args.visdom:
+        from visdom import Visdom
+        viz = Visdom()
+
     try:
         os.makedirs(save_folder)
     except OSError as e:
@@ -111,7 +116,6 @@ def main():
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
-    viz = Visdom()
     loss_window, cer_window, wer_window = None, None, None
     loss_results, cer_results, wer_results = torch.Tensor(args.epochs), torch.Tensor(args.epochs), torch.Tensor(
         args.epochs)
@@ -181,10 +185,9 @@ def main():
                     data_time=data_time, loss=losses))
 
         avg_loss /= len(train_loader)
-        epoch += 1
         print('Training Summary Epoch: [{0}]\t'
               'Average Loss {loss:.3f}\t'.format(
-            (epoch), loss=avg_loss))
+            epoch + 1, loss=avg_loss))
 
         total_cer, total_wer = 0, 0
         for i, (data) in enumerate(test_loader):  # test
@@ -224,61 +227,62 @@ def main():
         print('Validation Summary Epoch: [{0}]\t'
               'Average WER {wer:.0f}\t'
               'Average CER {cer:.0f}\t'.format(
-            (epoch), wer=wer, cer=cer))
+            epoch + 1, wer=wer, cer=cer))
 
-        loss_results[epoch - 1] = avg_loss
-        wer_results[epoch - 1] = wer
-        cer_results[epoch - 1] = cer
-        if not loss_window:
-            loss_window = viz.line(
-                X=epochs[0:epoch],
-                Y=loss_results[0:epoch],
-                opts=dict(
-                    title='Loss',
-                    ylabel='Loss',
-                    xlabel='Epoch'
-                ),
-            )
-            wer_window = viz.line(
-                X=epochs[0:epoch],
-                Y=wer_results[0:epoch],
-                opts=dict(
-                    title='WER',
-                    ylabel='WER',
-                    xlabel='Epoch'
-                ),
-            )
+        loss_results[epoch] = avg_loss
+        wer_results[epoch] = wer
+        cer_results[epoch] = cer
+        if args.visdom:
+            if not loss_window:
+                loss_window = viz.line(
+                    X=epochs[0:epoch],
+                    Y=loss_results[0:epoch],
+                    opts=dict(
+                        title='Loss',
+                        ylabel='Loss',
+                        xlabel='Epoch'
+                    ),
+                )
+                wer_window = viz.line(
+                    X=epochs[0:epoch],
+                    Y=wer_results[0:epoch],
+                    opts=dict(
+                        title='WER',
+                        ylabel='WER',
+                        xlabel='Epoch'
+                    ),
+                )
 
-            cer_window = viz.line(
-                X=epochs[0:epoch],
-                Y=cer_results[0:epoch],
-                opts=dict(
-                    title='CER',
-                    ylabel='CER',
-                    xlabel='Epoch'
-                ),
-            )
-        else:
-            viz.line(
-                X=epochs[0:epoch],
-                Y=loss_results[0:epoch],
-                win=loss_window,
-                update='replace',
-            )
+                cer_window = viz.line(
+                    X=epochs[0:epoch],
+                    Y=cer_results[0:epoch],
+                    opts=dict(
+                        title='CER',
+                        ylabel='CER',
+                        xlabel='Epoch'
+                    ),
+                )
+            else:
+                viz.line(
+                    X=epochs[0:epoch],
+                    Y=loss_results[0:epoch],
+                    win=loss_window,
+                    update='replace',
+                )
 
-            viz.line(
-                X=epochs[0:epoch],
-                Y=wer_results[0:epoch],
-                win=wer_window,
-                update='replace',
-            )
+                viz.line(
+                    X=epochs[0:epoch],
+                    Y=wer_results[0:epoch],
+                    win=wer_window,
+                    update='replace',
+                )
 
-            viz.line(
-                X=epochs[0:epoch],
-                Y=cer_results[0:epoch],
-                win=cer_window,
-                update='replace'
-            )
+                viz.line(
+                    X=epochs[0:epoch],
+                    Y=cer_results[0:epoch],
+                    win=cer_window,
+                    update='replace'
+                )
 
         if args.epoch_save:
             file_path = '%s/deepspeech_%d.pth.tar' % (save_folder, epoch)
