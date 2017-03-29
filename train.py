@@ -150,16 +150,7 @@ def main():
             optimizer.zero_grad()
             loss.backward()
 
-            # rescale gradients if necessary
-            total_norm = torch.FloatTensor([0])
-            for param in model.parameters():
-                param = param.norm().pow(2).data.cpu()
-                total_norm.add_(param)
-            total_norm = total_norm.sqrt()
-            if total_norm[0] > args.max_norm:
-                for param in model.parameters():
-                    param.grad.mul_(args.max_norm / total_norm[0])
-
+            torch.nn.utils.clip_grad_norm(model.parameters(), args.max_norm)
             # SGD step
             optimizer.step()
 
