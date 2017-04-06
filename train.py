@@ -186,6 +186,7 @@ def main():
             epoch + 1, loss=avg_loss))
 
         total_cer, total_wer = 0, 0
+        model.eval()
         for i, (data) in enumerate(test_loader):  # test
             inputs, targets, input_percentages, target_sizes = data
 
