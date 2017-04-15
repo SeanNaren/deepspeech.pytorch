@@ -59,13 +59,14 @@ class AverageMeter(object):
         self.avg = self.sum / self.count
 
 
-def checkpoint(model, args, nout, epoch=None):
+def checkpoint(model, optimizer, args, nout, epoch=None):
     package = {
         'epoch': epoch if epoch else 'N/A',
         'hidden_size': args.hidden_size,
         'hidden_layers': args.hidden_layers,
         'nout': nout,
         'state_dict': model.state_dict(),
+        'optim_state': optimizer.state_dict()
     }
     return package
 
