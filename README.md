@@ -67,5 +67,5 @@ Use `python train.py --help` for more parameters and options.
 There is also [Visdom](https://github.com/facebookresearch/visdom) support to visualise training. Once a server has been started, to use:
 
 ```
-python train.py --visdom true
+python train.py --visdom
 ```
