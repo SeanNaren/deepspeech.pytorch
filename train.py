@@ -130,7 +130,7 @@ def main():
         optimizer.load_state_dict(package['optim_dict'])
         start_epoch = package['epoch'] + 1
     else:
-        start_epoch = None
+        start_epoch = 0
 
     batch_time = AverageMeter()
     data_time = AverageMeter()
