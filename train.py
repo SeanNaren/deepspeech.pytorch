@@ -38,6 +38,7 @@ parser.add_argument('--visdom', default=False, type=bool, help='Turn on visdom g
 parser.add_argument('--save_folder', default='models/', help='Location to save epoch models')
 parser.add_argument('--final_model_path', default='models/deepspeech_final.pth.tar',
                     help='Location to save final model')
+parser.add_argument('--continue_from', default='', help='Continue from checkpoint model')
 
 
 class AverageMeter(object):
@@ -66,7 +67,7 @@ def checkpoint(model, optimizer, args, nout, epoch=None):
         'hidden_layers': args.hidden_layers,
         'nout': nout,
         'state_dict': model.state_dict(),
-        'optim_state': optimizer.state_dict()
+        'optim_dict': optimizer.state_dict()
     }
     return package
 
@@ -115,19 +116,27 @@ def main():
                                   num_workers=args.num_workers)
 
     model = DeepSpeech(rnn_hidden_size=args.hidden_size, nb_layers=args.hidden_layers, num_classes=len(labels))
+    parameters = model.parameters()
+    optimizer = torch.optim.SGD(parameters, lr=args.lr,
+                                momentum=args.momentum, nesterov=True)
     decoder = ArgMaxDecoder(labels)
     if args.cuda:
         model = torch.nn.DataParallel(model).cuda()
     print(model)
-    parameters = model.parameters()
-    optimizer = torch.optim.SGD(parameters, lr=args.lr,
-                                momentum=args.momentum, nesterov=True)
+
+    if args.continue_from:
+        package = torch.load(args.continue_from)
+        model.load_state_dict(package['state_dict'])
+        optimizer.load_state_dict(package['optim_dict'])
+        start_epoch = package['epoch'] + 1
+    else:
+        start_epoch = None
 
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
 
-    for epoch in range(args.epochs):
+    for epoch in range(start_epoch, args.epochs):
         model.train()
         end = time.time()
         avg_loss = 0
@@ -250,8 +259,8 @@ def main():
                     )
         if args.epoch_save:
             file_path = '%s/deepspeech_%d.pth.tar' % (save_folder, epoch)
-            torch.save(checkpoint(model, args, len(labels), epoch), file_path)
-    torch.save(checkpoint(model, args, len(labels)), args.final_model_path)
+            torch.save(checkpoint(model, optimizer, args, len(labels), epoch), file_path)
+    torch.save(checkpoint(model, optimizer, args, len(labels)), args.final_model_path)
 
 
 if __name__ == '__main__':
