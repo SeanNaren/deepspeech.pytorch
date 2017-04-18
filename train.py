@@ -33,7 +33,7 @@ parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
 parser.add_argument('--max_norm', default=400, type=int, help='Norm cutoff to prevent explosion of gradients')
 parser.add_argument('--learning_anneal', default=1.1, type=float, help='Annealing applied to learning rate every epoch')
 parser.add_argument('--silent', default=False, type=bool, help='Turn off progress tracking per iteration')
-parser.add_argument('--epoch_save', default=False, type=bool, help='Save model every epoch')
+parser.add_argument('--epoch_checkpoint', default=False, type=bool, help='Save model every epoch')
 parser.add_argument('--visdom', default=False, type=bool, help='Turn on visdom graphing')
 parser.add_argument('--save_folder', default='models/', help='Location to save epoch models')
 parser.add_argument('--final_model_path', default='models/deepspeech_final.pth.tar',
@@ -257,7 +257,7 @@ def main():
                         win=viz_windows[x],
                         update='replace',
                     )
-        if args.epoch_save:
+        if args.epoch_checkpoint:
             file_path = '%s/deepspeech_%d.pth.tar' % (save_folder, epoch)
             torch.save(checkpoint(model, optimizer, args, len(labels), epoch), file_path)
     torch.save(checkpoint(model, optimizer, args, len(labels)), args.final_model_path)
