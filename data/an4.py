@@ -8,13 +8,13 @@ import subprocess
 from utils import create_manifest
 
 parser = argparse.ArgumentParser(description='Processes and downloads an4.')
-parser.add_argument('--an4_path', default='an4_dataset/', help='Path to save dataset')
+parser.add_argument('--target_dir', default='an4_dataset/', help='Path to save dataset')
 parser.add_argument('--sample_rate', default=16000, type=int, help='Sample rate')
 args = parser.parse_args()
 
 
 def _format_data(root_path, data_tag, name, wav_folder):
-    data_path = args.an4_path + data_tag + '/' + name + '/'
+    data_path = args.target_dir + data_tag + '/' + name + '/'
     new_transcript_path = data_path + '/txt/'
     new_wav_path = data_path + '/wav/'
 
@@ -67,16 +67,16 @@ def main():
     name = 'an4'
     subprocess.call(['wget http://www.speech.cs.cmu.edu/databases/an4/an4_raw.bigendian.tar.gz'], shell=True)
     subprocess.call(['tar -xzvf an4_raw.bigendian.tar.gz'], stdout=open(os.devnull, 'wb'), shell=True)
-    os.makedirs(args.an4_path)
+    os.makedirs(args.target_dir)
     _format_data(root_path, 'train', name, 'an4_clstk')
     _format_data(root_path, 'test', name, 'an4test_clstk')
     shutil.rmtree(root_path)
     os.remove('an4_raw.bigendian.tar.gz')
-    train_path = args.an4_path + '/train/'
-    test_path = args.an4_path + '/test/'
+    train_path = args.target_dir + '/train/'
+    test_path = args.target_dir + '/test/'
     print ('Creating manifests...')
-    create_manifest(train_path, 'train')
-    create_manifest(test_path, 'val')
+    create_manifest(train_path, 'an4_train')
+    create_manifest(test_path, 'an4_val')
 
 
 if __name__ == '__main__':
