@@ -2,8 +2,8 @@ import argparse
 import os
 import io
 import shutil
-
-import subprocess
+import tarfile
+import wget
 
 from utils import create_manifest
 
@@ -65,8 +65,9 @@ def _process_transcript(transcripts, x):
 def main():
     root_path = 'an4/'
     name = 'an4'
-    subprocess.call(['wget http://www.speech.cs.cmu.edu/databases/an4/an4_raw.bigendian.tar.gz'], shell=True)
-    subprocess.call(['tar -xzvf an4_raw.bigendian.tar.gz'], stdout=open(os.devnull, 'wb'), shell=True)
+    wget.download('http://www.speech.cs.cmu.edu/databases/an4/an4_raw.bigendian.tar.gz')
+    tar = tarfile.open('an4_raw.bigendian.tar.gz')
+    tar.extractall()
     os.makedirs(args.target_dir)
     _format_data(root_path, 'train', name, 'an4_clstk')
     _format_data(root_path, 'test', name, 'an4test_clstk')
@@ -74,7 +75,7 @@ def main():
     os.remove('an4_raw.bigendian.tar.gz')
     train_path = args.target_dir + '/train/'
     test_path = args.target_dir + '/test/'
-    print ('Creating manifests...')
+    print ('\n', 'Creating manifests...')
     create_manifest(train_path, 'an4_train')
     create_manifest(test_path, 'an4_val')
 
