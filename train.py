@@ -140,8 +140,9 @@ def main():
         start_epoch = int(package.get('epoch', 1)) - 1  # Python index start at 0 for training
         start_iter = int(package.get('iteration', -1)) + 1
         avg_loss = int(package.get('avg_loss'))
-        if args.visdom and package['loss_results'] is not None:  # Add previous scores to visdom graph
-            epoch = int(package['epoch']) - 1
+        if args.visdom and \
+                        package['loss_results'] is not None and start_epoch > 0:  # Add previous scores to visdom graph
+            epoch = start_epoch
             loss_results, cer_results, wer_results = package['loss_results'], package['cer_results'], package[
                 'wer_results']
             x_axis = epochs[0:epoch]
@@ -311,6 +312,7 @@ def main():
 
         avg_loss = 0
     torch.save(checkpoint(model, optimizer, args, len(labels)), args.final_model_path)
+
 
 if __name__ == '__main__':
     main()
