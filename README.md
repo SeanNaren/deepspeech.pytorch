@@ -33,15 +33,36 @@ pip install -r requirements.txt
 
 ## Dataset
 
-Currently only supports an4. To download and setup the an4 dataset run below command in the root folder of the repo:
+Currently supports AN4, TEDLIUM and Voxforge.
+
+### AN4
+
+To download and setup the an4 dataset run below command in the root folder of the repo:
 
 ```
 cd data; python an4.py
 ```
 
-This will generate csv manifests files used to load the data for training.
+### TEDLIUM
 
-LibriSpeech formatting is in the works.
+You have the option to download the raw dataset file manually or through the script (which will cache it).
+The file is found [here](http://www.openslr.org/resources/19/TEDLIUM_release2.tar.gz).
+
+To download and setup the TEDLIUM_V2 dataset run below command in the root folder of the repo:
+
+```
+cd data; python ted.py # Optionally if you have downloaded the raw dataset file, pass --tar_path /path/to/TEDLIUM_release2.tar.gz
+
+```
+### Voxforge
+
+To download and setup the Voxforge dataset run below command in the root folder of the repo:
+
+```
+cd data; python voxforge.py
+```
+
+Note that this dataset does not come with a validation dataset or test dataset.
 
 ### Custom Dataset
 
