@@ -78,7 +78,6 @@ The first path is to the audio file, and the second path is to a text file conta
 
 ## Training
 
-
 ```
 python train.py --train_manifest data/train_manifest.csv --val_manifest data/val_manifest.csv
 ```
@@ -88,5 +87,31 @@ Use `python train.py --help` for more parameters and options.
 There is also [Visdom](https://github.com/facebookresearch/visdom) support to visualise training. Once a server has been started, to use:
 
 ```
-python train.py --visdom true
+python train.py --visdom
 ```
+
+## Checkpoints
+
+Training supports saving checkpoints of the model to continue training from should an error occur or early termination. To enable epoch
+checkpoints use:
+
+```
+python train.py --checkpoint
+```
+
+To enable checkpoints every N batches through the epoch as well as epoch saving:
+
+```
+python train.py --checkpoint --checkpoint_per_batch N # N is the number of batches to wait till saving a checkpoint at this batch.
+```
+
+Note for the batch checkpointing system to work, you cannot change the batch size when loading a checkpointed model from it's original training
+run.
+
+To continue from a checkpointed model that has been saved:
+
+```
+python train.py --continue_from models/deepspeech_checkpoint_epoch_N_iter_N.pth.tar
+```
+
+This continues from the same training state as well as recreates the visdom graph to continue from if enabled.
