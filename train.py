@@ -264,6 +264,9 @@ def main():
             total_cer += cer
             total_wer += wer
 
+            if args.cuda:
+                torch.cuda.synchronize()
+
         wer = total_wer / len(test_loader.dataset)
         cer = total_cer / len(test_loader.dataset)
         wer *= 100
@@ -300,9 +303,14 @@ def main():
             torch.save(checkpoint(model, optimizer, args, len(labels), epoch, loss_results=loss_results,
                                   wer_results=wer_results, cer_results=cer_results),
                        file_path)
+        # anneal lr
+        optim_state = optimizer.state_dict()
+        optim_state['param_groups'][0]['lr'] = optim_state['param_groups'][0]['lr'] / args.learning_anneal
+        optimizer.load_state_dict(optim_state)
+        print('Learning rate annealed to: {lr:.6f}'.format(lr=optim_state['param_groups'][0]['lr']))
+
         avg_loss = 0
     torch.save(checkpoint(model, optimizer, args, len(labels)), args.final_model_path)
-
 
 if __name__ == '__main__':
     main()
