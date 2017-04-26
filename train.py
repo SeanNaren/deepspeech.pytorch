@@ -39,6 +39,7 @@ parser.add_argument('--save_folder', default='models/', help='Location to save e
 parser.add_argument('--final_model_path', default='models/deepspeech_final.pth.tar',
                     help='Location to save final model')
 parser.add_argument('--continue_from', default='', help='Continue from checkpoint model')
+parser.add_argument('--rnn_type', default='lstm', help='Type of the RNN. simple_rnn/gru/lstm are supported')
 parser.set_defaults(cuda=False, silent=False, checkpoint=False, visdom=False)
 
 
@@ -124,7 +125,8 @@ def main():
     test_loader = AudioDataLoader(test_dataset, batch_size=args.batch_size,
                                   num_workers=args.num_workers)
 
-    model = DeepSpeech(rnn_hidden_size=args.hidden_size, nb_layers=args.hidden_layers, num_classes=len(labels))
+    model = DeepSpeech(rnn_type = args.rnn_type, rnn_hidden_size=args.hidden_size,
+                       nb_layers=args.hidden_layers, num_classes=len(labels))
     parameters = model.parameters()
     optimizer = torch.optim.SGD(parameters, lr=args.lr,
                                 momentum=args.momentum, nesterov=True)
