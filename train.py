@@ -61,7 +61,7 @@ class AverageMeter(object):
         self.avg = self.sum / self.count
 
 
-def checkpoint(model, optimizer, args, nout, epoch, iteration=None, loss_results=None, cer_results=None,
+def checkpoint(model, optimizer, args, nout, epoch=None, iteration=None, loss_results=None, cer_results=None,
                wer_results=None, avg_loss=None):
     package = {
         'epoch': epoch + 1 if epoch is not None else 'N/A',
@@ -124,7 +124,8 @@ def main():
     test_loader = AudioDataLoader(test_dataset, batch_size=args.batch_size,
                                   num_workers=args.num_workers)
 
-    model = DeepSpeech(rnn_hidden_size=args.hidden_size, nb_layers=args.hidden_layers, num_classes=len(labels))
+    model = DeepSpeech(rnn_hidden_size=args.hidden_size, nb_layers=args.hidden_layers, num_classes=len(labels),
+                       sample_rate=args.sample_rate, window_size=args.window_size)
     parameters = model.parameters()
     optimizer = torch.optim.SGD(parameters, lr=args.lr,
                                 momentum=args.momentum, nesterov=True)

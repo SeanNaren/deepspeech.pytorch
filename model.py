@@ -52,7 +52,8 @@ class BatchLSTM(nn.Module):
 
 
 class DeepSpeech(nn.Module):
-    def __init__(self, num_classes=29, rnn_hidden_size=400, nb_layers=4, bidirectional=True):
+    def __init__(self, num_classes=29, rnn_hidden_size=400, nb_layers=4, bidirectional=True, sample_rate=16000,
+                 window_size=0.02):
         super(DeepSpeech, self).__init__()
         self.conv = nn.Sequential(
             nn.Conv2d(1, 32, kernel_size=(41, 11), stride=(2, 2)),
@@ -63,10 +64,11 @@ class DeepSpeech(nn.Module):
             nn.Hardtanh(0, 20, inplace=True)
         )
         # Based on above convolutions and spectrogram size using conv formula (W - F + 2P)/ S+1
-        rnn_input_size = int(math.floor((16000 * 0.02) / 2) + 1)
+        rnn_input_size = int(math.floor((sample_rate * window_size) / 2) + 1)
         rnn_input_size = int(math.floor(rnn_input_size - 41) / 2 + 1)
         rnn_input_size = int(math.floor(rnn_input_size - 21) / 2 + 1)
         rnn_input_size *= 32
+
         rnns = []
         rnn = BatchLSTM(input_size=rnn_input_size, hidden_size=rnn_hidden_size,
                         bidirectional=bidirectional, batch_norm=False)
