@@ -97,7 +97,7 @@ def main():
         viz_windows = [None, None, None]
         loss_results, cer_results, wer_results = torch.Tensor(args.epochs), torch.Tensor(args.epochs), torch.Tensor(
             args.epochs)
-        epochs = torch.arange(1, args.epochs)
+        epochs = torch.arange(1, args.epochs + 1)
 
     try:
         os.makedirs(save_folder)
