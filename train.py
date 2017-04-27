@@ -5,6 +5,7 @@ import os
 import time
 
 import torch
+import torch.nn as nn
 from torch.autograd import Variable
 from warpctc_pytorch import CTCLoss
 from data.data_loader import AudioDataLoader, SpectrogramDataset
@@ -124,8 +125,15 @@ def main():
                                    num_workers=args.num_workers)
     test_loader = AudioDataLoader(test_dataset, batch_size=args.batch_size,
                                   num_workers=args.num_workers)
-
-    model = DeepSpeech(rnn_type = args.rnn_type, rnn_hidden_size=args.hidden_size,
+    rnn_type = args.rnn_type.lower()
+    assert rnn_type in ["lstm", "gru", "simplernn"], "rnn_type should be either lstm, simplernn or gru"
+    if rnn_type == "lstm":
+        rnn_cls = nn.LSTM
+    elif rnn_type == "gru":
+        rnn_cls = nn.GRU
+    else:
+        rnn_cls = nn.RNN
+    model = DeepSpeech(rnn_cls = rnn_cls, rnn_hidden_size=args.hidden_size,
                        nb_layers=args.hidden_layers, num_classes=len(labels))
     parameters = model.parameters()
     optimizer = torch.optim.SGD(parameters, lr=args.lr,

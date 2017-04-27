@@ -29,7 +29,7 @@ class SequenceWise(nn.Module):
 
 
 class BatchLSTM(nn.Module):
-    def __init__(self, input_size, hidden_size, rnn_type = "lstm", bidirectional=False, batch_norm=True):
+    def __init__(self, input_size, hidden_size, rnn_cls, bidirectional=False, batch_norm=True):
         super(BatchLSTM, self).__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
@@ -38,14 +38,8 @@ class BatchLSTM(nn.Module):
         self.batch_norm = SequenceWise(nn.Sequential(
             nn.Linear(input_size, hidden_size, bias=False),
             nn.BatchNorm1d(hidden_size)))
-        assert rnn_type in ["lstm", "simple_rnn", "gru"], "rnn_type should be either lstm, simple_rnn or gru"
-        if rnn_type=="lstm":
-            self.rnn = nn.LSTM(input_size=hidden_size if batch_norm else input_size, hidden_size=hidden_size,
-                           bidirectional=bidirectional, bias=False)
-        elif rnn_type=="simple_rnn":
-            self.rnn  = nn.RNN( bidirectional=bidirectional, input_size=input_size, hidden_size=hidden_size, bias=False )
-        elif rnn_type=="gru":
-            self.rnn = nn.GRU(bidirectional=bidirectional, input_size=input_size, hidden_size=hidden_size, bias=False)
+        self.rnn = rnn_cls(input_size=hidden_size if batch_norm else input_size, hidden_size=hidden_size,
+                       bidirectional=bidirectional, bias=False)
         self.num_directions = 2 if bidirectional else 1
 
     def forward(self, x):
@@ -58,7 +52,7 @@ class BatchLSTM(nn.Module):
 
 
 class DeepSpeech(nn.Module):
-    def __init__(self, rnn_type  = "lstm", num_classes=29, rnn_hidden_size=400, nb_layers=4,
+    def __init__(self, rnn_cls = nn.LSTM, num_classes=29, rnn_hidden_size=400, nb_layers=4,
                  bidirectional=True):
         super(DeepSpeech, self).__init__()
         self.conv = nn.Sequential(
@@ -75,11 +69,11 @@ class DeepSpeech(nn.Module):
         rnn_input_size = int(math.floor(rnn_input_size - 21) / 2 + 1)
         rnn_input_size *= 32
         rnns = []
-        rnn = BatchLSTM(rnn_type = rnn_type, input_size=rnn_input_size, hidden_size=rnn_hidden_size,
+        rnn = BatchLSTM(rnn_cls = rnn_cls, input_size=rnn_input_size, hidden_size=rnn_hidden_size,
                         bidirectional=bidirectional, batch_norm=False)
         rnns.append(('0', rnn))
         for x in range(nb_layers - 1):
-            rnn = BatchLSTM(input_size=rnn_hidden_size, hidden_size=rnn_hidden_size,
+            rnn = BatchLSTM(input_size=rnn_hidden_size, hidden_size=rnn_hidden_size, rnn_cls = rnn_cls,
                             bidirectional=bidirectional)
             rnns.append(('%d' % (x + 1), rnn))
         self.rnns = nn.Sequential(OrderedDict(rnns))
