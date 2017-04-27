@@ -62,7 +62,7 @@ class AverageMeter(object):
         self.avg = self.sum / self.count
 
 
-def checkpoint(model, optimizer, args, nout, epoch, iteration=None, loss_results=None, cer_results=None,
+def checkpoint(model, optimizer, args, nout, epoch=None, iteration=None, loss_results=None, cer_results=None,
                wer_results=None, avg_loss=None):
     package = {
         'epoch': epoch + 1 if epoch is not None else 'N/A',
@@ -129,7 +129,8 @@ def main():
     assert rnn_type in supported_rnns, "rnn_type should be either lstm, rnn or gru"
     model = DeepSpeech(rnn_hidden_size=args.hidden_size,
                        nb_layers=args.hidden_layers, num_classes=len(labels),
-                       rnn_type=supported_rnns[rnn_type])
+                       rnn_type=supported_rnns[rnn_type],
+                       sample_rate=args.sample_rate, window_size=args.window_size)
     parameters = model.parameters()
     optimizer = torch.optim.SGD(parameters, lr=args.lr,
                                 momentum=args.momentum, nesterov=True)
