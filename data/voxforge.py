@@ -7,7 +7,7 @@ import shutil
 import subprocess
 import tarfile
 
-from utils import create_manifest, _update_progress
+from utils import create_manifest, update_progress
 
 VOXFORGE_URL_16kHz = 'http://www.repository.voxforge1.org/downloads/SpeechCorpus/Trunk/Audio/Main/16kHz_16bit/'
 
@@ -89,6 +89,6 @@ if __name__ == '__main__':
     all_files = re.findall("href\=\"(.*\.tgz)\"", content.decode("utf-8"))
     for f_idx, f in enumerate(all_files):
         prepare_sample(f.replace(".tgz", ""), VOXFORGE_URL_16kHz + '/' + f, target_dir)
-        _update_progress(f_idx / float(len(all_files)))
+        update_progress(f_idx / float(len(all_files)))
     print('Creating manifests...')
     create_manifest(target_dir, 'voxforge_train')

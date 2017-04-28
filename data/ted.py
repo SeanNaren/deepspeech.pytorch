@@ -5,7 +5,7 @@ import argparse
 import subprocess
 import unicodedata
 
-from utils import create_manifest, _update_progress
+from utils import create_manifest, update_progress
 
 parser = argparse.ArgumentParser(description='Processes and downloads TED-LIUMv2 dataset.')
 parser.add_argument("--target_dir", default='TEDLIUM_dataset/', type=str, help="Directory to store the dataset.")
@@ -83,7 +83,7 @@ def prepare_dir(ted_dir):
             with open(target_txt_file, "w") as f:
                 f.write(_preprocess_transcript(utterance["transcript"]).encode('utf-8'))
         counter += 1
-        _update_progress(counter / float(len(entries)))
+        update_progress(counter / float(len(entries)))
 
 
 def main():
