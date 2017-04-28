@@ -10,6 +10,10 @@ import shutil
 parser = argparse.ArgumentParser(description='Processes and downloads LibriSpeech dataset.')
 parser.add_argument("--target_dir", default='LibriSpeech_dataset/', type=str, help="Directory to store the dataset.")
 parser.add_argument('--sample_rate', default=16000, type=int, help='Sample rate')
+parser.add_argument('--files_to_dl', default="train-clean-100.tar.gz,"
+                                             "train-clean-360.tar.gz,train-other-500.tar.gz,"
+                                             "dev-clean.tar.gz,dev-other.tar.gz,"
+                                             "test-clean.tar.gz,test-other.tar.gz", type=str, help='list of file names to download')
 args = parser.parse_args()
 
 LIBRI_SPEECH_URLS = {
@@ -49,7 +53,7 @@ def main():
     target_dl_dir = args.target_dir
     if not os.path.exists(target_dl_dir):
         os.makedirs(target_dl_dir)
-
+    files_to_dl = args.files_to_dl.strip().split(',')
     for split_type, lst_libri_urls in LIBRI_SPEECH_URLS.items():
         split_dir = os.path.join(target_dl_dir, split_type)
         if not os.path.exists(split_dir):
@@ -64,6 +68,14 @@ def main():
         if os.path.exists(extracted_dir):
             shutil.rmtree( extracted_dir )
         for url in lst_libri_urls:
+            #check if we want to dl this file
+            dl_flag = False
+            for f in files_to_dl:
+                if url.find(f) != -1:
+                    dl_flag = True
+            if not dl_flag:
+                print("Skipping url: {}".format( url ))
+                continue
             filename = url.split("/")[-1]
             target_filename =  os.path.join(split_dir, filename)
             if not os.path.exists( target_filename ):
