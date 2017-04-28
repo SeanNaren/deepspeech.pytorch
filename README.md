@@ -33,7 +33,7 @@ pip install -r requirements.txt
 
 ## Dataset
 
-Currently supports AN4, TEDLIUM and Voxforge.
+Currently supports AN4, TEDLIUM, Voxforge and LibriSpeech.
 
 ### AN4
 
@@ -56,13 +56,41 @@ cd data; python ted.py # Optionally if you have downloaded the raw dataset file,
 ```
 ### Voxforge
 
-To download and setup the Voxforge dataset run below command in the root folder of the repo:
+To download and setup the Voxforge dataset run the below command in the root folder of the repo:
 
 ```
 cd data; python voxforge.py
 ```
 
 Note that this dataset does not come with a validation dataset or test dataset.
+
+### LibriSpeech
+
+To download and setup the LibriSpeech dataset run the below command in the root folder of the repo:
+
+```
+cd data; python librispeech.py
+```
+
+You have the option to download the raw dataset files manually or through the script (which will cache them as well).
+In order to do this you must create the following folder structure and put the corresponding tar files that you download from [here](http://www.openslr.org/12/).
+
+```
+cd data/
+mkdir LibriSpeech/ # This can be anything as long as you specify the directory path as --target_dir when running the librispeech.py script
+mkdir LibriSpeech/val/
+mkdir LibriSpeech/test/
+mkdir LibriSpeech/train/
+```
+
+Now put the `tar.gz` files in the correct folders. They will now be used in the data pre-processing for librispeech.
+
+Optionally you can specify the exact librispeech files you want if you don't want to add all of them. This can be done like below:
+
+```
+cd data/
+python librispeech.py --files_to_use "train-clean-100.tar.gz, train-clean-360.tar.gz,train-other-500.tar.gz, dev-clean.tar.gz,dev-other.tar.gz, test-clean.tar.gz,test-other.tar.gz"
+```
 
 ### Custom Dataset
 
@@ -115,3 +143,7 @@ python train.py --continue_from models/deepspeech_checkpoint_epoch_N_iter_N.pth.
 ```
 
 This continues from the same training state as well as recreates the visdom graph to continue from if enabled.
+
+## Acknowledgements
+
+Thanks to [Egor](https://github.com/EgorLakomkin) for his awesome contributions in data processing and general feedback!
