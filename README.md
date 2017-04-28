@@ -83,7 +83,8 @@ mkdir LibriSpeech/test/
 mkdir LibriSpeech/train/
 ```
 
-Now put the `tar.gz` files in the correct folders. They will now be used in the data pre-processing for librispeech.
+Now put the `tar.gz` files in the correct folders. They will now be used in the data pre-processing for librispeech and be removed after
+formatting the dataset.
 
 Optionally you can specify the exact librispeech files you want if you don't want to add all of them. This can be done like below:
 
