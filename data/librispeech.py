@@ -86,7 +86,6 @@ def main():
             tar.close()
             os.remove(target_filename)
             print("Converting flac files to wav and extracting transcripts...")
-
             assert os.path.exists(extracted_dir), "Archive {} was not properly uncompressed.".format(filename)
             for root, subdirs, files in os.walk(extracted_dir):
                 for f in files:
@@ -99,9 +98,5 @@ def main():
         create_manifest(split_dir, 'libri_' + split_type)
 
 if __name__ == "__main__":
-    #_process_file(wav_dir="/informatik2/wtm/home/lakomkin/PycharmProjects/deepspeech.pytorch/data/libri/val/wav",
-    #              txt_dir = "/informatik2/wtm/home/lakomkin/PycharmProjects/deepspeech.pytorch/data/libri/val/txt",
-    #              root_dir="/informatik2/wtm/home/lakomkin/PycharmProjects/deepspeech.pytorch/data/libri/val/LibriSpeech/dev-clean/84/121123",
-    #              base_filename="84-121123-0000.flac")
     main()
 
