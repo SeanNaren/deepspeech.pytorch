@@ -33,7 +33,7 @@ pip install -r requirements.txt
 
 ## Dataset
 
-Currently supports AN4, TEDLIUM, Voxforge and LibriSpeech.
+Currently supports AN4, TEDLIUM, Voxforge and LibriSpeech. Scripts will setup the dataset and create manifest files used in dataloading.
 
 ### AN4
 
@@ -104,6 +104,17 @@ To create a custom dataset you must create a CSV file containing the locations o
 ```
 
 The first path is to the audio file, and the second path is to a text file containing the transcript on one line. This can then be used as stated below.
+
+
+### Merging multiple manifest files
+
+To create bigger manifest files (to train/test on multiple datasets at once) we can merge manifest files together like below from a directory
+containing all the manifests you want to merge. You can also prune short and long clips out of the new manifest.
+
+```
+cd data/
+python merge_manifests.py --output_path merged_manifest.csv --merge_dir all_manifests/ --min_duration 1 --max_duration 15 # durations in seconds
+```
 
 ## Training
 
