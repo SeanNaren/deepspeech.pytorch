@@ -119,7 +119,7 @@ There is also [Visdom](https://github.com/facebookresearch/visdom) support to vi
 python train.py --visdom
 ```
 
-## Checkpoints
+### Checkpoints
 
 Training supports saving checkpoints of the model to continue training from should an error occur or early termination. To enable epoch
 checkpoints use:
@@ -144,6 +144,17 @@ python train.py --continue_from models/deepspeech_checkpoint_epoch_N_iter_N.pth.
 ```
 
 This continues from the same training state as well as recreates the visdom graph to continue from if enabled.
+
+### Choosing batch sizes
+
+Included is a script that can be used to benchmark whether training can occur on your hardware, and the limits on the size of the model/batch
+sizes you can use. To use:
+
+```
+python benchmark.py --batch_size 32
+```
+
+Use the flag `--help` to see other parameters that can be used with the script.
 
 ## Acknowledgements
 
