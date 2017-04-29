@@ -7,7 +7,7 @@ import os
 import subprocess
 
 
-def _update_progress(progress):
+def update_progress(progress):
     print("\rProgress: [{0:50s}] {1:.1f}%".format('#' * int(progress * 50),
                                                   progress * 100), end="")
 
@@ -23,7 +23,7 @@ def create_manifest(data_path, tag, ordered=True):
     for file_path in wav_files:
         file_paths.append(file_path.strip())
         counter += 1
-        _update_progress(counter / float(size))
+        update_progress(counter / float(size))
     print('\n')
     if ordered:
         _order_files(file_paths)
@@ -34,7 +34,7 @@ def create_manifest(data_path, tag, ordered=True):
             sample = os.path.abspath(wav_path) + ',' + os.path.abspath(transcript_path) + '\n'
             file.write(sample.encode('utf-8'))
             counter += 1
-            _update_progress(counter / float(size))
+            update_progress(counter / float(size))
     print('\n')
 
 
