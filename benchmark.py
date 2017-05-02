@@ -36,9 +36,9 @@ optimizer = torch.optim.SGD(parameters, lr=3e-4,
 model = torch.nn.DataParallel(model).cuda()
 criterion = CTCLoss()
 
-
 seconds = int(args.seconds)
 batch_size = int(args.batch_size)
+
 
 def iteration(input_data):
     target = torch.IntTensor(int(batch_size * ((seconds * 100) / 2))).fill_(1)  # targets, align half of the audio
