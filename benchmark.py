@@ -41,7 +41,7 @@ seconds = int(args.seconds)
 batch_size = int(args.batch_size)
 
 def iteration(input_data):
-    target = torch.IntTensor(batch_size * ((seconds * 100) / 2)).fill_(1)  # targets, align half of the audio
+    target = torch.IntTensor(int(batch_size * ((seconds * 100) / 2))).fill_(1)  # targets, align half of the audio
     target_size = torch.IntTensor(batch_size).fill_((seconds * 100) / 2)
     input_percentages = torch.IntTensor(batch_size).fill_(1)
 
