@@ -140,11 +140,10 @@ def main():
     if args.continue_from:
         print("Loading checkpoint model %s" % args.continue_from)
         package = torch.load(args.continue_from)
-        print(package['epoch'])
         model.load_state_dict(package['state_dict'])
         optimizer.load_state_dict(package['optim_dict'])
-        start_epoch = int(package.get('epoch', 1)) - 1  # Python index start at 0 for training
-        start_iter = int(package.get('iteration', -1)) + 1
+        start_epoch = int(package.get('epoch', None) or -1) - 1  # Python index start at 0 for training
+        start_iter = int(package.get('iteration', None) or -1) + 1
         avg_loss = int(package.get('avg_loss'))
         if args.visdom and \
                         package['loss_results'] is not None and start_epoch > 0:  # Add previous scores to visdom graph
