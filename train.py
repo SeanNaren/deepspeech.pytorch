@@ -144,7 +144,7 @@ def main():
         package = torch.load(args.continue_from)
         model.load_state_dict(package['state_dict'])
         optimizer.load_state_dict(package['optim_dict'])
-        start_epoch = int(package.get('epoch', None) or -1) - 1  # Python index start at 0 for training
+        start_epoch = int(package.get('epoch', None) or 1) - 1  # Python index start at 0 for training
         start_iter = int(package.get('iteration', None) or -1) + 1
         avg_loss = int(package.get('avg_loss'))
         if args.visdom and \
