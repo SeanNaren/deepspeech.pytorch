@@ -65,13 +65,14 @@ class AverageMeter(object):
 def checkpoint(model, optimizer, args, nout, epoch=None, iteration=None, loss_results=None, cer_results=None,
                wer_results=None, avg_loss=None):
     package = {
-        'avg_loss': avg_loss if avg_loss is not None else 'N/A',
         'hidden_size': args.hidden_size,
         'hidden_layers': args.hidden_layers,
         'nout': nout,
         'state_dict': model.state_dict(),
         'optim_dict': optimizer.state_dict()
     }
+    if avg_loss is not None:
+        package['avg_loss'] = avg_loss
     if epoch is not None:
         package['epoch'] = epoch + 1  # increment for readability
     if iteration is not None:
