@@ -65,8 +65,6 @@ class AverageMeter(object):
 def checkpoint(model, optimizer, args, nout, epoch=None, iteration=None, loss_results=None, cer_results=None,
                wer_results=None, avg_loss=None):
     package = {
-        'epoch': epoch + 1 if epoch is not None else 'N/A',
-        'iteration': iteration if iteration is not None else 'N/A',
         'avg_loss': avg_loss if avg_loss is not None else 'N/A',
         'hidden_size': args.hidden_size,
         'hidden_layers': args.hidden_layers,
@@ -74,6 +72,10 @@ def checkpoint(model, optimizer, args, nout, epoch=None, iteration=None, loss_re
         'state_dict': model.state_dict(),
         'optim_dict': optimizer.state_dict()
     }
+    if epoch is not None:
+        package['epoch'] = epoch + 1  # increment for readability
+    if iteration is not None:
+        package['iteration'] = iteration
     if loss_results is not None:
         package['loss_results'] = loss_results
         package['cer_results'] = cer_results
@@ -308,16 +310,15 @@ def main():
             file_path = '%s/deepspeech_%d.pth.tar' % (save_folder, epoch + 1)
             torch.save(checkpoint(model, optimizer, args, len(labels), epoch, loss_results=loss_results,
                                   wer_results=wer_results, cer_results=cer_results),
-                       file_path)
-        # anneal lr
-        optim_state = optimizer.state_dict()
-        optim_state['param_groups'][0]['lr'] = optim_state['param_groups'][0]['lr'] / args.learning_anneal
-        optimizer.load_state_dict(optim_state)
-        print('Learning rate annealed to: {lr:.6f}'.format(lr=optim_state['param_groups'][0]['lr']))
+                       file_path)  # anneal lr
 
-        avg_loss = 0
-    torch.save(checkpoint(model, optimizer, args, len(labels)), args.final_model_path)
+            optim_state = optimizer.state_dict()
+            optim_state['param_groups'][0]['lr'] = optim_state['param_groups'][0]['lr'] / args.learning_anneal
+            optimizer.load_state_dict(optim_state)
+            print('Learning rate annealed to: {lr:.6f}'.format(lr=optim_state['param_groups'][0]['lr']))
 
+            avg_loss = 0
+        torch.save(checkpoint(model, optimizer, args, len(labels)), args.final_model_path)
 
-if __name__ == '__main__':
-    main()
+    if __name__ == '__main__':
+        main()
