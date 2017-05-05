@@ -65,15 +65,18 @@ class AverageMeter(object):
 def checkpoint(model, optimizer, args, nout, epoch=None, iteration=None, loss_results=None, cer_results=None,
                wer_results=None, avg_loss=None):
     package = {
-        'epoch': epoch + 1 if epoch is not None else 'N/A',
-        'iteration': iteration if iteration is not None else 'N/A',
-        'avg_loss': avg_loss if avg_loss is not None else 'N/A',
         'hidden_size': args.hidden_size,
         'hidden_layers': args.hidden_layers,
         'nout': nout,
         'state_dict': model.state_dict(),
         'optim_dict': optimizer.state_dict()
     }
+    if avg_loss is not None:
+        package['avg_loss'] = avg_loss
+    if epoch is not None:
+        package['epoch'] = epoch + 1  # increment for readability
+    if iteration is not None:
+        package['iteration'] = iteration
     if loss_results is not None:
         package['loss_results'] = loss_results
         package['cer_results'] = cer_results
@@ -140,12 +143,16 @@ def main():
     if args.continue_from:
         print("Loading checkpoint model %s" % args.continue_from)
         package = torch.load(args.continue_from)
-        print(package['epoch'])
         model.load_state_dict(package['state_dict'])
         optimizer.load_state_dict(package['optim_dict'])
-        start_epoch = int(package.get('epoch', 1)) - 1  # Python index start at 0 for training
-        start_iter = int(package.get('iteration', -1)) + 1
-        avg_loss = int(package.get('avg_loss'))
+        start_epoch = int(package.get('epoch', None) or 1) - 1  # Python index start at 0 for training
+        start_iter = package.get('iteration', None)
+        if start_iter is None:
+            start_epoch += 1  # Assume that we saved a model after an epoch finished, so start at the next epoch.
+            start_iter = 0
+        else:
+            start_iter += 1
+        avg_loss = int(package.get('avg_loss', 0))
         if args.visdom and \
                         package['loss_results'] is not None and start_epoch > 0:  # Add previous scores to visdom graph
             epoch = start_epoch
