@@ -147,7 +147,7 @@ def main():
         optimizer.load_state_dict(package['optim_dict'])
         start_epoch = int(package.get('epoch', None) or 1) - 1  # Python index start at 0 for training
         start_iter = int(package.get('iteration', None) or -1) + 1
-        avg_loss = int(package.get('avg_loss'))
+        avg_loss = int(package.get('avg_loss', 0))
         if args.visdom and \
                         package['loss_results'] is not None and start_epoch > 0:  # Add previous scores to visdom graph
             epoch = start_epoch
