@@ -2,6 +2,7 @@ import math
 from collections import OrderedDict
 
 import torch.nn as nn
+import torch
 
 supported_rnns = {
     'lstm': nn.LSTM,
@@ -102,3 +103,11 @@ class DeepSpeech(nn.Module):
         x = self.fc(x)
         x = x.transpose(0, 1)  # Transpose for multi-gpu concat
         return x
+
+    @classmethod
+    def load_model(cls, path):
+        package = torch.load(path)
+        model = cls(rnn_hidden_size=package['hidden_size'], nb_layers=package['hidden_layers'],
+                    num_classes=package['nout'], rnn_type=supported_rnns[package['rnn_type']])
+        model.load_state_dict(package['state_dict'])
+        return model
