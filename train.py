@@ -149,6 +149,7 @@ def main():
         start_iter = package.get('iteration', None)
         if start_iter is None:
             start_epoch += 1  # Assume that we saved a model after an epoch finished, so start at the next epoch.
+            start_iter = 0
         else:
             start_iter += 1
         avg_loss = int(package.get('avg_loss', 0))
