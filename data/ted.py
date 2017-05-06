@@ -4,7 +4,7 @@ import tarfile
 import argparse
 import subprocess
 import unicodedata
-
+import io
 from utils import create_manifest, update_progress
 
 parser = argparse.ArgumentParser(description='Processes and downloads TED-LIUMv2 dataset.')
@@ -30,7 +30,7 @@ def get_utterances_from_stm(stm_file):
             end_time = float(tokens[4])
             filename = tokens[0]
             transcript = unicodedata.normalize("NFKD",
-                                               unicode(" ".join(t for t in tokens[6:]).decode('utf-8').strip())). \
+                                               " ".join(t for t in tokens[6:]).strip()). \
                 encode("utf-8", "ignore").decode("utf-8", "ignore")
             if transcript != "ignore_time_segment_in_scoring":
                 res.append({
@@ -80,7 +80,7 @@ def prepare_dir(ted_dir):
             target_txt_file = os.path.join(txt_dir, "{}_{}.txt".format(utterance["filename"], str(utterance_id)))
             cut_utterance(sph_file_full, target_wav_file, utterance["start_time"], utterance["end_time"],
                           sample_rate=args.sample_rate)
-            with open(target_txt_file, "w") as f:
+            with io.FileIO(target_txt_file, "w") as f:
                 f.write(_preprocess_transcript(utterance["transcript"]).encode('utf-8'))
         counter += 1
         update_progress(counter / float(len(entries)))

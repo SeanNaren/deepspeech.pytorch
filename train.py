@@ -40,7 +40,8 @@ parser.add_argument('--final_model_path', default='models/deepspeech_final.pth.t
                     help='Location to save final model')
 parser.add_argument('--continue_from', default='', help='Continue from checkpoint model')
 parser.add_argument('--rnn_type', default='lstm', help='Type of the RNN. rnn|gru|lstm are supported')
-parser.set_defaults(cuda=False, silent=False, checkpoint=False, visdom=False)
+parser.add_argument('--augment', dest='augment', action='store_true', help='Use random tempo and gain perturbations.')
+parser.set_defaults(cuda=False, silent=False, checkpoint=False, visdom=False, augment=False)
 
 
 class AverageMeter(object):
@@ -121,9 +122,9 @@ def main():
                       window=args.window)
 
     train_dataset = SpectrogramDataset(audio_conf=audio_conf, manifest_filepath=args.train_manifest, labels=labels,
-                                       normalize=True)
+                                       normalize=True, augment=args.augment)
     test_dataset = SpectrogramDataset(audio_conf=audio_conf, manifest_filepath=args.val_manifest, labels=labels,
-                                      normalize=True)
+                                      normalize=True, augment=False)
     train_loader = AudioDataLoader(train_dataset, batch_size=args.batch_size,
                                    num_workers=args.num_workers)
     test_loader = AudioDataLoader(test_dataset, batch_size=args.batch_size,
@@ -134,7 +135,8 @@ def main():
     model = DeepSpeech(rnn_hidden_size=args.hidden_size,
                        nb_layers=args.hidden_layers, num_classes=len(labels),
                        rnn_type=supported_rnns[rnn_type],
-                       sample_rate=args.sample_rate, window_size=args.window_size)
+                       sample_rate=args.sample_rate, window_size=args.window_size,
+                       bidirectional=True)
     parameters = model.parameters()
     optimizer = torch.optim.SGD(parameters, lr=args.lr,
                                 momentum=args.momentum, nesterov=True)
