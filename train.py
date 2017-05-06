@@ -7,6 +7,7 @@ import time
 import torch
 from torch.autograd import Variable
 from warpctc_pytorch import CTCLoss
+
 from data.data_loader import AudioDataLoader, SpectrogramDataset
 from decoder import ArgMaxDecoder
 from model import DeepSpeech, supported_rnns
@@ -62,15 +63,16 @@ class AverageMeter(object):
         self.avg = self.sum / self.count
 
 
-def checkpoint(model, optimizer, args, nout, epoch=None, iteration=None, loss_results=None, cer_results=None,
-               wer_results=None, avg_loss=None, rnn_type="lstm"):
+def checkpoint(model, optimizer, args, audio_conf, labels, epoch=None, iteration=None, loss_results=None,
+               cer_results=None, wer_results=None, avg_loss=None, rnn_type="lstm"):
     package = {
         'hidden_size': args.hidden_size,
         'hidden_layers': args.hidden_layers,
-        'nout': nout,
         'state_dict': model.state_dict(),
         'optim_dict': optimizer.state_dict(),
-        'rnn_type': rnn_type
+        'rnn_type': rnn_type,
+        'audio_conf': audio_conf,
+        'labels': labels
     }
     if avg_loss is not None:
         package['avg_loss'] = avg_loss
@@ -238,8 +240,9 @@ def main():
                 file_path = '%s/deepspeech_checkpoint_epoch_%d_iter_%d.pth.tar' % (save_folder, epoch + 1, i + 1)
                 print("Saving checkpoint model to %s" % file_path)
                 torch.save(
-                    checkpoint(model, optimizer, args, len(labels), epoch=epoch, iteration=i, loss_results=loss_results,
-                               wer_results=wer_results, cer_results=cer_results, avg_loss=avg_loss, rnn_type=rnn_type),
+                    checkpoint(model, optimizer, args, audio_conf, labels, epoch=epoch, iteration=i,
+                               loss_results=loss_results, wer_results=wer_results, cer_results=cer_results,
+                               avg_loss=avg_loss, rnn_type=rnn_type),
                     file_path)
         avg_loss /= len(train_loader)
 
@@ -315,7 +318,7 @@ def main():
                     )
         if args.checkpoint:
             file_path = '%s/deepspeech_%d.pth.tar' % (save_folder, epoch + 1)
-            torch.save(checkpoint(model, optimizer, args, len(labels), epoch, loss_results=loss_results,
+            torch.save(checkpoint(model, optimizer, args, audio_conf, labels, epoch, loss_results=loss_results,
                                   wer_results=wer_results, cer_results=cer_results, rnn_type=rnn_type),
                        file_path)
         # anneal lr
@@ -325,7 +328,7 @@ def main():
         print('Learning rate annealed to: {lr:.6f}'.format(lr=optim_state['param_groups'][0]['lr']))
 
         avg_loss = 0
-    torch.save(checkpoint(model, optimizer, args, len(labels)), args.final_model_path, rnn_type=rnn_type)
+    torch.save(checkpoint(model, optimizer, args, audio_conf, labels, rnn_type=rnn_type), args.final_model_path)
 
 
 if __name__ == '__main__':
