@@ -6,7 +6,7 @@ import tempfile
 import shutil
 import subprocess
 import tarfile
-
+import io
 from utils import create_manifest, update_progress
 
 VOXFORGE_URL_16kHz = 'http://www.repository.voxforge1.org/downloads/SpeechCorpus/Trunk/Audio/Main/16kHz_16bit/'
@@ -44,7 +44,7 @@ def prepare_sample(recording_name, url, target_folder):
     response = urllib.request.urlopen(request)
     content = response.read()
     response.close()
-    with tempfile.NamedTemporaryFile(suffix=".tgz", mode='w') as target_tgz:
+    with tempfile.NamedTemporaryFile(suffix=".tgz", mode='wb') as target_tgz:
         target_tgz.write(content)
         target_tgz.flush()
         dirpath = tempfile.mkdtemp()
@@ -68,8 +68,8 @@ def prepare_sample(recording_name, url, target_folder):
 
                 target_wav_file = os.path.join(wav_dir, "{}_{}.wav".format(recording_name, recording_id))
                 target_txt_file = os.path.join(txt_dir, "{}_{}.txt".format(recording_name, recording_id))
-                with open(target_txt_file, "w") as f:
-                    f.write(utterance.encode('utf-8'))
+                with io.FileIO(target_txt_file, "w") as file:
+                    file.write(utterance.encode('utf-8'))
                 original_wav_file = os.path.join(recordings_dir, wav_file)
                 subprocess.call(["sox {}  -r {} -b 16 -c 1 {}".format(original_wav_file, str(args.sample_rate),
                                                                       target_wav_file)], shell=True)
