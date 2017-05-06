@@ -4,12 +4,24 @@ import scipy.signal
 import torch
 from torch.utils.data import DataLoader
 from torch.utils.data import Dataset
-from scipy.io.wavfile import read as wav_read
-from data.augmentation import load_randomly_augmented_audio
+import torchaudio
+from tempfile import NamedTemporaryFile
+import os
 
 windows = {'hamming': scipy.signal.hamming, 'hann': scipy.signal.hann, 'blackman': scipy.signal.blackman,
            'bartlett': scipy.signal.bartlett}
 
+def load_audio(path):
+    sound, _ = torchaudio.load(path.encode('utf-8'))  # py3 fix
+    sound = sound.numpy()
+    if len(sound.shape) > 1:
+        if sound.shape[1] == 1:
+            #single channel, we just squeeze it
+            sound = sound.squeeze()
+        else:
+            #multiple channels, average
+            sound = sound.mean(axis=1)
+    return sound
 
 class AudioParser(object):
     def parse_transcript(self, transcript_path):
@@ -45,14 +57,15 @@ class SpectrogramParser(AudioParser):
 
     def parse_audio(self, audio_path):
         if not self.augment:
-            _, y = wav_read(audio_path)
+            y = load_audio(audio_path)
         else:
             y = load_randomly_augmented_audio(audio_path)
         n_fft = int(self.sample_rate * self.window_size)
         win_length = n_fft
         hop_length = int(self.sample_rate * self.window_stride)
         # STFT
-        D = librosa.stft(y, n_fft=n_fft, hop_length=hop_length, win_length=win_length, window=self.window)
+        D = librosa.stft(y, n_fft=n_fft, hop_length=hop_length,
+                         win_length=win_length, window=self.window)
         spect, phase = librosa.magphase(D)
         # S = log(S+1)
         spect = np.log1p(spect)
@@ -142,3 +155,31 @@ class AudioDataLoader(DataLoader):
         """
         super(AudioDataLoader, self).__init__(*args, **kwargs)
         self.collate_fn = _collate_fn
+
+def augment_audio_with_sox(path, sample_rate, tempo=1.0, gain=0.0):
+    """
+    Changes tempo and gain of the recording with sox and loads it.
+    """
+    with NamedTemporaryFile(suffix=".wav") as augmented_file:
+        augmented_filename = augmented_file.name
+        sox_augment_params = ["tempo", "{:.3f}".format(tempo), "gain", "{:.3f}".format(gain)]
+        sox_params = "sox {} -r {} -c 1 -b 16 {} {} >/dev/null 2>&1".format(path, sample_rate,
+                                                            augmented_filename, " ".join(sox_augment_params))
+        os.system(sox_params)
+        y = load_audio(path)
+        return y
+
+
+def load_randomly_augmented_audio(path, sample_rate=16000, tempo_range=(0.85, 1.15),
+                                  gain_range=(-6, 8)):
+    """
+    Picks tempo and gain uniformly, applies it to the utterance by using sox utility.
+    Returns the augmented utterance.
+    """
+    low_tempo, high_tempo = tempo_range
+    tempo_value = np.random.uniform(low=low_tempo, high=high_tempo)
+    low_gain, high_gain = gain_range
+    gain_value = np.random.uniform(low=low_gain, high=high_gain)
+    audio = augment_audio_with_sox(path=path, sample_rate=sample_rate,
+                                   tempo=tempo_value, gain=gain_value)
+    return audio
