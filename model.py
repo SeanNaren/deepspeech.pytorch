@@ -1,8 +1,8 @@
 import math
 from collections import OrderedDict
 
-import torch.nn as nn
 import torch
+import torch.nn as nn
 
 supported_rnns = {
     'lstm': nn.LSTM,
@@ -105,9 +105,10 @@ class DeepSpeech(nn.Module):
         return x
 
     @classmethod
-    def load_model(cls, path):
-        package = torch.load(path)
+    def load_model(cls, package, cuda):
         model = cls(rnn_hidden_size=package['hidden_size'], nb_layers=package['hidden_layers'],
-                    num_classes=package['nout'], rnn_type=supported_rnns[package['rnn_type']])
+                    num_classes=len(package['labels']), rnn_type=supported_rnns[package['rnn_type']])
+        if cuda:
+            model = torch.nn.DataParallel(model).cuda()
         model.load_state_dict(package['state_dict'])
         return model
