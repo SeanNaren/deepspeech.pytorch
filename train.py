@@ -40,9 +40,8 @@ parser.add_argument('--final_model_path', default='models/deepspeech_final.pth.t
                     help='Location to save final model')
 parser.add_argument('--continue_from', default='', help='Continue from checkpoint model')
 parser.add_argument('--rnn_type', default='lstm', help='Type of the RNN. rnn|gru|lstm are supported')
-parser.add_argument('--bidirectional', dest='bidirectional', action='store_true', help='Use bi-directional rnns')
 parser.add_argument('--augment', dest='augment', action='store_true', help='Use random tempo and gain perturbations.')
-parser.set_defaults(cuda=False, silent=False, checkpoint=False, visdom=False, bidirectional=False, augment=False)
+parser.set_defaults(cuda=False, silent=False, checkpoint=False, visdom=False, augment=False)
 
 
 class AverageMeter(object):
@@ -136,7 +135,7 @@ def main():
                        nb_layers=args.hidden_layers, num_classes=len(labels),
                        rnn_type=supported_rnns[rnn_type],
                        sample_rate=args.sample_rate, window_size=args.window_size,
-                       bidirectional=args.bidirectional)
+                       bidirectional=True)
     parameters = model.parameters()
     optimizer = torch.optim.SGD(parameters, lr=args.lr,
                                 momentum=args.momentum, nesterov=True)
