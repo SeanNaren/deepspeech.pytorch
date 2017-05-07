@@ -1,27 +1,28 @@
+import os
+from tempfile import NamedTemporaryFile
+
 import librosa
 import numpy as np
 import scipy.signal
 import torch
+import torchaudio
 from torch.utils.data import DataLoader
 from torch.utils.data import Dataset
-import torchaudio
-from tempfile import NamedTemporaryFile
-import os
 
 windows = {'hamming': scipy.signal.hamming, 'hann': scipy.signal.hann, 'blackman': scipy.signal.blackman,
            'bartlett': scipy.signal.bartlett}
+
 
 def load_audio(path):
     sound, _ = torchaudio.load(path.encode('utf-8'))  # py3 fix
     sound = sound.numpy()
     if len(sound.shape) > 1:
         if sound.shape[1] == 1:
-            #single channel, we just squeeze it
             sound = sound.squeeze()
         else:
-            #multiple channels, average
-            sound = sound.mean(axis=1)
+            sound = sound.mean(axis=1)  # multiple channels, average
     return sound
+
 
 class AudioParser(object):
     def parse_transcript(self, transcript_path):
@@ -39,10 +40,52 @@ class AudioParser(object):
         raise NotImplementedError
 
 
+class NoiseInjection(object):
+    def __init__(self,
+                 path=None,
+                 sr=16000,
+                 noise_levels=(0, 0.5)):
+        """
+        Adds noise to an input signal with specific SNR.
+        Modified code from https://github.com/willfrey/audio/blob/master/torchaudio/transforms.py
+        """
+        self.paths = librosa.util.find_files(path)
+        self.sr = sr
+        self.noise_levels = noise_levels
+
+    def inject_noise(self, data):
+        noise_src = load_audio(np.random.choice(self.paths))
+        noise_offset_fraction = np.random.rand()
+        noise_level = np.random.uniform(*self.noise_levels)
+
+        noise_dst = np.zeros_like(data)
+
+        src_offset = int(len(noise_src) * noise_offset_fraction)
+        src_left = len(noise_src) - src_offset
+
+        dst_offset = 0
+        dst_left = len(data)
+
+        while dst_left > 0:
+            copy_size = min(dst_left, src_left)
+            np.copyto(noise_dst[dst_offset:dst_offset + copy_size],
+                      noise_src[src_offset:src_offset + copy_size])
+            if src_left > dst_left:
+                dst_left = 0
+            else:
+                dst_left -= copy_size
+                dst_offset += copy_size
+                src_left = len(noise_src)
+                src_offset = 0
+
+        data += noise_level * noise_dst
+        return data
+
+
 class SpectrogramParser(AudioParser):
     def __init__(self, audio_conf, normalize=False, augment=False):
         """
-        Parses audio file into spectrogram with optional normalization
+        Parses audio file into spectrogram with optional normalization and various augmentations
         :param audio_conf: Dictionary containing the sample rate, window and the window length/stride in seconds
         :param normalize(default False):  Apply standard mean and deviation normalization to audio tensor
         :param augment(default False):  Apply random tempo and gain perturbations
@@ -54,12 +97,20 @@ class SpectrogramParser(AudioParser):
         self.window = windows.get(audio_conf['window'], windows['hamming'])
         self.normalize = normalize
         self.augment = augment
+        self.noiseInjector = NoiseInjection(audio_conf['noise_dir'], self.sample_rate,
+                                            audio_conf['noise_levels']) if audio_conf.get(
+            'noise_dir') is not None else None
+        self.noise_prob = audio_conf.get('noise_prob')
 
     def parse_audio(self, audio_path):
-        if not self.augment:
-            y = load_audio(audio_path)
-        else:
+        if self.augment:
             y = load_randomly_augmented_audio(audio_path)
+        else:
+            y = load_audio(audio_path)
+        if self.noiseInjector:
+            add_noise = np.random.binomial(1, self.noise_prob)
+            if add_noise:
+                y = self.noiseInjector.inject_noise(y)
         n_fft = int(self.sample_rate * self.window_size)
         win_length = n_fft
         hop_length = int(self.sample_rate * self.window_stride)
@@ -147,7 +198,6 @@ def _collate_fn(batch):
     return inputs, targets, input_percentages, target_sizes
 
 
-
 class AudioDataLoader(DataLoader):
     def __init__(self, *args, **kwargs):
         """
@@ -156,7 +206,8 @@ class AudioDataLoader(DataLoader):
         super(AudioDataLoader, self).__init__(*args, **kwargs)
         self.collate_fn = _collate_fn
 
-def augment_audio_with_sox(path, sample_rate, tempo=1.0, gain=0.0):
+
+def augment_audio_with_sox(path, sample_rate, tempo, gain):
     """
     Changes tempo and gain of the recording with sox and loads it.
     """
@@ -164,7 +215,8 @@ def augment_audio_with_sox(path, sample_rate, tempo=1.0, gain=0.0):
         augmented_filename = augmented_file.name
         sox_augment_params = ["tempo", "{:.3f}".format(tempo), "gain", "{:.3f}".format(gain)]
         sox_params = "sox {} -r {} -c 1 -b 16 {} {} >/dev/null 2>&1".format(path, sample_rate,
-                                                            augmented_filename, " ".join(sox_augment_params))
+                                                                            augmented_filename,
+                                                                            " ".join(sox_augment_params))
         os.system(sox_params)
         y = load_audio(path)
         return y

@@ -42,6 +42,13 @@ parser.add_argument('--final_model_path', default='models/deepspeech_final.pth.t
 parser.add_argument('--continue_from', default='', help='Continue from checkpoint model')
 parser.add_argument('--rnn_type', default='lstm', help='Type of the RNN. rnn|gru|lstm are supported')
 parser.add_argument('--augment', dest='augment', action='store_true', help='Use random tempo and gain perturbations.')
+parser.add_argument('--noise_dir', default='',
+                    help='Directory to inject noise into audio. If default, noise Inject not added')
+parser.add_argument('--noise_prob', default=0.4, help='Probability of noise being added per sample')
+parser.add_argument('--noise_min', default=0.0,
+                    help='Minimum noise level to sample from. (1.0 means all noise, not original signal)', type=float)
+parser.add_argument('--noise_max', default=0.5,
+                    help='Maximum noise levels to sample from. Maximum 1.0', type=float)
 parser.set_defaults(cuda=False, silent=False, checkpoint=False, visdom=False, augment=False)
 
 
@@ -121,7 +128,10 @@ def main():
     audio_conf = dict(sample_rate=args.sample_rate,
                       window_size=args.window_size,
                       window_stride=args.window_stride,
-                      window=args.window)
+                      window=args.window,
+                      noise_dir=args.noise_dir,
+                      noise_prob=args.noise_prob,
+                      noise_levels=(args.noise_min, args.noise_max))
 
     train_dataset = SpectrogramDataset(audio_conf=audio_conf, manifest_filepath=args.train_manifest, labels=labels,
                                        normalize=True, augment=args.augment)
