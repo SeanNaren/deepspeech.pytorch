@@ -9,13 +9,8 @@ from decoder import ArgMaxDecoder
 from model import DeepSpeech
 
 parser = argparse.ArgumentParser(description='DeepSpeech prediction')
-parser.add_argument('--sample_rate', default=16000, type=int, help='Sample rate')
-parser.add_argument('--labels_path', default='labels.json', help='Contains all characters for prediction')
 parser.add_argument('--model_path', default='models/deepspeech_final.pth.tar',
                     help='Path to model file created by training')
-parser.add_argument('--window_size', default=.02, type=float, help='Window size for spectrogram in seconds')
-parser.add_argument('--window_stride', default=.01, type=float, help='Window stride for spectrogram in seconds')
-parser.add_argument('--window', default='hamming', help='Window type for spectrogram generation')
 parser.add_argument('--cuda', action="store_true", help='Use cuda to test model')
 parser.add_argument('--val_manifest', metavar='DIR',
                     help='path to validation manifest csv', default='data/val_manifest.csv')
@@ -24,19 +19,12 @@ parser.add_argument('--num_workers', default=4, type=int, help='Number of worker
 args = parser.parse_args()
 
 if __name__ == '__main__':
-    model = DeepSpeech.load_model(args.model_path)
-    if args.cuda:
-        model = torch.nn.DataParallel(model).cuda()
+    package = torch.load(args.model_path)
+    model = DeepSpeech.load_model(package, cuda=args.cuda)
     model.eval()
 
-    with open(args.labels_path) as label_file:
-        labels = str(''.join(json.load(label_file)))
-    decoder = ArgMaxDecoder(labels)
-
-    audio_conf = dict(sample_rate=args.sample_rate,
-                      window_size=args.window_size,
-                      window_stride=args.window_stride,
-                      window=args.window)
+    labels = package['labels']
+    audio_conf = package['audio_conf']
 
     test_dataset = SpectrogramDataset(audio_conf=audio_conf, manifest_filepath=args.val_manifest, labels=labels,
                                       normalize=True)

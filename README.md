@@ -23,8 +23,15 @@ cd pytorch_binding
 python setup.py install
 ```
 
-Finally:
+Install pytorch audio:
+```
+sudo apt-get install sox libsox-dev libsox-fmt-all
+git clone https://github.com/pytorch/audio.git
+cd audio
+python setup.py install
+```
 
+Finally:
 ```
 pip install -r requirements.txt
 ```
