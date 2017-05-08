@@ -16,12 +16,12 @@ parser.add_argument('--cuda', action="store_true", help='Use cuda to test model'
 args = parser.parse_args()
 
 if __name__ == '__main__':
-    package = torch.load(args.model_path)
-    model = DeepSpeech.load_model(package, cuda=args.cuda)
+    model = DeepSpeech.load_model(args.model_path, cuda=args.cuda)
     model.eval()
 
-    labels = package['labels']
-    audio_conf = package['audio_conf']
+    labels = DeepSpeech.get_labels(model)
+    audio_conf = DeepSpeech.get_audio_conf(model)
+
     decoder = ArgMaxDecoder(labels)
     parser = SpectrogramParser(audio_conf, normalize=True)
     spect = parser.parse_audio(args.audio_path).contiguous()
