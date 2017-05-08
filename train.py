@@ -217,8 +217,8 @@ def main():
             if args.checkpoint_per_batch > 0 and i > 0 and (i + 1) % args.checkpoint_per_batch == 0:
                 file_path = '%s/deepspeech_checkpoint_epoch_%d_iter_%d.pth.tar' % (save_folder, epoch + 1, i + 1)
                 print("Saving checkpoint model to %s" % file_path)
-                torch.save(model.serialize(optimizer=optimizer, epoch=epoch, iteration=i, loss_results=loss_results,
-                                           wer_results=wer_results, cer_results=cer_results, avg_loss=avg_loss),
+                torch.save(DeepSpeech.serialize(model, optimizer=optimizer, epoch=epoch, iteration=i, loss_results=loss_results,
+                                                wer_results=wer_results, cer_results=cer_results, avg_loss=avg_loss),
                            file_path)
         avg_loss /= len(train_loader)
 
@@ -294,8 +294,8 @@ def main():
                     )
         if args.checkpoint:
             file_path = '%s/deepspeech_%d.pth.tar' % (save_folder, epoch + 1)
-            torch.save(model.serialize(optimizer=optimizer, epoch=epoch, loss_results=loss_results,
-                                       wer_results=wer_results, cer_results=cer_results),
+            torch.save(DeepSpeech.serialize(model, optimizer=optimizer, epoch=epoch, loss_results=loss_results,
+                                            wer_results=wer_results, cer_results=cer_results),
                        file_path)
         # anneal lr
         optim_state = optimizer.state_dict()
@@ -304,7 +304,7 @@ def main():
         print('Learning rate annealed to: {lr:.6f}'.format(lr=optim_state['param_groups'][0]['lr']))
 
         avg_loss = 0
-    torch.save(model.serialize(optimizer=optimizer), args.final_model_path)
+    torch.save(DeepSpeech.serialize(model, optimizer=optimizer), args.final_model_path)
 
 
 if __name__ == '__main__':

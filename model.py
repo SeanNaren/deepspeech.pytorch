@@ -62,7 +62,7 @@ class DeepSpeech(nn.Module):
         super(DeepSpeech, self).__init__()
 
         # model metadata needed for serialization/deserialization
-        self.__version__ = '0.0.1'
+        self._version = '0.0.1'
         self._hidden_size = rnn_hidden_size
         self._hidden_layers = nb_layers
         self._rnn_type = rnn_type
@@ -126,17 +126,19 @@ class DeepSpeech(nn.Module):
             model = torch.nn.DataParallel(model).cuda()
         return model
 
-    def serialize(self, optimizer=None, epoch=None, iteration=None, loss_results=None,
+    @staticmethod
+    def serialize(model, optimizer=None, epoch=None, iteration=None, loss_results=None,
                   cer_results=None, wer_results=None, avg_loss=None, meta=None):
-        model_is_cuda = next(self.parameters()).is_cuda
+        model_is_cuda = next(model.parameters()).is_cuda
+        model = model.module if model_is_cuda else model
         package = {
-            'version': self.__version__,
-            'hidden_size': self._hidden_size,
-            'hidden_layers': self._hidden_layers,
-            'rnn_type': supported_rnns_inv.get(self._rnn_type, type(self._rnn_type).__name__),
-            'audio_conf': self._audio_conf,
-            'labels': self._labels,
-            'state_dict': self.module.state_dict() if model_is_cuda else self.state_dict()
+            'version': model._version,
+            'hidden_size': model._hidden_size,
+            'hidden_layers': model._hidden_layers,
+            'rnn_type': supported_rnns_inv.get(model._rnn_type, type(model._rnn_type).__name__),
+            'audio_conf': model._audio_conf,
+            'labels': model._labels,
+            'state_dict': model.state_dict()
         }
         if optimizer is not None:
             package['optim_dict'] = optimizer.state_dict()
