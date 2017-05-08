@@ -136,7 +136,7 @@ class DeepSpeech(nn.Module):
             'version': model._version,
             'hidden_size': model._hidden_size,
             'hidden_layers': model._hidden_layers,
-            'rnn_type': supported_rnns_inv.get(model._rnn_type, type(model._rnn_type).__name__),
+            'rnn_type': supported_rnns_inv.get(model._rnn_type, model._rnn_type.__name__.lower()),
             'audio_conf': model._audio_conf,
             'labels': model._labels,
             'state_dict': model.state_dict()
@@ -166,3 +166,44 @@ class DeepSpeech(nn.Module):
     def get_audio_conf(model):
         model_is_cuda = next(model.parameters()).is_cuda
         return model.module._audio_conf if model_is_cuda else model._audio_conf
+
+if __name__ == '__main__':
+    import os.path
+    import argparse
+    import json
+    parser = argparse.ArgumentParser(description='DeepSpeech model information')
+    parser.add_argument('--model_path', default='models/deepspeech_final.pth.tar',
+                        help='Path to model file created by training')
+    args = parser.parse_args()
+    package = torch.load(args.model_path, map_location=lambda storage, loc: storage)
+    model = DeepSpeech.load_model(args.model_path)
+
+    print("Model name:         ", os.path.basename(args.model_path))
+    print("DeepSpeech version: ", model._version)
+    print("")
+    print("Recurrent Neural Network Properties")
+    print("  RNN Type:         ", model._rnn_type.__name__.lower())
+    print("  RNN Layers:       ", model._hidden_layers)
+    print("  RNN Size:         ", model._hidden_size)
+    print("  Classes:          ", len(model._labels))
+    print("")
+    print("Model Features")
+    print("  Labels:           ", model._labels)
+    print("  Sample Rate:      ", model._audio_conf.get("sample_rate", "n/a"))
+    print("  Window Type:      ", model._audio_conf.get("window", "n/a"))
+    print("  Window Size:      ", model._audio_conf.get("window_size", "n/a"))
+    print("  Window Stride:    ", model._audio_conf.get("window_stride", "n/a"))
+
+    if package.get('meta', None) is not None:
+        print("")
+        print("Additional Metadata")
+        for k, v in model._meta:
+            print("  ", k, ": ", v)
+    if package.get('loss_results', None) is not None:
+        print("")
+        print("Training Information")
+        epochs = package['epoch']
+        print("  Epochs:           ", epochs)
+        print("  Min Loss:          {0:.3f}".format(package['loss_results'][0:epochs-1].min()))
+        print("  Min CER:           {0:.3f}".format(package['cer_results'][0:epochs-1].min()))
+        print("  Min WER:           {0:.3f}".format(package['wer_results'][0:epochs-1].min()))
