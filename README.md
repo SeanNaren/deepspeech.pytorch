@@ -179,7 +179,7 @@ Use the flag `--help` to see other parameters that can be used with the script.
 Saved models contain the metadata of their training process. To see the metadata run the below command:
 
 ```
-python model --model_path models/deepspeech.pth.tar
+python model.py --model_path models/deepspeech.pth.tar
 ```
 
 ## Acknowledgements
