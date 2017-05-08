@@ -174,6 +174,14 @@ python benchmark.py --batch_size 32
 
 Use the flag `--help` to see other parameters that can be used with the script.
 
+### Model details
+
+Saved models contain the metadata of their training process. To see the metadata run the below command:
+
+```
+python model --model_path models/deepspeech.pth.tar
+```
+
 ## Acknowledgements
 
-Thanks to [Egor](https://github.com/EgorLakomkin) for his awesome contributions in data processing and general feedback!
+Thanks to [Egor](https://github.com/EgorLakomkin) and [Ryan](https://github.com/ryanleary) for their contributions!
