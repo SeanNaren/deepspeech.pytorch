@@ -24,7 +24,7 @@ if __name__ == '__main__':
     model.eval()
 
     labels = DeepSpeech.get_labels(model)
-    audio_conf = DeepSpeech.get_labels(model)
+    audio_conf = DeepSpeech.get_audio_conf(model)
 
     test_dataset = SpectrogramDataset(audio_conf=audio_conf, manifest_filepath=args.val_manifest, labels=labels,
                                       normalize=True)

@@ -21,7 +21,7 @@ if __name__ == '__main__':
     model.eval()
 
     labels = DeepSpeech.get_labels(model)
-    audio_conf = DeepSpeech.get_labels(model)
+    audio_conf = DeepSpeech.get_audio_conf(model)
 
     decoder = ArgMaxDecoder(labels)
     parser = SpectrogramParser(audio_conf, normalize=True)
