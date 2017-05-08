@@ -118,7 +118,8 @@ class DeepSpeech(nn.Module):
         return x
 
     @classmethod
-    def load_model(cls, package, cuda):
+    def load_model(cls, path, cuda=False):
+        package = torch.load(path, map_location=lambda storage, loc: storage)
         model = cls(rnn_hidden_size=package['hidden_size'], nb_layers=package['hidden_layers'],
                     labels=package['labels'], audio_conf=package['audio_conf'], rnn_type=supported_rnns[package['rnn_type']])
         model.load_state_dict(package['state_dict'])

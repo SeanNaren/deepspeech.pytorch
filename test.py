@@ -19,12 +19,12 @@ parser.add_argument('--num_workers', default=4, type=int, help='Number of worker
 args = parser.parse_args()
 
 if __name__ == '__main__':
-    package = torch.load(args.model_path)
-    model = DeepSpeech.load_model(package, cuda=args.cuda)
+    model = DeepSpeech.load_model(args.model_path, cuda=args.cuda)
     model.eval()
 
     labels = DeepSpeech.get_labels(model)
     audio_conf = DeepSpeech.get_audio_conf(model)
+    decoder = ArgMaxDecoder(labels)
 
     test_dataset = SpectrogramDataset(audio_conf=audio_conf, manifest_filepath=args.val_manifest, labels=labels,
                                       normalize=True)
