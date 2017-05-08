@@ -137,6 +137,22 @@ There is also [Visdom](https://github.com/facebookresearch/visdom) support to vi
 python train.py --visdom
 ```
 
+### Noise Augmentation/Injection
+
+There is support for two different types of noise; noise augmentation and noise injection.
+
+#### Noise Augmentation
+
+Applies small changes to the tempo and gain when loading audio to increase robustness. To use, use the `--augment` flag when training.
+
+#### Noise Injection
+
+Dynamically adds noise into the training data to increase robustness. To use, first fill a directory up with all the noise files you want to sample from.
+The dataloader will randomly pick samples from this directory.
+
+To enable noise injection, use the `--noise_dir /path/to/noise/dir/` to specify where your noise files are. There are a few noise parameters to tweak, such as
+`--noise_prob` to determine the probability that noise is added, and the `--noise_min`, `--noise_max` parameters to determine the minimum and maximum noise to add in training.
+
 ### Checkpoints
 
 Training supports saving checkpoints of the model to continue training from should an error occur or early termination. To enable epoch
