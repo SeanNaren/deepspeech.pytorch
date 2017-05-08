@@ -63,31 +63,6 @@ class AverageMeter(object):
         self.count += n
         self.avg = self.sum / self.count
 
-
-def checkpoint(model, optimizer, args, audio_conf, labels, epoch=None, iteration=None, loss_results=None,
-               cer_results=None, wer_results=None, avg_loss=None, rnn_type="lstm"):
-    package = {
-        'hidden_size': args.hidden_size,
-        'hidden_layers': args.hidden_layers,
-        'state_dict': model.state_dict(),
-        'optim_dict': optimizer.state_dict(),
-        'rnn_type': rnn_type,
-        'audio_conf': audio_conf,
-        'labels': labels
-    }
-    if avg_loss is not None:
-        package['avg_loss'] = avg_loss
-    if epoch is not None:
-        package['epoch'] = epoch + 1  # increment for readability
-    if iteration is not None:
-        package['iteration'] = iteration
-    if loss_results is not None:
-        package['loss_results'] = loss_results
-        package['cer_results'] = cer_results
-        package['wer_results'] = wer_results
-    return package
-
-
 def main():
     args = parser.parse_args()
     save_folder = args.save_folder
@@ -135,9 +110,10 @@ def main():
     rnn_type = args.rnn_type.lower()
     assert rnn_type in supported_rnns, "rnn_type should be either lstm, rnn or gru"
     model = DeepSpeech(rnn_hidden_size=args.hidden_size,
-                       nb_layers=args.hidden_layers, num_classes=len(labels),
+                       nb_layers=args.hidden_layers,
+                       labels=labels,
                        rnn_type=supported_rnns[rnn_type],
-                       sample_rate=args.sample_rate, window_size=args.window_size,
+                       audio_conf=audio_conf,
                        bidirectional=True)
     parameters = model.parameters()
     optimizer = torch.optim.SGD(parameters, lr=args.lr,
@@ -241,11 +217,9 @@ def main():
             if args.checkpoint_per_batch > 0 and i > 0 and (i + 1) % args.checkpoint_per_batch == 0:
                 file_path = '%s/deepspeech_checkpoint_epoch_%d_iter_%d.pth.tar' % (save_folder, epoch + 1, i + 1)
                 print("Saving checkpoint model to %s" % file_path)
-                torch.save(
-                    checkpoint(model, optimizer, args, audio_conf, labels, epoch=epoch, iteration=i,
-                               loss_results=loss_results, wer_results=wer_results, cer_results=cer_results,
-                               avg_loss=avg_loss, rnn_type=rnn_type),
-                    file_path)
+                torch.save(model.serialize(optimizer=optimizer, epoch=epoch, iteration=i, loss_results=loss_results,
+                                           wer_results=wer_results, cer_results=cer_results, avg_loss=avg_loss),
+                           file_path)
         avg_loss /= len(train_loader)
 
         print('Training Summary Epoch: [{0}]\t'
@@ -320,8 +294,8 @@ def main():
                     )
         if args.checkpoint:
             file_path = '%s/deepspeech_%d.pth.tar' % (save_folder, epoch + 1)
-            torch.save(checkpoint(model, optimizer, args, audio_conf, labels, epoch, loss_results=loss_results,
-                                  wer_results=wer_results, cer_results=cer_results, rnn_type=rnn_type),
+            torch.save(model.serialize(optimizer=optimizer, epoch=epoch, loss_results=loss_results,
+                                       wer_results=wer_results, cer_results=cer_results),
                        file_path)
         # anneal lr
         optim_state = optimizer.state_dict()
@@ -330,7 +304,7 @@ def main():
         print('Learning rate annealed to: {lr:.6f}'.format(lr=optim_state['param_groups'][0]['lr']))
 
         avg_loss = 0
-    torch.save(checkpoint(model, optimizer, args, audio_conf, labels, rnn_type=rnn_type), args.final_model_path)
+    torch.save(model.serialize(optimizer=optimizer), args.final_model_path)
 
 
 if __name__ == '__main__':

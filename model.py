@@ -9,6 +9,7 @@ supported_rnns = {
     'rnn': nn.RNN,
     'gru': nn.GRU
 }
+supported_rnns_inv = dict((v,k) for k,v in supported_rnns.items())
 
 
 class SequenceWise(nn.Module):
@@ -57,9 +58,21 @@ class BatchRNN(nn.Module):
 
 
 class DeepSpeech(nn.Module):
-    def __init__(self, rnn_type=nn.LSTM, num_classes=29, rnn_hidden_size=768, nb_layers=5, sample_rate=16000,
-                 window_size=0.02, bidirectional=True):
+    def __init__(self, rnn_type=nn.LSTM, labels="abc", rnn_hidden_size=768, nb_layers=5, audio_conf={}, bidirectional=True):
         super(DeepSpeech, self).__init__()
+
+        # model metadata needed for serialization/deserialization
+        self.__version__ = '0.0.1'
+        self._hidden_size = rnn_hidden_size
+        self._hidden_layers = nb_layers
+        self._rnn_type = rnn_type
+        self._audio_conf = audio_conf or {}
+        self._labels = labels
+
+        sample_rate = self._audio_conf.get("sample_rate", 16000)
+        window_size = self._audio_conf.get("window_size", 0.02)
+        num_classes = len(self._labels)
+
         self.conv = nn.Sequential(
             nn.Conv2d(1, 32, kernel_size=(41, 11), stride=(2, 2)),
             nn.BatchNorm2d(32),
@@ -107,8 +120,36 @@ class DeepSpeech(nn.Module):
     @classmethod
     def load_model(cls, package, cuda):
         model = cls(rnn_hidden_size=package['hidden_size'], nb_layers=package['hidden_layers'],
-                    num_classes=len(package['labels']), rnn_type=supported_rnns[package['rnn_type']])
+                    labels=package['labels'], audio_conf=package['audio_conf'], rnn_type=supported_rnns[package['rnn_type']])
+        model.load_state_dict(package['state_dict'])
         if cuda:
             model = torch.nn.DataParallel(model).cuda()
-        model.load_state_dict(package['state_dict'])
         return model
+
+    def serialize(self, optimizer=None, epoch=None, iteration=None, loss_results=None,
+                  cer_results=None, wer_results=None, avg_loss=None, meta=None):
+        model_is_cuda = next(self.parameters()).is_cuda
+        package = {
+            'version': self.__version__,
+            'hidden_size': self._hidden_size,
+            'hidden_layers': self._hidden_layers,
+            'rnn_type': supported_rnns_inv.get(self._rnn_type, type(self._rnn_type).__name__),
+            'audio_conf': self._audio_conf,
+            'labels': self._labels,
+            'state_dict': self.module.state_dict() if model_is_cuda else self.state_dict()
+        }
+        if optimizer is not None:
+            package['optim_dict'] = optimizer.state_dict()
+        if avg_loss is not None:
+            package['avg_loss'] = avg_loss
+        if epoch is not None:
+            package['epoch'] = epoch + 1  # increment for readability
+        if iteration is not None:
+            package['iteration'] = iteration
+        if loss_results is not None:
+            package['loss_results'] = loss_results
+            package['cer_results'] = cer_results
+            package['wer_results'] = wer_results
+        if meta is not None:
+            package['meta'] = meta
+        return package
