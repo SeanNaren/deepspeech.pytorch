@@ -23,8 +23,8 @@ if __name__ == '__main__':
     model = DeepSpeech.load_model(package, cuda=args.cuda)
     model.eval()
 
-    labels = model._labels
-    audio_conf = model._audio_conf
+    labels = DeepSpeech.get_labels(model)
+    audio_conf = DeepSpeech.get_labels(model)
 
     test_dataset = SpectrogramDataset(audio_conf=audio_conf, manifest_filepath=args.val_manifest, labels=labels,
                                       normalize=True)

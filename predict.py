@@ -20,9 +20,9 @@ if __name__ == '__main__':
     model = DeepSpeech.load_model(package, cuda=args.cuda)
     model.eval()
 
-    labels = model._labels
-    audio_conf = model._audio_conf
-    
+    labels = DeepSpeech.get_labels(model)
+    audio_conf = DeepSpeech.get_labels(model)
+
     decoder = ArgMaxDecoder(labels)
     parser = SpectrogramParser(audio_conf, normalize=True)
     spect = parser.parse_audio(args.audio_path).contiguous()
