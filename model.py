@@ -194,16 +194,17 @@ if __name__ == '__main__':
     print("  Window Size:      ", model._audio_conf.get("window_size", "n/a"))
     print("  Window Stride:    ", model._audio_conf.get("window_stride", "n/a"))
 
-    if package.get('meta', None) is not None:
-        print("")
-        print("Additional Metadata")
-        for k, v in model._meta:
-            print("  ", k, ": ", v)
     if package.get('loss_results', None) is not None:
         print("")
         print("Training Information")
         epochs = package['epoch']
         print("  Epochs:           ", epochs)
-        print("  Min Loss:          {0:.3f}".format(package['loss_results'][0:epochs-1].min()))
-        print("  Min CER:           {0:.3f}".format(package['cer_results'][0:epochs-1].min()))
-        print("  Min WER:           {0:.3f}".format(package['wer_results'][0:epochs-1].min()))
+        print("  Current Loss:      {0:.3f}".format(package['loss_results'][epochs-1]))
+        print("  Current CER:       {0:.3f}".format(package['cer_results'][epochs-1]))
+        print("  Current WER:       {0:.3f}".format(package['wer_results'][epochs-1]))
+
+    if package.get('meta', None) is not None:
+        print("")
+        print("Additional Metadata")
+        for k, v in model._meta:
+            print("  ", k, ": ", v)
