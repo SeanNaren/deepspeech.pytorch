@@ -42,7 +42,7 @@ parser.add_argument('--final_model_path', default='models/deepspeech_final.pth.t
 parser.add_argument('--continue_from', default='', help='Continue from checkpoint model')
 parser.add_argument('--rnn_type', default='lstm', help='Type of the RNN. rnn|gru|lstm are supported')
 parser.add_argument('--augment', dest='augment', action='store_true', help='Use random tempo and gain perturbations.')
-parser.add_argument('--noise_dir', default='',
+parser.add_argument('--noise_dir', default=None,
                     help='Directory to inject noise into audio. If default, noise Inject not added')
 parser.add_argument('--noise_prob', default=0.4, help='Probability of noise being added per sample')
 parser.add_argument('--noise_min', default=0.0,
