@@ -2,3 +2,4 @@ python-levenshtein
 torch
 visdom
 wget
+librosa
