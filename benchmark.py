@@ -15,7 +15,7 @@ parser.add_argument('--seconds', type=int, default=15,
                          '15s is usually the maximum duration')
 parser.add_argument('--dry_runs', type=int, default=20, help='Dry runs before measuring performance')
 parser.add_argument('--runs', type=int, default=20, help='How many benchmark runs to measure performance')
-parser.add_argument('--labels_path', default=20, help='Path to the labels to infer over in the model')
+parser.add_argument('--labels_path', default='labels.json', help='Path to the labels to infer over in the model')
 parser.add_argument('--hidden_size', default=400, type=int, help='Hidden size of RNNs')
 parser.add_argument('--hidden_layers', default=4, type=int, help='Number of RNN layers')
 parser.add_argument('--rnn_type', default='lstm', help='Type of the RNN. rnn|gru|lstm are supported')
