@@ -129,8 +129,7 @@ def main():
     optimizer = torch.optim.SGD(parameters, lr=args.lr,
                                 momentum=args.momentum, nesterov=True)
     decoder = ArgMaxDecoder(labels)
-    if args.cuda:
-        model = torch.nn.DataParallel(model).cuda()
+
     if args.continue_from:
         print("Loading checkpoint model %s" % args.continue_from)
         package = torch.load(args.continue_from)
@@ -161,6 +160,8 @@ def main():
         avg_loss = 0
         start_epoch = 0
         start_iter = 0
+    if args.cuda:
+        model = torch.nn.DataParallel(model).cuda()
 
     print(model)
     batch_time = AverageMeter()
