@@ -198,6 +198,8 @@ Saved models contain the metadata of their training process. To see the metadata
 python model.py --model_path models/deepspeech.pth.tar
 ```
 
+To also note, there is no final softmax layer on the model as when trained, warp-ctc does this softmax internally. This will have to also be implemented in complex decoders if anything is built on top of the model, so take this into consideration!
+
 ## Acknowledgements
 
 Thanks to [Egor](https://github.com/EgorLakomkin) and [Ryan](https://github.com/ryanleary) for their contributions!
