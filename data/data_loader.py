@@ -43,29 +43,27 @@ class AudioParser(object):
 class NoiseInjection(object):
     def __init__(self,
                  path=None,
-                 sr=16000,
                  noise_levels=(0, 0.5)):
         """
-        Adds noise to an input signal with specific SNR.
+        Adds noise to an input signal with specific SNR. Higher the noise level, the more noise added.
         Modified code from https://github.com/willfrey/audio/blob/master/torchaudio/transforms.py
         """
-        self.paths = librosa.util.find_files(path)
-        self.sr = sr
+        self.paths = path is not None and librosa.util.find_files(path)
         self.noise_levels = noise_levels
 
     def inject_noise(self, data):
-        noise_src = load_audio(np.random.choice(self.paths))
-        noise_offset_fraction = np.random.rand()
+        noise_path = np.random.choice(self.paths)
         noise_level = np.random.uniform(*self.noise_levels)
+        return self.inject_noise_sample(data, noise_path, noise_level)
 
+    def inject_noise_sample(self, data, noise_path, noise_level):
+        noise_src = load_audio(noise_path)
+        noise_offset_fraction = np.random.rand()
         noise_dst = np.zeros_like(data)
-
         src_offset = int(len(noise_src) * noise_offset_fraction)
         src_left = len(noise_src) - src_offset
-
         dst_offset = 0
         dst_left = len(data)
-
         while dst_left > 0:
             copy_size = min(dst_left, src_left)
             np.copyto(noise_dst[dst_offset:dst_offset + copy_size],
@@ -77,7 +75,6 @@ class NoiseInjection(object):
                 dst_offset += copy_size
                 src_left = len(noise_src)
                 src_offset = 0
-
         data += noise_level * noise_dst
         return data
 
