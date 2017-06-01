@@ -218,7 +218,7 @@ def augment_audio_with_sox(path, sample_rate, tempo, gain):
                                                                             augmented_filename,
                                                                             " ".join(sox_augment_params))
         os.system(sox_params)
-        y = load_audio(path)
+        y = load_audio(augmented_filename)
         return y
 
 
