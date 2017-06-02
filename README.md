@@ -153,6 +153,12 @@ The dataloader will randomly pick samples from this directory.
 To enable noise injection, use the `--noise_dir /path/to/noise/dir/` to specify where your noise files are. There are a few noise parameters to tweak, such as
 `--noise_prob` to determine the probability that noise is added, and the `--noise_min`, `--noise_max` parameters to determine the minimum and maximum noise to add in training.
 
+Included is a script to inject noise into an audio file to hear what different noise levels/files would sound like. Useful for curating the noise dataset.
+
+```
+python noise_inject.py --input_path /path/to/input.wav --noise_path /path/to/noise.wav --output_path /path/to/input_injected.wav --noise_level 0.5 # higher levels means more noise
+```
+
 ### Checkpoints
 
 Training supports saving checkpoints of the model to continue training from should an error occur or early termination. To enable epoch
