@@ -177,9 +177,9 @@ def main():
             inputs, targets, input_percentages, target_sizes = data
             # measure data loading time
             data_time.update(time.time() - end)
-            inputs = Variable(inputs)
-            target_sizes = Variable(target_sizes)
-            targets = Variable(targets)
+            inputs = Variable(inputs, requires_grad=False)
+            target_sizes = Variable(target_sizes, requires_grad=False)
+            targets = Variable(targets. reqiores_grad=False)
 
             if args.cuda:
                 inputs = inputs.cuda()
@@ -188,7 +188,7 @@ def main():
             out = out.transpose(0, 1)  # TxNxH
 
             seq_length = out.size(0)
-            sizes = Variable(input_percentages.mul_(int(seq_length)).int())
+            sizes = Variable(input_percentages.mul_(int(seq_length)).int(), requires_grad=False)
 
             loss = criterion(out, targets, sizes, target_sizes)
             loss = loss / inputs.size(0)  # average the loss by minibatch
@@ -243,7 +243,7 @@ def main():
         for i, (data) in enumerate(test_loader):  # test
             inputs, targets, input_percentages, target_sizes = data
 
-            inputs = Variable(inputs)
+            inputs = Variable(inputs, volatile=True)
 
             # unflatten targets
             split_targets = []
@@ -258,7 +258,7 @@ def main():
             out = model(inputs)
             out = out.transpose(0, 1)  # TxNxH
             seq_length = out.size(0)
-            sizes = Variable(input_percentages.mul_(int(seq_length)).int())
+            sizes = Variable(input_percentages.mul_(int(seq_length)).int(), volatile=True)
 
             decoded_output = decoder.decode(out.data, sizes)
             target_strings = decoder.process_strings(decoder.convert_to_strings(split_targets))

@@ -26,7 +26,7 @@ if __name__ == '__main__':
     parser = SpectrogramParser(audio_conf, normalize=True)
     spect = parser.parse_audio(args.audio_path).contiguous()
     spect = spect.view(1, 1, spect.size(0), spect.size(1))
-    out = model(Variable(spect))
+    out = model(Variable(spect, volatile=True))
     out = out.transpose(0, 1)  # TxNxH
     decoded_output = decoder.decode(out.data)
     print(decoded_output[0])
