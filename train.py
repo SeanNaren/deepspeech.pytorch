@@ -215,7 +215,7 @@ def main():
             data_time.update(time.time() - end)
             inputs = Variable(inputs, requires_grad=False)
             target_sizes = Variable(target_sizes, requires_grad=False)
-            targets = Variable(targets. reqiores_grad=False)
+            targets = Variable(targets, requires_grad=False)
 
             if args.cuda:
                 inputs = inputs.cuda()
