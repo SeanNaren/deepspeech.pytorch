@@ -49,8 +49,13 @@ parser.add_argument('--noise_min', default=0.0,
                     help='Minimum noise level to sample from. (1.0 means all noise, not original signal)', type=float)
 parser.add_argument('--noise_max', default=0.5,
                     help='Maximum noise levels to sample from. Maximum 1.0', type=float)
-parser.set_defaults(cuda=False, silent=False, checkpoint=False, visdom=False, augment=False)
+parser.add_argument('--tensorboard', dest='tensorboard', action='store_true', help='Turn on tensorboard graphing')
+parser.add_argument('--log_dir', default='visualize/deepspeech_final', help='Location of tensorboard log')
+parser.add_argument('--log_params', dest='log_params', action='store_true', help='Log parameter values and gradients')
+parser.set_defaults(cuda=False, silent=False, checkpoint=False, visdom=False, augment=False, tensorboard=False, log_params=False)
 
+def to_np(x):
+    return x.data.cpu().numpy()
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""
@@ -87,6 +92,25 @@ def main():
         loss_results, cer_results, wer_results = torch.Tensor(args.epochs), torch.Tensor(args.epochs), torch.Tensor(
             args.epochs)
         epochs = torch.arange(1, args.epochs + 1)
+    if args.tensorboard:
+        from logger import Logger
+        try:
+            os.makedirs(args.log_dir)
+        except OSError as e:
+            if e.errno == errno.EEXIST:
+                print('Directory already exists.')
+                for file in os.listdir(args.log_dir):
+                    file_path = os.path.join(args.log_dir, file)
+                    try:
+                        if os.path.isfile(file_path):
+                            os.unlink(file_path)
+                    except Exception as e:
+                        raise
+            else:
+                raise
+        loss_results, cer_results, wer_results = torch.Tensor(args.epochs), torch.Tensor(args.epochs), torch.Tensor(
+            args.epochs)
+        logger = Logger(args.log_dir)
 
     try:
         os.makedirs(save_folder)
@@ -146,7 +170,7 @@ def main():
         if args.visdom and \
                         package['loss_results'] is not None and start_epoch > 0:  # Add previous scores to visdom graph
             epoch = start_epoch
-            loss_results, cer_results, wer_results = package['loss_results'], package['cer_results'], package[
+            loss_results[0:epoch], cer_results[0:epoch], wer_results[0:epoch] = package['loss_results'], package['cer_results'], package[
                 'wer_results']
             x_axis = epochs[0:epoch]
             y_axis = [loss_results[0:epoch], wer_results[0:epoch], cer_results[0:epoch]]
@@ -156,6 +180,18 @@ def main():
                     Y=y_axis[x],
                     opts=opts[x],
                 )
+        if args.tensorboard and package['loss_results'] is not None and start_epoch > 0:  # Add previous scores to tensorboard logs
+            epoch = start_epoch
+            loss_results, cer_results, wer_results = package['loss_results'], package['cer_results'], package[
+                'wer_results']
+            for i in range(len(loss_results)):
+                info = {
+                    'Avg Train Loss': loss_results[i],
+                    'Avg WER': wer_results[i],
+                    'Avg CER': cer_results[i]
+                }
+                for tag, val in info.items():
+                    logger.scalar_summary(tag, val, i+1)
     else:
         avg_loss = 0
         start_epoch = 0
@@ -238,7 +274,7 @@ def main():
             epoch + 1, loss=avg_loss))
 
         start_iter = 0  # Reset start iteration for next epoch
-        total_cer, total_wer = 0, 0
+        total_cer, total_wer= 0, 0
         model.eval()
         for i, (data) in enumerate(test_loader):  # test
             inputs, targets, input_percentages, target_sizes = data
@@ -271,7 +307,6 @@ def main():
 
             if args.cuda:
                 torch.cuda.synchronize()
-
         wer = total_wer / len(test_loader.dataset)
         cer = total_cer / len(test_loader.dataset)
         wer *= 100
@@ -286,9 +321,9 @@ def main():
             loss_results[epoch] = avg_loss
             wer_results[epoch] = wer
             cer_results[epoch] = cer
-            epoch += 1
-            x_axis = epochs[0:epoch]
-            y_axis = [loss_results[0:epoch], wer_results[0:epoch], cer_results[0:epoch]]
+            # epoch += 1
+            x_axis = epochs[0:epoch+1]
+            y_axis = [loss_results[0:epoch+1], wer_results[0:epoch+1], cer_results[0:epoch+1]]
             for x in range(len(viz_windows)):
                 if viz_windows[x] is None:
                     viz_windows[x] = viz.line(
@@ -303,6 +338,23 @@ def main():
                         win=viz_windows[x],
                         update='replace',
                     )
+        if args.tensorboard:
+            loss_results[epoch] = avg_loss
+            wer_results[epoch] = wer
+            cer_results[epoch] = cer
+            info = {
+                'Avg Train Loss': avg_loss,
+                'Avg WER': wer,
+                'Avg CER': cer
+            }
+            for tag, val in info.items():
+                logger.scalar_summary(tag, val, epoch+1)
+            if args.log_params:
+                for tag, value in model.named_parameters():
+                    tag = tag.replace('.', '/')
+                    logger.histo_summary(tag, to_np(value), epoch+1)
+                    if value.grad is not None: # Condition inserted because batch_norm RNN_0 weights.grad and bias.grad are None. Check why
+                        logger.histo_summary(tag+'/grad', to_np(value.grad), epoch+1)
         if args.checkpoint:
             file_path = '%s/deepspeech_%d.pth.tar' % (save_folder, epoch + 1)
             torch.save(DeepSpeech.serialize(model, optimizer=optimizer, epoch=epoch, loss_results=loss_results,
