@@ -8,6 +8,7 @@ import torch
 from torch.autograd import Variable
 from warpctc_pytorch import CTCLoss
 
+from data.bucketing_sampler import BucketingSampler, SpectrogramDatasetWithLength
 from data.data_loader import AudioDataLoader, SpectrogramDataset
 from decoder import ArgMaxDecoder
 from model import DeepSpeech, supported_rnns
@@ -52,6 +53,7 @@ parser.add_argument('--noise_max', default=0.5,
 parser.add_argument('--tensorboard', dest='tensorboard', action='store_true', help='Turn on tensorboard graphing')
 parser.add_argument('--log_dir', default='visualize/deepspeech_final', help='Location of tensorboard log')
 parser.add_argument('--log_params', dest='log_params', action='store_true', help='Log parameter values and gradients')
+parser.add_argument('--bucketing', dest='bucketing', action='store_true', help='Split utterances into buckets and sample from them')
 parser.set_defaults(cuda=False, silent=False, checkpoint=False, visdom=False, augment=False, tensorboard=False, log_params=False)
 
 def to_np(x):
@@ -215,7 +217,7 @@ def main():
             data_time.update(time.time() - end)
             inputs = Variable(inputs, requires_grad=False)
             target_sizes = Variable(target_sizes, requires_grad=False)
-            targets = Variable(targets. reqiores_grad=False)
+            targets = Variable(targets, requires_grad=False)
 
             if args.cuda:
                 inputs = inputs.cuda()
@@ -367,6 +369,14 @@ def main():
         print('Learning rate annealed to: {lr:.6f}'.format(lr=optim_state['param_groups'][0]['lr']))
 
         avg_loss = 0
+        if args.bucketing and epoch == 0:
+            print("Switching to bucketing")
+            train_dataset = SpectrogramDatasetWithLength(audio_conf=audio_conf, manifest_filepath=args.train_manifest,
+                                               labels=labels,
+                                               normalize=True, augment=args.augment)
+            sampler = BucketingSampler(train_dataset)
+            train_loader.sampler = sampler
+
     torch.save(DeepSpeech.serialize(model, optimizer=optimizer), args.final_model_path)
 
 
