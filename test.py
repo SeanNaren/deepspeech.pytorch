@@ -12,8 +12,8 @@ parser = argparse.ArgumentParser(description='DeepSpeech prediction')
 parser.add_argument('--model_path', default='models/deepspeech_final.pth.tar',
                     help='Path to model file created by training')
 parser.add_argument('--cuda', action="store_true", help='Use cuda to test model')
-parser.add_argument('--val_manifest', metavar='DIR',
-                    help='path to validation manifest csv', default='data/val_manifest.csv')
+parser.add_argument('--test_manifest', metavar='DIR',
+                    help='path to validation manifest csv', default='data/test_manifest.csv')
 parser.add_argument('--batch_size', default=20, type=int, help='Batch size for training')
 parser.add_argument('--num_workers', default=4, type=int, help='Number of workers used in dataloading')
 args = parser.parse_args()
@@ -26,7 +26,7 @@ if __name__ == '__main__':
     audio_conf = DeepSpeech.get_audio_conf(model)
     decoder = ArgMaxDecoder(labels)
 
-    test_dataset = SpectrogramDataset(audio_conf=audio_conf, manifest_filepath=args.val_manifest, labels=labels,
+    test_dataset = SpectrogramDataset(audio_conf=audio_conf, manifest_filepath=args.test_manifest, labels=labels,
                                       normalize=True)
     test_loader = AudioDataLoader(test_dataset, batch_size=args.batch_size,
                                   num_workers=args.num_workers)
@@ -63,6 +63,6 @@ if __name__ == '__main__':
     wer = total_wer / len(test_loader.dataset)
     cer = total_cer / len(test_loader.dataset)
 
-    print('Validation Summary \t'
+    print('Test Summary \t'
           'Average WER {wer:.3f}\t'
           'Average CER {cer:.3f}\t'.format(wer=wer * 100, cer=cer * 100))

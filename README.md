@@ -206,6 +206,20 @@ python model.py --model_path models/deepspeech.pth.tar
 
 To also note, there is no final softmax layer on the model as when trained, warp-ctc does this softmax internally. This will have to also be implemented in complex decoders if anything is built on top of the model, so take this into consideration!
 
+## Testing/Inference
+
+To evaluate a trained model on a test set (has to be in the same format as the training set):
+
+```
+python test.py --model_path models/deepspeech.pth.tar --test_manifest /path/to/test_manifest.csv --cuda
+```
+
+An example script to output a prediction has been provided:
+
+```
+python predict.py --model_path models/deepspeech.pth.tar --audio_path /path/to/audio.wav
+```
+
 ## Acknowledgements
 
 Thanks to [Egor](https://github.com/EgorLakomkin) and [Ryan](https://github.com/ryanleary) for their contributions!
