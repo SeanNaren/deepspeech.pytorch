@@ -56,14 +56,14 @@ def iteration(input_data):
     input_percentages = torch.IntTensor(batch_size).fill_(1)
 
     inputs = Variable(input_data, requires_grad=False)
-    target_sizes = Variable(target_size requires_grad=False)
-    targets = Variable(target requires_grad=False)
+    target_sizes = Variable(target_size, requires_grad=False)
+    targets = Variable(target, requires_grad=False)
     start = time.time()
     out = model(inputs)
     out = out.transpose(0, 1)  # TxNxH
 
     seq_length = out.size(0)
-    sizes = Variable(input_percentages.mul_(int(seq_length)).int() requires_grad=False)
+    sizes = Variable(input_percentages.mul_(int(seq_length)).int(), requires_grad=False)
     loss = criterion(out, targets, sizes, target_sizes)
     loss = loss / inputs.size(0)  # average the loss by minibatch
     # compute gradient
