@@ -34,7 +34,7 @@ if __name__ == '__main__':
     for i, (data) in enumerate(test_loader):
         inputs, targets, input_percentages, target_sizes = data
 
-        inputs = Variable(inputs)
+        inputs = Variable(inputs, volatile=True)
 
         # unflatten targets
         split_targets = []
@@ -49,7 +49,7 @@ if __name__ == '__main__':
         out = model(inputs)
         out = out.transpose(0, 1)  # TxNxH
         seq_length = out.size(0)
-        sizes = Variable(input_percentages.mul_(int(seq_length)).int())
+        sizes = Variable(input_percentages.mul_(int(seq_length)).int(), volatile=True)
 
         decoded_output = decoder.decode(out.data, sizes)
         target_strings = decoder.process_strings(decoder.convert_to_strings(split_targets))
