@@ -40,6 +40,8 @@ model = DeepSpeech(rnn_hidden_size=args.hidden_size,
                    labels=labels,
                    rnn_type=supported_rnns[rnn_type])
 
+print("Number of parameters: %d" % DeepSpeech.get_param_size(model))
+
 parameters = model.parameters()
 optimizer = torch.optim.SGD(parameters, lr=3e-4,
                             momentum=0.9, nesterov=True)

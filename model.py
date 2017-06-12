@@ -166,6 +166,16 @@ class DeepSpeech(nn.Module):
         return model.module._labels if model_is_cuda else model._labels
 
     @staticmethod
+    def get_param_size(model):
+        params = 0
+        for p in model.parameters():
+            tmp = 1
+            for x in p.size():
+                tmp *= x
+            params += tmp
+        return params
+
+    @staticmethod
     def get_audio_conf(model):
         model_is_cuda = next(model.parameters()).is_cuda
         return model.module._audio_conf if model_is_cuda else model._audio_conf
