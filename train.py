@@ -185,7 +185,7 @@ def main():
                         package['loss_results'] is not None and start_epoch > 0:  # Previous scores to tensorboard logs
             loss_results, cer_results, wer_results = package['loss_results'], package['cer_results'], package[
                 'wer_results']
-            for i in range(len(loss_results)):
+            for i in range(epoch):
                 info = {
                     'Avg Train Loss': loss_results[i],
                     'Avg WER': wer_results[i],
