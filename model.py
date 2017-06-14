@@ -9,7 +9,7 @@ supported_rnns = {
     'rnn': nn.RNN,
     'gru': nn.GRU
 }
-supported_rnns_inv = dict((v,k) for k,v in supported_rnns.items())
+supported_rnns_inv = dict((v, k) for k, v in supported_rnns.items())
 
 
 class SequenceWise(nn.Module):
@@ -41,15 +41,14 @@ class BatchRNN(nn.Module):
         super(BatchRNN, self).__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
-        self.batch_norm_activate = batch_norm
         self.bidirectional = bidirectional
-        self.batch_norm = SequenceWise(nn.BatchNorm1d(input_size))
+        self.batch_norm = SequenceWise(nn.BatchNorm1d(input_size)) if batch_norm else None
         self.rnn = rnn_type(input_size=input_size, hidden_size=hidden_size,
                             bidirectional=bidirectional, bias=False)
         self.num_directions = 2 if bidirectional else 1
 
     def forward(self, x):
-        if self.batch_norm_activate:
+        if self.batch_norm is not None:
             x = self.batch_norm(x)
         x, _ = self.rnn(x)
         if self.bidirectional:
@@ -58,10 +57,13 @@ class BatchRNN(nn.Module):
 
 
 class DeepSpeech(nn.Module):
-    def __init__(self, rnn_type=nn.LSTM, labels="abc", rnn_hidden_size=768, nb_layers=5, audio_conf={}, bidirectional=True):
+    def __init__(self, rnn_type=nn.LSTM, labels="abc", rnn_hidden_size=768, nb_layers=5, audio_conf=None,
+                 bidirectional=True):
         super(DeepSpeech, self).__init__()
 
         # model metadata needed for serialization/deserialization
+        if audio_conf is None:
+            audio_conf = {}
         self._version = '0.0.1'
         self._hidden_size = rnn_hidden_size
         self._hidden_layers = nb_layers
@@ -121,7 +123,8 @@ class DeepSpeech(nn.Module):
     def load_model(cls, path, cuda=False):
         package = torch.load(path, map_location=lambda storage, loc: storage)
         model = cls(rnn_hidden_size=package['hidden_size'], nb_layers=package['hidden_layers'],
-                    labels=package['labels'], audio_conf=package['audio_conf'], rnn_type=supported_rnns[package['rnn_type']])
+                    labels=package['labels'], audio_conf=package['audio_conf'],
+                    rnn_type=supported_rnns[package['rnn_type']])
         model.load_state_dict(package['state_dict'])
         if cuda:
             model = torch.nn.DataParallel(model).cuda()
@@ -163,14 +166,25 @@ class DeepSpeech(nn.Module):
         return model.module._labels if model_is_cuda else model._labels
 
     @staticmethod
+    def get_param_size(model):
+        params = 0
+        for p in model.parameters():
+            tmp = 1
+            for x in p.size():
+                tmp *= x
+            params += tmp
+        return params
+
+    @staticmethod
     def get_audio_conf(model):
         model_is_cuda = next(model.parameters()).is_cuda
         return model.module._audio_conf if model_is_cuda else model._audio_conf
 
+
 if __name__ == '__main__':
     import os.path
     import argparse
-    import json
+
     parser = argparse.ArgumentParser(description='DeepSpeech model information')
     parser.add_argument('--model_path', default='models/deepspeech_final.pth.tar',
                         help='Path to model file created by training')
@@ -199,9 +213,9 @@ if __name__ == '__main__':
         print("Training Information")
         epochs = package['epoch']
         print("  Epochs:           ", epochs)
-        print("  Current Loss:      {0:.3f}".format(package['loss_results'][epochs-1]))
-        print("  Current CER:       {0:.3f}".format(package['cer_results'][epochs-1]))
-        print("  Current WER:       {0:.3f}".format(package['wer_results'][epochs-1]))
+        print("  Current Loss:      {0:.3f}".format(package['loss_results'][epochs - 1]))
+        print("  Current CER:       {0:.3f}".format(package['cer_results'][epochs - 1]))
+        print("  Current WER:       {0:.3f}".format(package['wer_results'][epochs - 1]))
 
     if package.get('meta', None) is not None:
         print("")

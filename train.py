@@ -57,8 +57,6 @@ parser.add_argument('--no_bucketing', dest='no_bucketing', action='store_false',
                     help='Turn off bucketing and sample from dataset based on sequence length (smallest to largest)')
 parser.set_defaults(cuda=False, silent=False, checkpoint=False, visdom=False, augment=False, tensorboard=False,
                     log_params=False, no_bucketing=False)
-
-
 def to_np(x):
     return x.data.cpu().numpy()
 
@@ -86,7 +84,8 @@ def main():
     args = parser.parse_args()
     save_folder = args.save_folder
 
-    loss_results, cer_results, wer_results = None, None, None
+    loss_results, cer_results, wer_results = torch.Tensor(args.epochs), torch.Tensor(args.epochs), torch.Tensor(
+        args.epochs)
     if args.visdom:
         from visdom import Visdom
         viz = Visdom()
@@ -96,11 +95,9 @@ def main():
                 dict(title='CER', ylabel='CER', xlabel='Epoch')]
 
         viz_windows = [None, None, None]
-        loss_results, cer_results, wer_results = torch.Tensor(args.epochs), torch.Tensor(args.epochs), torch.Tensor(
-            args.epochs)
         epochs = torch.arange(1, args.epochs + 1)
     if args.tensorboard:
-        from logger import Logger
+        from logger import TensorBoardLogger
         try:
             os.makedirs(args.log_dir)
         except OSError as e:
@@ -115,9 +112,7 @@ def main():
                         raise
             else:
                 raise
-        loss_results, cer_results, wer_results = torch.Tensor(args.epochs), torch.Tensor(args.epochs), torch.Tensor(
-            args.epochs)
-        logger = Logger(args.log_dir)
+        logger = TensorBoardLogger(args.log_dir)
 
     try:
         os.makedirs(save_folder)
@@ -165,7 +160,7 @@ def main():
         package = torch.load(args.continue_from)
         model.load_state_dict(package['state_dict'])
         optimizer.load_state_dict(package['optim_dict'])
-        start_epoch = int(package.get('epoch', None) or 1) - 1  # Python index start at 0 for training
+        start_epoch = int(package.get('epoch', 1)) - 1  # Python index start at 0 for training
         start_iter = package.get('iteration', None)
         if start_iter is None:
             start_epoch += 1  # Assume that we saved a model after an epoch finished, so start at the next epoch.
@@ -177,8 +172,7 @@ def main():
                         package['loss_results'] is not None and start_epoch > 0:  # Add previous scores to visdom graph
             epoch = start_epoch
             loss_results[0:epoch], cer_results[0:epoch], wer_results[0:epoch] = package['loss_results'], package[
-                'cer_results'], package[
-                                                                                    'wer_results']
+                'cer_results'], package['wer_results']
             x_axis = epochs[0:epoch]
             y_axis = [loss_results[0:epoch], wer_results[0:epoch], cer_results[0:epoch]]
             for x in range(len(viz_windows)):
@@ -187,9 +181,8 @@ def main():
                     Y=y_axis[x],
                     opts=opts[x],
                 )
-        if args.tensorboard and package[
-            'loss_results'] is not None and start_epoch > 0:  # Add previous scores to tensorboard logs
-            epoch = start_epoch
+        if args.tensorboard and \
+                        package['loss_results'] is not None and start_epoch > 0:  # Previous scores to tensorboard logs
             loss_results, cer_results, wer_results = package['loss_results'], package['cer_results'], package[
                 'wer_results']
             for i in range(len(loss_results)):
@@ -208,6 +201,8 @@ def main():
         model = torch.nn.DataParallel(model).cuda()
 
     print(model)
+    print("Number of parameters: %d" % DeepSpeech.get_param_size(model))
+
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
@@ -365,8 +360,7 @@ def main():
                 for tag, value in model.named_parameters():
                     tag = tag.replace('.', '/')
                     logger.histo_summary(tag, to_np(value), epoch + 1)
-                    if value.grad is not None:  # Condition inserted because batch_norm RNN_0 weights.grad and bias.grad are None. Check why
-                        logger.histo_summary(tag + '/grad', to_np(value.grad), epoch + 1)
+                    logger.histo_summary(tag + '/grad', to_np(value.grad), epoch + 1)
         if args.checkpoint:
             file_path = '%s/deepspeech_%d.pth.tar' % (save_folder, epoch + 1)
             torch.save(DeepSpeech.serialize(model, optimizer=optimizer, epoch=epoch, loss_results=loss_results,
