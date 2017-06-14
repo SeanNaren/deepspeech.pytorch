@@ -6,6 +6,11 @@ from collections import defaultdict
 
 class SpectrogramDatasetWithLength(SpectrogramDataset):
     def __init__(self, *args, **kwargs):
+        """
+        SpectrogramDataset that splits utterances into buckets based on their length.
+        Bucketing is done via numpy's histogram method.
+        Used by BucketingSampler to sample utterances from the same bin.
+        """
         super(SpectrogramDatasetWithLength, self).__init__(*args, **kwargs)
         audio_paths = [path for (path, _) in self.ids]
         audio_lengths = [len(load_audio(path)) for path in audio_paths]
