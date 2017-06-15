@@ -8,6 +8,7 @@ import torch
 from torch.autograd import Variable
 from warpctc_pytorch import CTCLoss
 
+from data.bucketing_sampler import BucketingSampler, SpectrogramDatasetWithLength
 from data.data_loader import AudioDataLoader, SpectrogramDataset
 from decoder import ArgMaxDecoder
 from model import DeepSpeech, supported_rnns
@@ -52,10 +53,10 @@ parser.add_argument('--noise_max', default=0.5,
 parser.add_argument('--tensorboard', dest='tensorboard', action='store_true', help='Turn on tensorboard graphing')
 parser.add_argument('--log_dir', default='visualize/deepspeech_final', help='Location of tensorboard log')
 parser.add_argument('--log_params', dest='log_params', action='store_true', help='Log parameter values and gradients')
+parser.add_argument('--no_bucketing', dest='no_bucketing', action='store_false',
+                    help='Turn off bucketing and sample from dataset based on sequence length (smallest to largest)')
 parser.set_defaults(cuda=False, silent=False, checkpoint=False, visdom=False, augment=False, tensorboard=False,
-                    log_params=False)
-
-
+                    log_params=False, no_bucketing=False)
 def to_np(x):
     return x.data.cpu().numpy()
 
@@ -124,7 +125,6 @@ def main():
 
     with open(args.labels_path) as label_file:
         labels = str(''.join(json.load(label_file)))
-
     audio_conf = dict(sample_rate=args.sample_rate,
                       window_size=args.window_size,
                       window_stride=args.window_stride,
@@ -271,6 +271,8 @@ def main():
                                                 loss_results=loss_results,
                                                 wer_results=wer_results, cer_results=cer_results, avg_loss=avg_loss),
                            file_path)
+            del loss
+            del out
         avg_loss /= len(train_loader)
 
         print('Training Summary Epoch: [{0}]\t'
@@ -311,6 +313,7 @@ def main():
 
             if args.cuda:
                 torch.cuda.synchronize()
+            del out
         wer = total_wer / len(test_loader.dataset)
         cer = total_cer / len(test_loader.dataset)
         wer *= 100
@@ -370,6 +373,14 @@ def main():
         print('Learning rate annealed to: {lr:.6f}'.format(lr=optim_state['param_groups'][0]['lr']))
 
         avg_loss = 0
+        if not args.no_bucketing and epoch == 0:
+            print("Switching to bucketing sampler for following epochs")
+            train_dataset = SpectrogramDatasetWithLength(audio_conf=audio_conf, manifest_filepath=args.train_manifest,
+                                                         labels=labels,
+                                                         normalize=True, augment=args.augment)
+            sampler = BucketingSampler(train_dataset)
+            train_loader.sampler = sampler
+
     torch.save(DeepSpeech.serialize(model, optimizer=optimizer), args.final_model_path)
 
 

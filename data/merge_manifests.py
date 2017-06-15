@@ -37,7 +37,7 @@ for x in range(size):
     file_path = files[x]
     file_path = file_path.split(',')[0]
     output = subprocess.check_output(
-        ['soxi -D %s' % file_path.strip()],
+        ['soxi -D \"%s\"' % file_path.strip()],
         shell=True
     )
     duration = float(output)
