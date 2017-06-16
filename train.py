@@ -318,16 +318,16 @@ def main():
         cer = total_cer / len(test_loader.dataset)
         wer *= 100
         cer *= 100
-
+        loss_results[epoch] = avg_loss
+        wer_results[epoch] = wer
+        cer_results[epoch] = cer
         print('Validation Summary Epoch: [{0}]\t'
               'Average WER {wer:.3f}\t'
               'Average CER {cer:.3f}\t'.format(
             epoch + 1, wer=wer, cer=cer))
 
         if args.visdom:
-            loss_results[epoch] = avg_loss
-            wer_results[epoch] = wer
-            cer_results[epoch] = cer
+
             # epoch += 1
             x_axis = epochs[0:epoch + 1]
             y_axis = [loss_results[0:epoch + 1], wer_results[0:epoch + 1], cer_results[0:epoch + 1]]
@@ -346,9 +346,6 @@ def main():
                         update='replace',
                     )
         if args.tensorboard:
-            loss_results[epoch] = avg_loss
-            wer_results[epoch] = wer
-            cer_results[epoch] = cer
             info = {
                 'Avg Train Loss': avg_loss,
                 'Avg WER': wer,
