@@ -43,7 +43,7 @@ class Decoder(object):
         strings = []
         for x in xrange(len(sequences)):
             string = self.convert_to_string(sequences[x])
-            string = string[0:int(sizes.data[x])] if sizes else string
+            string = string[0:int(sizes.data[x])] if sizes is not None else string
             strings.append(string)
         return strings
 

@@ -8,6 +8,7 @@ import torch
 from torch.autograd import Variable
 from warpctc_pytorch import CTCLoss
 
+from data.bucketing_sampler import BucketingSampler, SpectrogramDatasetWithLength
 from data.data_loader import AudioDataLoader, SpectrogramDataset
 from decoder import ArgMaxDecoder
 from model import DeepSpeech, supported_rnns
@@ -49,7 +50,15 @@ parser.add_argument('--noise_min', default=0.0,
                     help='Minimum noise level to sample from. (1.0 means all noise, not original signal)', type=float)
 parser.add_argument('--noise_max', default=0.5,
                     help='Maximum noise levels to sample from. Maximum 1.0', type=float)
-parser.set_defaults(cuda=False, silent=False, checkpoint=False, visdom=False, augment=False)
+parser.add_argument('--tensorboard', dest='tensorboard', action='store_true', help='Turn on tensorboard graphing')
+parser.add_argument('--log_dir', default='visualize/deepspeech_final', help='Location of tensorboard log')
+parser.add_argument('--log_params', dest='log_params', action='store_true', help='Log parameter values and gradients')
+parser.add_argument('--no_bucketing', dest='no_bucketing', action='store_false',
+                    help='Turn off bucketing and sample from dataset based on sequence length (smallest to largest)')
+parser.set_defaults(cuda=False, silent=False, checkpoint=False, visdom=False, augment=False, tensorboard=False,
+                    log_params=False, no_bucketing=False)
+def to_np(x):
+    return x.data.cpu().numpy()
 
 
 class AverageMeter(object):
@@ -70,11 +79,13 @@ class AverageMeter(object):
         self.count += n
         self.avg = self.sum / self.count
 
+
 def main():
     args = parser.parse_args()
     save_folder = args.save_folder
 
-    loss_results, cer_results, wer_results = None, None, None
+    loss_results, cer_results, wer_results = torch.Tensor(args.epochs), torch.Tensor(args.epochs), torch.Tensor(
+        args.epochs)
     if args.visdom:
         from visdom import Visdom
         viz = Visdom()
@@ -84,9 +95,24 @@ def main():
                 dict(title='CER', ylabel='CER', xlabel='Epoch')]
 
         viz_windows = [None, None, None]
-        loss_results, cer_results, wer_results = torch.Tensor(args.epochs), torch.Tensor(args.epochs), torch.Tensor(
-            args.epochs)
         epochs = torch.arange(1, args.epochs + 1)
+    if args.tensorboard:
+        from logger import TensorBoardLogger
+        try:
+            os.makedirs(args.log_dir)
+        except OSError as e:
+            if e.errno == errno.EEXIST:
+                print('Directory already exists.')
+                for file in os.listdir(args.log_dir):
+                    file_path = os.path.join(args.log_dir, file)
+                    try:
+                        if os.path.isfile(file_path):
+                            os.unlink(file_path)
+                    except Exception as e:
+                        raise
+            else:
+                raise
+        logger = TensorBoardLogger(args.log_dir)
 
     try:
         os.makedirs(save_folder)
@@ -99,7 +125,6 @@ def main():
 
     with open(args.labels_path) as label_file:
         labels = str(''.join(json.load(label_file)))
-
     audio_conf = dict(sample_rate=args.sample_rate,
                       window_size=args.window_size,
                       window_stride=args.window_stride,
@@ -129,14 +154,13 @@ def main():
     optimizer = torch.optim.SGD(parameters, lr=args.lr,
                                 momentum=args.momentum, nesterov=True)
     decoder = ArgMaxDecoder(labels)
-    if args.cuda:
-        model = torch.nn.DataParallel(model).cuda()
+
     if args.continue_from:
         print("Loading checkpoint model %s" % args.continue_from)
         package = torch.load(args.continue_from)
         model.load_state_dict(package['state_dict'])
         optimizer.load_state_dict(package['optim_dict'])
-        start_epoch = int(package.get('epoch', None) or 1) - 1  # Python index start at 0 for training
+        start_epoch = int(package.get('epoch', 1)) - 1  # Python index start at 0 for training
         start_iter = package.get('iteration', None)
         if start_iter is None:
             start_epoch += 1  # Assume that we saved a model after an epoch finished, so start at the next epoch.
@@ -147,8 +171,8 @@ def main():
         if args.visdom and \
                         package['loss_results'] is not None and start_epoch > 0:  # Add previous scores to visdom graph
             epoch = start_epoch
-            loss_results, cer_results, wer_results = package['loss_results'], package['cer_results'], package[
-                'wer_results']
+            loss_results[0:epoch], cer_results[0:epoch], wer_results[0:epoch] = package['loss_results'], package[
+                'cer_results'], package['wer_results']
             x_axis = epochs[0:epoch]
             y_axis = [loss_results[0:epoch], wer_results[0:epoch], cer_results[0:epoch]]
             for x in range(len(viz_windows)):
@@ -157,12 +181,28 @@ def main():
                     Y=y_axis[x],
                     opts=opts[x],
                 )
+        if args.tensorboard and \
+                        package['loss_results'] is not None and start_epoch > 0:  # Previous scores to tensorboard logs
+            loss_results, cer_results, wer_results = package['loss_results'], package['cer_results'], package[
+                'wer_results']
+            for i in range(len(loss_results)):
+                info = {
+                    'Avg Train Loss': loss_results[i],
+                    'Avg WER': wer_results[i],
+                    'Avg CER': cer_results[i]
+                }
+                for tag, val in info.items():
+                    logger.scalar_summary(tag, val, i + 1)
     else:
         avg_loss = 0
         start_epoch = 0
         start_iter = 0
+    if args.cuda:
+        model = torch.nn.DataParallel(model).cuda()
 
     print(model)
+    print("Number of parameters: %d" % DeepSpeech.get_param_size(model))
+
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
@@ -176,9 +216,9 @@ def main():
             inputs, targets, input_percentages, target_sizes = data
             # measure data loading time
             data_time.update(time.time() - end)
-            inputs = Variable(inputs)
-            target_sizes = Variable(target_sizes)
-            targets = Variable(targets)
+            inputs = Variable(inputs, requires_grad=False)
+            target_sizes = Variable(target_sizes, requires_grad=False)
+            targets = Variable(targets, requires_grad=False)
 
             if args.cuda:
                 inputs = inputs.cuda()
@@ -187,7 +227,7 @@ def main():
             out = out.transpose(0, 1)  # TxNxH
 
             seq_length = out.size(0)
-            sizes = Variable(input_percentages.mul_(int(seq_length)).int())
+            sizes = Variable(input_percentages.mul_(int(seq_length)).int(), requires_grad=False)
 
             loss = criterion(out, targets, sizes, target_sizes)
             loss = loss / inputs.size(0)  # average the loss by minibatch
@@ -227,9 +267,12 @@ def main():
             if args.checkpoint_per_batch > 0 and i > 0 and (i + 1) % args.checkpoint_per_batch == 0:
                 file_path = '%s/deepspeech_checkpoint_epoch_%d_iter_%d.pth.tar' % (save_folder, epoch + 1, i + 1)
                 print("Saving checkpoint model to %s" % file_path)
-                torch.save(DeepSpeech.serialize(model, optimizer=optimizer, epoch=epoch, iteration=i, loss_results=loss_results,
+                torch.save(DeepSpeech.serialize(model, optimizer=optimizer, epoch=epoch, iteration=i,
+                                                loss_results=loss_results,
                                                 wer_results=wer_results, cer_results=cer_results, avg_loss=avg_loss),
                            file_path)
+            del loss
+            del out
         avg_loss /= len(train_loader)
 
         print('Training Summary Epoch: [{0}]\t'
@@ -242,7 +285,7 @@ def main():
         for i, (data) in enumerate(test_loader):  # test
             inputs, targets, input_percentages, target_sizes = data
 
-            inputs = Variable(inputs)
+            inputs = Variable(inputs, volatile=True)
 
             # unflatten targets
             split_targets = []
@@ -257,7 +300,7 @@ def main():
             out = model(inputs)
             out = out.transpose(0, 1)  # TxNxH
             seq_length = out.size(0)
-            sizes = Variable(input_percentages.mul_(int(seq_length)).int())
+            sizes = Variable(input_percentages.mul_(int(seq_length)).int(), volatile=True)
 
             decoded_output = decoder.decode(out.data, sizes)
             target_strings = decoder.process_strings(decoder.convert_to_strings(split_targets))
@@ -270,7 +313,7 @@ def main():
 
             if args.cuda:
                 torch.cuda.synchronize()
-
+            del out
         wer = total_wer / len(test_loader.dataset)
         cer = total_cer / len(test_loader.dataset)
         wer *= 100
@@ -285,9 +328,9 @@ def main():
             loss_results[epoch] = avg_loss
             wer_results[epoch] = wer
             cer_results[epoch] = cer
-            epoch += 1
-            x_axis = epochs[0:epoch]
-            y_axis = [loss_results[0:epoch], wer_results[0:epoch], cer_results[0:epoch]]
+            # epoch += 1
+            x_axis = epochs[0:epoch + 1]
+            y_axis = [loss_results[0:epoch + 1], wer_results[0:epoch + 1], cer_results[0:epoch + 1]]
             for x in range(len(viz_windows)):
                 if viz_windows[x] is None:
                     viz_windows[x] = viz.line(
@@ -302,6 +345,22 @@ def main():
                         win=viz_windows[x],
                         update='replace',
                     )
+        if args.tensorboard:
+            loss_results[epoch] = avg_loss
+            wer_results[epoch] = wer
+            cer_results[epoch] = cer
+            info = {
+                'Avg Train Loss': avg_loss,
+                'Avg WER': wer,
+                'Avg CER': cer
+            }
+            for tag, val in info.items():
+                logger.scalar_summary(tag, val, epoch + 1)
+            if args.log_params:
+                for tag, value in model.named_parameters():
+                    tag = tag.replace('.', '/')
+                    logger.histo_summary(tag, to_np(value), epoch + 1)
+                    logger.histo_summary(tag + '/grad', to_np(value.grad), epoch + 1)
         if args.checkpoint:
             file_path = '%s/deepspeech_%d.pth.tar' % (save_folder, epoch + 1)
             torch.save(DeepSpeech.serialize(model, optimizer=optimizer, epoch=epoch, loss_results=loss_results,
@@ -314,6 +373,14 @@ def main():
         print('Learning rate annealed to: {lr:.6f}'.format(lr=optim_state['param_groups'][0]['lr']))
 
         avg_loss = 0
+        if not args.no_bucketing and epoch == 0:
+            print("Switching to bucketing sampler for following epochs")
+            train_dataset = SpectrogramDatasetWithLength(audio_conf=audio_conf, manifest_filepath=args.train_manifest,
+                                                         labels=labels,
+                                                         normalize=True, augment=args.augment)
+            sampler = BucketingSampler(train_dataset)
+            train_loader.sampler = sampler
+
     torch.save(DeepSpeech.serialize(model, optimizer=optimizer), args.final_model_path)
 
 

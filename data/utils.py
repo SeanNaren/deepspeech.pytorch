@@ -43,7 +43,7 @@ def _order_files(file_paths):
 
     def func(element):
         output = subprocess.check_output(
-            ['soxi -D %s' % element.strip()],
+            ['soxi -D \"%s\"' % element.strip()],
             shell=True
         )
         return float(output)

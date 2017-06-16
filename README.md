@@ -153,6 +153,12 @@ The dataloader will randomly pick samples from this directory.
 To enable noise injection, use the `--noise_dir /path/to/noise/dir/` to specify where your noise files are. There are a few noise parameters to tweak, such as
 `--noise_prob` to determine the probability that noise is added, and the `--noise_min`, `--noise_max` parameters to determine the minimum and maximum noise to add in training.
 
+Included is a script to inject noise into an audio file to hear what different noise levels/files would sound like. Useful for curating the noise dataset.
+
+```
+python noise_inject.py --input_path /path/to/input.wav --noise_path /path/to/noise.wav --output_path /path/to/input_injected.wav --noise_level 0.5 # higher levels means more noise
+```
+
 ### Checkpoints
 
 Training supports saving checkpoints of the model to continue training from should an error occur or early termination. To enable epoch
@@ -196,6 +202,22 @@ Saved models contain the metadata of their training process. To see the metadata
 
 ```
 python model.py --model_path models/deepspeech.pth.tar
+```
+
+To also note, there is no final softmax layer on the model as when trained, warp-ctc does this softmax internally. This will have to also be implemented in complex decoders if anything is built on top of the model, so take this into consideration!
+
+## Testing/Inference
+
+To evaluate a trained model on a test set (has to be in the same format as the training set):
+
+```
+python test.py --model_path models/deepspeech.pth.tar --test_manifest /path/to/test_manifest.csv --cuda
+```
+
+An example script to output a prediction has been provided:
+
+```
+python predict.py --model_path models/deepspeech.pth.tar --audio_path /path/to/audio.wav
 ```
 
 ## Acknowledgements
