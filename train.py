@@ -168,13 +168,12 @@ def main():
         else:
             start_iter += 1
         avg_loss = int(package.get('avg_loss', 0))
+        loss_results, cer_results, wer_results = package['loss_results'], package[
+                'cer_results'], package['wer_results']
         if args.visdom and \
                         package['loss_results'] is not None and start_epoch > 0:  # Add previous scores to visdom graph
-            epoch = start_epoch
-            loss_results[0:epoch], cer_results[0:epoch], wer_results[0:epoch] = package['loss_results'], package[
-                'cer_results'], package['wer_results']
-            x_axis = epochs[0:epoch]
-            y_axis = [loss_results[0:epoch], wer_results[0:epoch], cer_results[0:epoch]]
+            x_axis = epochs[0:start_epoch]
+            y_axis = [loss_results[0:start_epoch], wer_results[0:start_epoch], cer_results[0:start_epoch]]
             for x in range(len(viz_windows)):
                 viz_windows[x] = viz.line(
                     X=x_axis,
@@ -183,9 +182,7 @@ def main():
                 )
         if args.tensorboard and \
                         package['loss_results'] is not None and start_epoch > 0:  # Previous scores to tensorboard logs
-            loss_results, cer_results, wer_results = package['loss_results'], package['cer_results'], package[
-                'wer_results']
-            for i in range(epoch):
+            for i in range(start_epoch):
                 info = {
                     'Avg Train Loss': loss_results[i],
                     'Avg WER': wer_results[i],
@@ -327,7 +324,6 @@ def main():
             epoch + 1, wer=wer, cer=cer))
 
         if args.visdom:
-
             # epoch += 1
             x_axis = epochs[0:epoch + 1]
             y_axis = [loss_results[0:epoch + 1], wer_results[0:epoch + 1], cer_results[0:epoch + 1]]
