@@ -28,9 +28,8 @@ def finalize_ctm(ctm, seconds_per_timestep):
     duration = ctm['end_ts'] * seconds_per_timestep - start_sec
 
     return {'chars': chars, 'word': '', 'start': float("{:.2f}".format(start_sec)), 'duration': float("{:.2f}".format(duration)), 'conf': float("{:.2f}".format(conf))}
-    
 
-def predict(model_path, audio_path, debug=False, transcript_path=None, cuda=False):
+def load_model(model_path, cuda=False):
     model = DeepSpeech.load_model(model_path, cuda=cuda)
     model.eval()
 
@@ -39,6 +38,10 @@ def predict(model_path, audio_path, debug=False, transcript_path=None, cuda=Fals
 
     decoder = ArgMaxDecoder(labels)
     parser = SpectrogramParser(audio_conf, normalize=True)
+
+    return model, labels, audio_conf, decoder, parser
+
+def predict(audio_path, model, labels, audio_conf, decoder, parser, debug=False, transcript_path=None):
     spect = parser.parse_audio(audio_path).contiguous()
     spect = spect.view(1, 1, spect.size(0), spect.size(1))
     out = model(Variable(spect, volatile=True))
@@ -126,7 +129,7 @@ def predict(model_path, audio_path, debug=False, transcript_path=None, cuda=Fals
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='DeepSpeech prediction')
-    parser.add_argument('--model_path', default='models/deepspeech_final.pth.tar',
+    parser.add_argument('--model_path', default='models/latest.pth.tar',
                         help='Path to model file created by training')
     parser.add_argument('--audio_path', default='audio.wav',
                         help='Audio file to predict on')
@@ -136,7 +139,8 @@ if __name__ == '__main__':
     parser.add_argument('--cuda', action="store_true", help='Use cuda to test model', default=False)
     args = parser.parse_args()
 
-    ctms = predict(args.model_path, args.audio_path, args.debug, args.transcript_path, args.cuda)
+    model, labels, audio_conf, decoder, parser = load_model(args.model_path, args.cuda)
+    ctms = predict(args.audio_path, model, labels, audio_conf, decoder, parser, debug=args.debug, transcript_path=args.transcript_path)
     if not args.debug:
         words = [c['word'] for c in ctms]
         print(' '.join(words))

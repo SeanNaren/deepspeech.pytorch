@@ -1,5 +1,6 @@
 from __future__ import absolute_import
 import re
+import os
 import kenlm
 from heapq import heapify
 from six.moves import range
@@ -8,11 +9,13 @@ from six.moves import range
 BEAM_WIDTH = 1024
 MODEL = None
 
+lm_dir = os.path.join(os.path.dirname(__file__), "language-model")
+
 # Lazy-load language model (TED corpus, Kneser-Ney, 4-gram, 30k word LM)
 def get_model():
     global MODEL
     if MODEL is None:
-        MODEL = kenlm.Model('language-model/lm.binary')
+        MODEL = kenlm.Model(os.path.join(lm_dir, 'lm.binary'))
     return MODEL
 
 def words(text):
@@ -20,7 +23,7 @@ def words(text):
     return re.findall(r'\w+', text.lower())
 
 # Load known word set
-with open('language-model/words.txt') as f:
+with open(os.path.join(lm_dir, 'words.txt')) as f:
     WORDS = set(words(f.read()))
 
 def log_probability(sentence):
