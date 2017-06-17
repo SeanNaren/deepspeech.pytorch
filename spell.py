@@ -34,7 +34,16 @@ def correction(sentence):
         layer = [(-log_probability(node + [cword]), node + [cword]) for cword in candidate_words(word) for priority, node in layer]
         heapify(layer)
         layer = layer[:BEAM_WIDTH]
-    return ' '.join(layer[0][1])
+
+    out = ' '.join(layer[0][1])
+
+    # insert back apostrophies
+    out = re.sub("(it|they|she|he|you|i|we|that) (re|ll|ve|d)\\b", r"\1'\2", out)
+    out = re.sub("(\w+) (s)\\b", r"\1'\2", out)
+    out = re.sub("n t\\b", "n't", out)
+    out = re.sub("i m\\b", "i'm", out)
+
+    return out
 
 def candidate_words(word):
     "Generate possible spelling corrections for word."
