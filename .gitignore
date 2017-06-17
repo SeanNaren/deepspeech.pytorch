@@ -103,3 +103,5 @@ data/*.csv
 data/*_dataset/
 data/*.wav
 data/*.mp3
+language-model/*
+*.swp

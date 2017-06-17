@@ -6,9 +6,10 @@ from torch.autograd import Variable
 from data.data_loader import SpectrogramParser
 from decoder import ArgMaxDecoder
 from model import DeepSpeech
+from spell import correction
 
 parser = argparse.ArgumentParser(description='DeepSpeech prediction')
-parser.add_argument('--model_path', default='models/deepspeech_final.pth.tar',
+parser.add_argument('--model_path', default='models/latest.pth.tar',
                     help='Path to model file created by training')
 parser.add_argument('--audio_path', default='audio.wav',
                     help='Audio file to predict on')
@@ -29,4 +30,4 @@ if __name__ == '__main__':
     out = model(Variable(spect))
     out = out.transpose(0, 1)  # TxNxH
     decoded_output = decoder.decode(out.data)
-    print(decoded_output[0])
+    print(correction(decoded_output[0]))
