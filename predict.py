@@ -56,7 +56,7 @@ def predict(audio_path, model, labels, audio_conf, decoder, parser, debug=False,
     softmax_probs = []
 
     f = sf.SoundFile(audio_path)
-    duration = float(len(f)/f.samplerate)
+    duration = len(f)/float(f.samplerate)
     seconds_per_timestep = duration/transposed.size()[1]
 
     # loop through each timestep and store the largest softmax value of all the characters
@@ -93,8 +93,8 @@ def predict(audio_path, model, labels, audio_conf, decoder, parser, debug=False,
     for i in range(len(ctms)):
         if i+1 < len(ctms) and ctms[i+1]['chars'][0] == "'":
             ctms[i]['chars'] = ctms[i]['chars'] + ctms[i+1]['chars']
-            ctms[i]['duration'] += ctms[i+1]['duration']
-            ctms[i]['conf'] = (ctms[i]['conf'] + ctms[i+1]['conf'])/2
+            ctms[i]['duration'] = float("{:.2f}".format(ctms[i]['duration'] + ctms[i+1]['duration']))
+            ctms[i]['conf'] = float("{:.2f}".format((ctms[i]['conf'] + ctms[i+1]['conf'])/2))
             del ctms[i+1]
 
     output = decoded_output[0]
