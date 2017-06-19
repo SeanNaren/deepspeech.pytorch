@@ -42,7 +42,7 @@ class Decoder(object):
         """Given a list of numeric sequences, returns the corresponding strings"""
         strings = []
         for x in xrange(len(sequences)):
-            seq_len = sizes[x][0] if sizes is not None else len(sequences[x])
+            seq_len = sizes[x] if sizes is not None else len(sequences[x])
             string = self._convert_to_string(sequences[x], seq_len)
             strings.append(string)
         return strings
@@ -140,7 +140,8 @@ class BeamCTCDecoder(Decoder):
     def decode(self, probs, sizes=None):
         out, conf, seq_len = self._ctc.beam_decode(probs, sizes, top_paths=self._top_n,
                                                    beam_width=self._beam_width, merge_repeated=False)
-        strings = self.convert_to_strings(out[0], sizes=seq_len)
+        # TODO: support returning multiple paths
+        strings = self.convert_to_strings(out[0], sizes=seq_len[0])
         return self.process_strings(strings)
 
 class GreedyDecoder(Decoder):
@@ -156,6 +157,5 @@ class GreedyDecoder(Decoder):
             strings: sequences of the model's best guess for the transcription on inputs
         """
         _, max_probs = torch.max(probs.transpose(0, 1), 2)
-        size_data = sizes.data if sizes is not None else None
-        strings = self.convert_to_strings(max_probs.view(max_probs.size(0), max_probs.size(1)), size_data)
+        strings = self.convert_to_strings(max_probs.view(max_probs.size(0), max_probs.size(1)), sizes)
         return self.process_strings(strings, remove_repetitions=True)
