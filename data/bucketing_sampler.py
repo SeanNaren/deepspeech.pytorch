@@ -28,7 +28,7 @@ class BucketingSampler(Sampler):
         memory overhead.
         :param data_source: The dataset to be sampled from
         """
-        super().__init__(data_source)
+        super(BucketingSampler, self).__init__(data_source)
         self.data_source = data_source
         assert hasattr(self.data_source, 'bins_to_samples')
 
