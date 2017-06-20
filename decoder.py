@@ -138,7 +138,7 @@ class BeamCTCDecoder(Decoder):
         self._ctc = pytorch_ctc
 
     def decode(self, probs, sizes=None):
-        out, conf, seq_len = self._ctc.beam_decode(probs, sizes, top_paths=self._top_n,
+        out, conf, seq_len = self._ctc.beam_decode(probs.cpu(), sizes.cpu(), top_paths=self._top_n,
                                                    beam_width=self._beam_width, merge_repeated=False)
         # TODO: support returning multiple paths
         strings = self.convert_to_strings(out[0], sizes=seq_len[0])

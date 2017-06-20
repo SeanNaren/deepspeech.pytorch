@@ -153,7 +153,7 @@ def main():
     parameters = model.parameters()
     optimizer = torch.optim.SGD(parameters, lr=args.lr,
                                 momentum=args.momentum, nesterov=True)
-    decoder = ArgMaxDecoder(labels)
+    decoder = GreedyDecoder(labels)
 
     if args.continue_from:
         print("Loading checkpoint model %s" % args.continue_from)
