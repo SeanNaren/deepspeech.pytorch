@@ -36,12 +36,15 @@ class SequenceWise(nn.Module):
         tmpstr += ')'
         return tmpstr
 
-class BatchSoftmax(nn.Module):
+
+class InferenceBatchSoftmax(nn.Module):
     def forward(self, input_):
-        output_ = input_.transpose(0,1)
-        batch_size = output_.size()[0]
-        output_ = torch.stack([F.log_softmax(output_[i]) for i in range(batch_size)], 0)
-        return output_
+        if not self.training:
+            batch_size = input_.size()[0]
+            return torch.stack([F.log_softmax(input_[i]) for i in range(batch_size)], 0)
+        else:
+            return input_
+
 
 class BatchRNN(nn.Module):
     def __init__(self, input_size, hidden_size, rnn_type=nn.LSTM, bidirectional=False, batch_norm=True):
@@ -77,7 +80,6 @@ class DeepSpeech(nn.Module):
         self._rnn_type = rnn_type
         self._audio_conf = audio_conf or {}
         self._labels = labels
-        self._softmax = BatchSoftmax()
 
         sample_rate = self._audio_conf.get("sample_rate", 16000)
         window_size = self._audio_conf.get("window_size", 0.02)
@@ -113,6 +115,7 @@ class DeepSpeech(nn.Module):
         self.fc = nn.Sequential(
             SequenceWise(fully_connected),
         )
+        self.softmax = InferenceBatchSoftmax()
 
     def forward(self, x):
         x = self.conv(x)
@@ -124,8 +127,8 @@ class DeepSpeech(nn.Module):
         x = self.rnns(x)
 
         x = self.fc(x)
-        if not self.training:
-            x = self._softmax(x)
+        x = x.transpose(0, 1)
+        x = self.softmax(x)
         return x
 
     @classmethod
