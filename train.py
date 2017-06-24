@@ -190,6 +190,13 @@ def main():
                 }
                 for tag, val in info.items():
                     logger.scalar_summary(tag, val, i + 1)
+        if not args.no_bucketing:
+            print("Using bucketing sampler for the following epochs")
+            train_dataset = SpectrogramDatasetWithLength(audio_conf=audio_conf, manifest_filepath=args.train_manifest,
+                                                         labels=labels,
+                                                         normalize=True, augment=args.augment)
+            sampler = BucketingSampler(train_dataset)
+            train_loader.sampler = sampler
     else:
         avg_loss = 0
         start_epoch = 0
