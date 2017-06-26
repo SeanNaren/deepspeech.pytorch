@@ -142,7 +142,7 @@ class BeamCTCDecoder(Decoder):
             raise ImportError("BeamCTCDecoder requires pytorch_ctc package.")
 
         self._decoder = CTCBD(scorer, labels, top_paths=top_paths, beam_width=beam_width,
-                              blank_index=blank_index, space_index=space_index, merge_repeated=True)
+                              blank_index=blank_index, space_index=space_index, merge_repeated=False)
 
 
     def decode(self, probs, sizes=None):
