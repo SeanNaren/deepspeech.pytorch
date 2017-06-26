@@ -31,6 +31,16 @@ cd audio
 python setup.py install
 ```
 
+If you want decoding to support beam search with an optional language model, install pytorch-ctc:
+```
+git clone --recursive https://github.com/ryanleary/pytorch-ctc.git
+cd pytorch-ctc
+pip install -r requirements.txt
+
+# build the extension and install python package (requires gcc-5 or later)
+CC=/path/to/gcc-5 CXX=/path/to/g++-5 python setup.py install
+```
+
 Finally:
 ```
 pip install -r requirements.txt
@@ -219,6 +229,17 @@ An example script to output a prediction has been provided:
 ```
 python predict.py --model_path models/deepspeech.pth.tar --audio_path /path/to/audio.wav
 ```
+
+### Alternate Decoders
+By default, `test.py` and `predict.py` use a `GreedyDecoder` which picks the highest-likelihood output label at each timestep. Repeated and blank symbols are then filtered to give the final output.
+
+A beam search decoder can optionally be used with the installation of the `pytorch-ctc` library as described in the Installation section. The `test` and `predict` scripts have a `--decoder` argument. To use the beam decoder, add `--decoder beam`. The beam decoder enables additional decoding parameters:
+- **beam_width** how many beams to consider at each timestep
+- **lm_path** optional binary KenLM language model to use for decoding
+- **trie_path** trie describing lexicon. required if `lm_path` is supplied
+- **lm_alpha** weight for language model
+- **lm_beta1** bonus weight for words
+- **lm_beta2** bonus weight for in-vocabulary words
 
 ## Acknowledgements
 
