@@ -168,13 +168,12 @@ def main():
         else:
             start_iter += 1
         avg_loss = int(package.get('avg_loss', 0))
+        loss_results, cer_results, wer_results = package['loss_results'], package[
+                'cer_results'], package['wer_results']
         if args.visdom and \
                         package['loss_results'] is not None and start_epoch > 0:  # Add previous scores to visdom graph
-            epoch = start_epoch
-            loss_results[0:epoch], cer_results[0:epoch], wer_results[0:epoch] = package['loss_results'], package[
-                'cer_results'], package['wer_results']
-            x_axis = epochs[0:epoch]
-            y_axis = [loss_results[0:epoch], wer_results[0:epoch], cer_results[0:epoch]]
+            x_axis = epochs[0:start_epoch]
+            y_axis = [loss_results[0:start_epoch], wer_results[0:start_epoch], cer_results[0:start_epoch]]
             for x in range(len(viz_windows)):
                 viz_windows[x] = viz.line(
                     X=x_axis,
@@ -183,9 +182,7 @@ def main():
                 )
         if args.tensorboard and \
                         package['loss_results'] is not None and start_epoch > 0:  # Previous scores to tensorboard logs
-            loss_results, cer_results, wer_results = package['loss_results'], package['cer_results'], package[
-                'wer_results']
-            for i in range(len(loss_results)):
+            for i in range(start_epoch):
                 info = {
                     'Avg Train Loss': loss_results[i],
                     'Avg WER': wer_results[i],
@@ -193,6 +190,13 @@ def main():
                 }
                 for tag, val in info.items():
                     logger.scalar_summary(tag, val, i + 1)
+        if not args.no_bucketing:
+            print("Using bucketing sampler for the following epochs")
+            train_dataset = SpectrogramDatasetWithLength(audio_conf=audio_conf, manifest_filepath=args.train_manifest,
+                                                         labels=labels,
+                                                         normalize=True, augment=args.augment)
+            sampler = BucketingSampler(train_dataset)
+            train_loader.sampler = sampler
     else:
         avg_loss = 0
         start_epoch = 0
@@ -318,16 +322,15 @@ def main():
         cer = total_cer / len(test_loader.dataset)
         wer *= 100
         cer *= 100
-
+        loss_results[epoch] = avg_loss
+        wer_results[epoch] = wer
+        cer_results[epoch] = cer
         print('Validation Summary Epoch: [{0}]\t'
               'Average WER {wer:.3f}\t'
               'Average CER {cer:.3f}\t'.format(
             epoch + 1, wer=wer, cer=cer))
 
         if args.visdom:
-            loss_results[epoch] = avg_loss
-            wer_results[epoch] = wer
-            cer_results[epoch] = cer
             # epoch += 1
             x_axis = epochs[0:epoch + 1]
             y_axis = [loss_results[0:epoch + 1], wer_results[0:epoch + 1], cer_results[0:epoch + 1]]
@@ -346,9 +349,6 @@ def main():
                         update='replace',
                     )
         if args.tensorboard:
-            loss_results[epoch] = avg_loss
-            wer_results[epoch] = wer
-            cer_results[epoch] = cer
             info = {
                 'Avg Train Loss': avg_loss,
                 'Avg WER': wer,
