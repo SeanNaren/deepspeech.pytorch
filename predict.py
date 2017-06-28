@@ -13,7 +13,7 @@ from model import DeepSpeech
 from spell import correction
 
 def np_softmax(tensor):
-    arr = tensor.numpy() 
+    arr = tensor.cpu().numpy() 
     exp = np.exp(arr-np.max(arr))
     return exp/exp.sum()
 
