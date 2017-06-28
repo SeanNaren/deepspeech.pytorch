@@ -23,7 +23,7 @@ def get_utterances_from_stm(stm_file):
     :return:
     """
     res = []
-    with open(stm_file, "r") as f:
+    with io.open(stm_file, "r", encoding='utf-8') as f:
         for stm_line in f:
             tokens = stm_line.split()
             start_time = float(tokens[3])
