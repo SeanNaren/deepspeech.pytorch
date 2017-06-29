@@ -4,6 +4,16 @@
 Implementation of DeepSpeech2 using [Baidu Warp-CTC](https://github.com/baidu-research/warp-ctc).
 Creates a network based on the [DeepSpeech2](http://arxiv.org/pdf/1512.02595v1.pdf) architecture, trained with the CTC activation function.
 
+## Features
+
+* Train DeepSpeech, configurable RNN types and architectures with multi-gpu support.
+* Language model support using kenlm (WIP right now, currently no instructions to build a LM yet).
+* Multiple dataset downloaders, support for AN4, TED, Voxforge and Librispeech. Datasets can be merged, support for custom datasets included.
+* Noise injection for online training to improve noise robustness.
+* Audio augmentation to improve noise robustness.
+* Easy start/stop capabilities in the event of crash or hard stop during training.
+* Visdom/Tensorboard support for visualising training graphs.
+
 # Installation
 
 Several libraries are needed to be installed for training to work. I will assume that everything is being installed in
