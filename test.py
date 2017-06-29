@@ -5,7 +5,7 @@ import torch
 from torch.autograd import Variable
 
 from data.data_loader import SpectrogramDataset, AudioDataLoader
-from decoder import ArgMaxDecoder
+from decoder import GreedyDecoder, BeamCTCDecoder, Scorer, KenLMScorer
 from model import DeepSpeech
 
 parser = argparse.ArgumentParser(description='DeepSpeech prediction')
@@ -16,6 +16,14 @@ parser.add_argument('--test_manifest', metavar='DIR',
                     help='path to validation manifest csv', default='data/test_manifest.csv')
 parser.add_argument('--batch_size', default=20, type=int, help='Batch size for training')
 parser.add_argument('--num_workers', default=4, type=int, help='Number of workers used in dataloading')
+parser.add_argument('--decoder', default="greedy", choices=["greedy", "beam"], type=str, help="Decoder to use")
+beam_args = parser.add_argument_group("Beam Decode Options", "Configurations options for the CTC Beam Search decoder")
+beam_args.add_argument('--beam_width', default=10, type=int, help='Beam width to use')
+beam_args.add_argument('--lm_path', default=None, type=str, help='Path to an (optional) kenlm language model for use with beam search (req\'d with trie)')
+beam_args.add_argument('--trie_path', default=None, type=str, help='Path to an (optional) trie dictionary for use with beam search (req\'d with LM)')
+beam_args.add_argument('--lm_alpha', default=0.8, type=float, help='Language model weight')
+beam_args.add_argument('--lm_beta1', default=1, type=float, help='Language model word bonus (all words)')
+beam_args.add_argument('--lm_beta2', default=1, type=float, help='Language model word bonus (IV words)')
 args = parser.parse_args()
 
 if __name__ == '__main__':
@@ -24,7 +32,19 @@ if __name__ == '__main__':
 
     labels = DeepSpeech.get_labels(model)
     audio_conf = DeepSpeech.get_audio_conf(model)
-    decoder = ArgMaxDecoder(labels)
+
+    if args.decoder == "beam":
+        scorer = None
+        if args.lm_path is not None:
+            scorer = KenLMScorer(labels, args.lm_path, args.trie_path)
+            scorer.set_lm_weight(args.lm_alpha)
+            scorer.set_word_weight(args.lm_beta1)
+            scorer.set_valid_word_weight(args.lm_beta2)
+        else:
+            scorer = Scorer()
+        decoder = BeamCTCDecoder(labels, scorer, beam_width=args.beam_width, top_paths=1, space_index=labels.index(' '), blank_index=labels.index('_'))
+    else:
+        decoder = GreedyDecoder(labels, space_index=labels.index(' '), blank_index=labels.index('_'))
 
     test_dataset = SpectrogramDataset(audio_conf=audio_conf, manifest_filepath=args.test_manifest, labels=labels,
                                       normalize=True)
@@ -49,7 +69,7 @@ if __name__ == '__main__':
         out = model(inputs)
         out = out.transpose(0, 1)  # TxNxH
         seq_length = out.size(0)
-        sizes = Variable(input_percentages.mul_(int(seq_length)).int(), volatile=True)
+        sizes = input_percentages.mul_(int(seq_length)).int()
 
         decoded_output = decoder.decode(out.data, sizes)
         target_strings = decoder.process_strings(decoder.convert_to_strings(split_targets))

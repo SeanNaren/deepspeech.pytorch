@@ -17,8 +17,13 @@
 
 import Levenshtein as Lev
 import torch
+from enum import Enum
 from six.moves import xrange
-
+try:
+    from pytorch_ctc import CTCBeamDecoder as CTCBD
+    from pytorch_ctc import Scorer, KenLMScorer
+except ImportError:
+    print("warn: pytorch_ctc unavailable. Only greedy decoding is supported.")
 
 class Decoder(object):
     """
@@ -42,13 +47,13 @@ class Decoder(object):
         """Given a list of numeric sequences, returns the corresponding strings"""
         strings = []
         for x in xrange(len(sequences)):
-            string = self.convert_to_string(sequences[x])
-            string = string[0:int(sizes.data[x])] if sizes is not None else string
+            seq_len = sizes[x] if sizes is not None else len(sequences[x])
+            string = self._convert_to_string(sequences[x], seq_len)
             strings.append(string)
         return strings
 
-    def convert_to_string(self, sequence):
-        return ''.join([self.int_to_char[i] for i in sequence])
+    def _convert_to_string(self, sequence, sizes):
+        return ''.join([self.int_to_char[sequence[i]] for i in range(sizes)])
 
     def process_strings(self, sequences, remove_repetitions=False):
         """
@@ -126,7 +131,29 @@ class Decoder(object):
         raise NotImplementedError
 
 
-class ArgMaxDecoder(Decoder):
+class BeamCTCDecoder(Decoder):
+    def __init__(self, labels, scorer, beam_width=20, top_paths=1, blank_index=0, space_index=28):
+        super(BeamCTCDecoder, self).__init__(labels, blank_index=blank_index, space_index=space_index)
+        self._beam_width = beam_width
+        self._top_n = top_paths
+        try:
+            import pytorch_ctc
+        except ImportError:
+            raise ImportError("BeamCTCDecoder requires pytorch_ctc package.")
+
+        self._decoder = CTCBD(scorer, labels, top_paths=top_paths, beam_width=beam_width,
+                              blank_index=blank_index, space_index=space_index, merge_repeated=False)
+
+
+    def decode(self, probs, sizes=None):
+        sizes = sizes.cpu() if sizes is not None else None
+        out, conf, seq_len = self._decoder.decode(probs.cpu(), sizes)
+
+        # TODO: support returning multiple paths
+        strings = self.convert_to_strings(out[0], sizes=seq_len[0])
+        return self.process_strings(strings)
+
+class GreedyDecoder(Decoder):
     def decode(self, probs, sizes=None):
         """
         Returns the argmax decoding given the probability matrix. Removes

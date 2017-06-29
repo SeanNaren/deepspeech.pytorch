@@ -3,6 +3,7 @@ from collections import OrderedDict
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 supported_rnns = {
     'lstm': nn.LSTM,
@@ -34,6 +35,15 @@ class SequenceWise(nn.Module):
         tmpstr += self.module.__repr__()
         tmpstr += ')'
         return tmpstr
+
+
+class InferenceBatchSoftmax(nn.Module):
+    def forward(self, input_):
+        if not self.training:
+            batch_size = input_.size()[0]
+            return torch.stack([F.log_softmax(input_[i]) for i in range(batch_size)], 0)
+        else:
+            return input_
 
 
 class BatchRNN(nn.Module):
@@ -105,6 +115,7 @@ class DeepSpeech(nn.Module):
         self.fc = nn.Sequential(
             SequenceWise(fully_connected),
         )
+        self.softmax = InferenceBatchSoftmax()
 
     def forward(self, x):
         x = self.conv(x)
@@ -116,7 +127,8 @@ class DeepSpeech(nn.Module):
         x = self.rnns(x)
 
         x = self.fc(x)
-        x = x.transpose(0, 1)  # Transpose for multi-gpu concat
+        x = x.transpose(0, 1)
+        x = self.softmax(x)
         return x
 
     @classmethod
