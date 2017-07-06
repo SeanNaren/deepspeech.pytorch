@@ -37,9 +37,10 @@ parser.add_argument('--silent', dest='silent', action='store_true', help='Turn o
 parser.add_argument('--checkpoint', dest='checkpoint', action='store_true', help='Enables checkpoint saving of model')
 parser.add_argument('--checkpoint_per_batch', default=0, type=int, help='Save checkpoint per batch. 0 means never save')
 parser.add_argument('--visdom', dest='visdom', action='store_true', help='Turn on visdom graphing')
+parser.add_argument('--visdom_id', default='Deepspeech training', help='Identifier for visdom graph')
 parser.add_argument('--save_folder', default='models/', help='Location to save epoch models')
-parser.add_argument('--final_model_path', default='models/deepspeech_final.pth.tar',
-                    help='Location to save final model')
+parser.add_argument('--model_path', default='models/deepspeech_final.pth.tar',
+                    help='Location to save best validation model')
 parser.add_argument('--continue_from', default='', help='Continue from checkpoint model')
 parser.add_argument('--rnn_type', default='lstm', help='Type of the RNN. rnn|gru|lstm are supported')
 parser.add_argument('--augment', dest='augment', action='store_true', help='Use random tempo and gain perturbations.')
@@ -57,6 +58,8 @@ parser.add_argument('--no_bucketing', dest='no_bucketing', action='store_false',
                     help='Turn off bucketing and sample from dataset based on sequence length (smallest to largest)')
 parser.set_defaults(cuda=False, silent=False, checkpoint=False, visdom=False, augment=False, tensorboard=False,
                     log_params=False, no_bucketing=False)
+
+
 def to_np(x):
     return x.data.cpu().numpy()
 
@@ -86,13 +89,14 @@ def main():
 
     loss_results, cer_results, wer_results = torch.Tensor(args.epochs), torch.Tensor(args.epochs), torch.Tensor(
         args.epochs)
+    best_wer = None
     if args.visdom:
         from visdom import Visdom
         viz = Visdom()
 
-        opts = [dict(title='Loss', ylabel='Loss', xlabel='Epoch'),
-                dict(title='WER', ylabel='WER', xlabel='Epoch'),
-                dict(title='CER', ylabel='CER', xlabel='Epoch')]
+        opts = [dict(title=args.visdom_id + ' Loss', ylabel='Loss', xlabel='Epoch'),
+                dict(title=args.visdom_id + ' WER', ylabel='WER', xlabel='Epoch'),
+                dict(title=args.visdom_id + ' CER', ylabel='CER', xlabel='Epoch')]
 
         viz_windows = [None, None, None]
         epochs = torch.arange(1, args.epochs + 1)
@@ -169,7 +173,7 @@ def main():
             start_iter += 1
         avg_loss = int(package.get('avg_loss', 0))
         loss_results, cer_results, wer_results = package['loss_results'], package[
-                'cer_results'], package['wer_results']
+            'cer_results'], package['wer_results']
         if args.visdom and \
                         package['loss_results'] is not None and start_epoch > 0:  # Add previous scores to visdom graph
             x_axis = epochs[0:start_epoch]
@@ -372,6 +376,13 @@ def main():
         optimizer.load_state_dict(optim_state)
         print('Learning rate annealed to: {lr:.6f}'.format(lr=optim_state['param_groups'][0]['lr']))
 
+        if best_wer is None or best_wer > wer:
+            print("Found better validated model, saving to %s" % args.final_model_path)
+            torch.save(DeepSpeech.serialize(model, optimizer=optimizer, epoch=epoch, loss_results=loss_results,
+                                            wer_results=wer_results, cer_results=cer_results)
+                       , args.final_model_path)
+            best_wer = wer
+
         avg_loss = 0
         if not args.no_bucketing and epoch == 0:
             print("Switching to bucketing sampler for following epochs")
@@ -380,8 +391,6 @@ def main():
                                                          normalize=True, augment=args.augment)
             sampler = BucketingSampler(train_dataset)
             train_loader.sampler = sampler
-
-    torch.save(DeepSpeech.serialize(model, optimizer=optimizer), args.final_model_path)
 
 
 if __name__ == '__main__':

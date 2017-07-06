@@ -74,6 +74,8 @@ def iteration(input_data):
     optimizer.step()
     torch.cuda.synchronize()
     end = time.time()
+    del loss
+    del out
     return start, end
 
 

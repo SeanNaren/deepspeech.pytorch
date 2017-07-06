@@ -8,6 +8,7 @@ parser.add_argument('--dictionary', help='path to text dictionary (one word per 
 parser.add_argument('--kenlm', help='path to binary kenlm language model', default="lm.kenlm")
 parser.add_argument('--trie', help='path of trie to output', default='vocab.trie')
 
+
 def main():
     args = parser.parse_args()
     with open(args.labels, "r") as fh:
@@ -16,6 +17,7 @@ def main():
     labels = ''.join(label_data)
 
     pytorch_ctc.generate_lm_trie(args.dictionary, args.kenlm, args.trie, labels, labels.index('_'), labels.index(' '))
+
 
 if __name__ == '__main__':
     main()

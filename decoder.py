@@ -19,11 +19,13 @@ import Levenshtein as Lev
 import torch
 from enum import Enum
 from six.moves import xrange
+
 try:
     from pytorch_ctc import CTCBeamDecoder as CTCBD
     from pytorch_ctc import Scorer, KenLMScorer
 except ImportError:
     print("warn: pytorch_ctc unavailable. Only greedy decoding is supported.")
+
 
 class Decoder(object):
     """
@@ -144,7 +146,6 @@ class BeamCTCDecoder(Decoder):
         self._decoder = CTCBD(scorer, labels, top_paths=top_paths, beam_width=beam_width,
                               blank_index=blank_index, space_index=space_index, merge_repeated=False)
 
-
     def decode(self, probs, sizes=None):
         sizes = sizes.cpu() if sizes is not None else None
         out, conf, seq_len = self._decoder.decode(probs.cpu(), sizes)
@@ -152,6 +153,7 @@ class BeamCTCDecoder(Decoder):
         # TODO: support returning multiple paths
         strings = self.convert_to_strings(out[0], sizes=seq_len[0])
         return self.process_strings(strings)
+
 
 class GreedyDecoder(Decoder):
     def decode(self, probs, sizes=None):
