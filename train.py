@@ -377,10 +377,10 @@ def main():
         print('Learning rate annealed to: {lr:.6f}'.format(lr=optim_state['param_groups'][0]['lr']))
 
         if best_wer is None or best_wer > wer:
-            print("Found better validated model, saving to %s" % args.final_model_path)
+            print("Found better validated model, saving to %s" % args.model_path)
             torch.save(DeepSpeech.serialize(model, optimizer=optimizer, epoch=epoch, loss_results=loss_results,
                                             wer_results=wer_results, cer_results=cer_results)
-                       , args.final_model_path)
+                       , args.model_path)
             best_wer = wer
 
         avg_loss = 0
