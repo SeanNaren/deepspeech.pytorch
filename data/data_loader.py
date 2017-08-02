@@ -101,7 +101,7 @@ class SpectrogramParser(AudioParser):
 
     def parse_audio(self, audio_path):
         if self.augment:
-            y = load_randomly_augmented_audio(audio_path)
+            y = load_randomly_augmented_audio(audio_path, self.sample_rate)
         else:
             y = load_audio(audio_path)
         if self.noiseInjector:
