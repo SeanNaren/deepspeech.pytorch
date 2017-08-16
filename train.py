@@ -194,7 +194,7 @@ def main():
                 }
                 for tag, val in info.items():
                     logger.scalar_summary(tag, val, i + 1)
-        if not args.no_bucketing:
+        if not args.no_bucketing and epoch != 0:
             print("Using bucketing sampler for the following epochs")
             train_dataset = SpectrogramDatasetWithLength(audio_conf=audio_conf, manifest_filepath=args.train_manifest,
                                                          labels=labels,
