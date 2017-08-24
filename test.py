@@ -1,6 +1,8 @@
 import argparse
 
 from torch.autograd import Variable
+from tqdm import tqdm
+
 from decoder import GreedyDecoder, BeamCTCDecoder
 
 from data.data_loader import SpectrogramDataset, AudioDataLoader
@@ -46,7 +48,7 @@ if __name__ == '__main__':
     test_loader = AudioDataLoader(test_dataset, batch_size=args.batch_size,
                                   num_workers=args.num_workers)
     total_cer, total_wer = 0, 0
-    for i, (data) in enumerate(test_loader):
+    for i, (data) in tqdm(enumerate(test_loader), total=len(test_loader)):
         inputs, targets, input_percentages, target_sizes = data
 
         inputs = Variable(inputs, volatile=True)
