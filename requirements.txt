@@ -3,3 +3,4 @@ torch
 visdom
 wget
 librosa
+tqdm

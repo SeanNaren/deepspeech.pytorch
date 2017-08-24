@@ -1,11 +1,11 @@
 import argparse
-import json
 
-import torch
 from torch.autograd import Variable
+from tqdm import tqdm
+
+from decoder import GreedyDecoder, BeamCTCDecoder
 
 from data.data_loader import SpectrogramDataset, AudioDataLoader
-from decoder import GreedyDecoder, BeamCTCDecoder, Scorer, KenLMScorer
 from model import DeepSpeech
 
 parser = argparse.ArgumentParser(description='DeepSpeech prediction')
@@ -19,8 +19,10 @@ parser.add_argument('--num_workers', default=4, type=int, help='Number of worker
 parser.add_argument('--decoder', default="greedy", choices=["greedy", "beam"], type=str, help="Decoder to use")
 beam_args = parser.add_argument_group("Beam Decode Options", "Configurations options for the CTC Beam Search decoder")
 beam_args.add_argument('--beam_width', default=10, type=int, help='Beam width to use')
-beam_args.add_argument('--lm_path', default=None, type=str, help='Path to an (optional) kenlm language model for use with beam search (req\'d with trie)')
-beam_args.add_argument('--trie_path', default=None, type=str, help='Path to an (optional) trie dictionary for use with beam search (req\'d with LM)')
+beam_args.add_argument('--lm_path', default=None, type=str,
+                       help='Path to an (optional) kenlm language model for use with beam search (req\'d with trie)')
+beam_args.add_argument('--trie_path', default=None, type=str,
+                       help='Path to an (optional) trie dictionary for use with beam search (req\'d with LM)')
 beam_args.add_argument('--lm_alpha', default=0.8, type=float, help='Language model weight')
 beam_args.add_argument('--lm_beta1', default=1, type=float, help='Language model word bonus (all words)')
 beam_args.add_argument('--lm_beta2', default=1, type=float, help='Language model word bonus (IV words)')
@@ -34,15 +36,10 @@ if __name__ == '__main__':
     audio_conf = DeepSpeech.get_audio_conf(model)
 
     if args.decoder == "beam":
-        scorer = None
-        if args.lm_path is not None:
-            scorer = KenLMScorer(labels, args.lm_path, args.trie_path)
-            scorer.set_lm_weight(args.lm_alpha)
-            scorer.set_word_weight(args.lm_beta1)
-            scorer.set_valid_word_weight(args.lm_beta2)
-        else:
-            scorer = Scorer()
-        decoder = BeamCTCDecoder(labels, scorer, beam_width=args.beam_width, top_paths=1, space_index=labels.index(' '), blank_index=labels.index('_'))
+        decoder = BeamCTCDecoder(labels, beam_width=args.beam_width, top_paths=1, space_index=labels.index(' '),
+                                 blank_index=labels.index('_'), lm_path=args.lm_path,
+                                 trie_path=args.trie_path, lm_alpha=args.lm_alpha, lm_beta1=args.lm_beta1,
+                                 lm_beta2=args.lm_beta2)
     else:
         decoder = GreedyDecoder(labels, space_index=labels.index(' '), blank_index=labels.index('_'))
 
@@ -51,7 +48,7 @@ if __name__ == '__main__':
     test_loader = AudioDataLoader(test_dataset, batch_size=args.batch_size,
                                   num_workers=args.num_workers)
     total_cer, total_wer = 0, 0
-    for i, (data) in enumerate(test_loader):
+    for i, (data) in tqdm(enumerate(test_loader), total=len(test_loader)):
         inputs, targets, input_percentages, target_sizes = data
 
         inputs = Variable(inputs, volatile=True)
