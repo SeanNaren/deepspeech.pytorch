@@ -251,6 +251,10 @@ A beam search decoder can optionally be used with the installation of the `pytor
 - **lm_beta1** bonus weight for words
 - **lm_beta2** bonus weight for in-vocabulary words
 
+## Pre-trained models
+
+Pre-trained models can be found under releases [here](https://github.com/SeanNaren/deepspeech.pytorch/releases).
+
 ## Acknowledgements
 
 Thanks to [Egor](https://github.com/EgorLakomkin) and [Ryan](https://github.com/ryanleary) for their contributions!
