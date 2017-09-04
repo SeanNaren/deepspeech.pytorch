@@ -25,8 +25,9 @@ parser.add_argument('--labels_path', default='labels.json', help='Contains all c
 parser.add_argument('--window_size', default=.02, type=float, help='Window size for spectrogram in seconds')
 parser.add_argument('--window_stride', default=.01, type=float, help='Window stride for spectrogram in seconds')
 parser.add_argument('--window', default='hamming', help='Window type for spectrogram generation')
-parser.add_argument('--hidden_size', default=400, type=int, help='Hidden size of RNNs')
-parser.add_argument('--hidden_layers', default=4, type=int, help='Number of RNN layers')
+parser.add_argument('--hidden_size', default=800, type=int, help='Hidden size of RNNs')
+parser.add_argument('--hidden_layers', default=5, type=int, help='Number of RNN layers')
+parser.add_argument('--rnn_type', default='gru', help='Type of the RNN. rnn|gru|lstm are supported')
 parser.add_argument('--epochs', default=70, type=int, help='Number of training epochs')
 parser.add_argument('--cuda', dest='cuda', action='store_true', help='Use cuda to train model')
 parser.add_argument('--lr', '--learning-rate', default=3e-4, type=float, help='initial learning rate')
@@ -42,7 +43,6 @@ parser.add_argument('--save_folder', default='models/', help='Location to save e
 parser.add_argument('--model_path', default='models/deepspeech_final.pth.tar',
                     help='Location to save best validation model')
 parser.add_argument('--continue_from', default='', help='Continue from checkpoint model')
-parser.add_argument('--rnn_type', default='lstm', help='Type of the RNN. rnn|gru|lstm are supported')
 parser.add_argument('--augment', dest='augment', action='store_true', help='Use random tempo and gain perturbations.')
 parser.add_argument('--noise_dir', default=None,
                     help='Directory to inject noise into audio. If default, noise Inject not added')
@@ -56,8 +56,6 @@ parser.add_argument('--log_dir', default='visualize/deepspeech_final', help='Loc
 parser.add_argument('--log_params', dest='log_params', action='store_true', help='Log parameter values and gradients')
 parser.add_argument('--no_bucketing', dest='no_bucketing', action='store_true',
                     help='Turn off bucketing and sample from dataset based on sequence length (smallest to largest)')
-parser.set_defaults(cuda=False, silent=False, checkpoint=False, visdom=False, augment=False, tensorboard=False,
-                    log_params=False, no_bucketing=False)
 
 
 def to_np(x):
