@@ -21,7 +21,7 @@ parser.add_argument('--val_manifest', metavar='DIR',
 parser.add_argument('--sample_rate', default=16000, type=int, help='Sample rate')
 parser.add_argument('--batch_size', default=20, type=int, help='Batch size for training')
 parser.add_argument('--num_workers', default=4, type=int, help='Number of workers used in data-loading')
-parser.add_argument('--labels_path', default='labels.json', help='Contains all characters for prediction')
+parser.add_argument('--labels_path', default='labels.json', help='Contains all characters for transcription')
 parser.add_argument('--window_size', default=.02, type=float, help='Window size for spectrogram in seconds')
 parser.add_argument('--window_stride', default=.01, type=float, help='Window stride for spectrogram in seconds')
 parser.add_argument('--window', default='hamming', help='Window type for spectrogram generation')

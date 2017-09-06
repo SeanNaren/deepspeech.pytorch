@@ -2,14 +2,14 @@ import argparse
 import sys
 import time
 
-from decoder import GreedyDecoder, BeamCTCDecoder
+from decoder import GreedyDecoder
 
 from torch.autograd import Variable
 
 from data.data_loader import SpectrogramParser
 from model import DeepSpeech
 
-parser = argparse.ArgumentParser(description='DeepSpeech prediction')
+parser = argparse.ArgumentParser(description='DeepSpeech transcription')
 parser.add_argument('--model_path', default='models/deepspeech_final.pth.tar',
                     help='Path to model file created by training')
 parser.add_argument('--audio_path', default='audio.wav',
@@ -35,6 +35,7 @@ if __name__ == '__main__':
     audio_conf = DeepSpeech.get_audio_conf(model)
 
     if args.decoder == "beam":
+        from decoder import BeamCTCDecoder
         decoder = BeamCTCDecoder(labels, beam_width=args.beam_width, top_paths=1, space_index=labels.index(' '),
                                  blank_index=labels.index('_'), lm_path=args.lm_path,
                                  trie_path=args.trie_path, lm_alpha=args.lm_alpha, lm_beta1=args.lm_beta1,

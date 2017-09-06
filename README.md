@@ -235,16 +235,16 @@ To evaluate a trained model on a test set (has to be in the same format as the t
 python test.py --model_path models/deepspeech.pth.tar --test_manifest /path/to/test_manifest.csv --cuda
 ```
 
-An example script to output a prediction has been provided:
+An example script to output a transcription has been provided:
 
 ```
-python predict.py --model_path models/deepspeech.pth.tar --audio_path /path/to/audio.wav
+python transcribe.py --model_path models/deepspeech.pth.tar --audio_path /path/to/audio.wav
 ```
 
 ### Alternate Decoders
-By default, `test.py` and `predict.py` use a `GreedyDecoder` which picks the highest-likelihood output label at each timestep. Repeated and blank symbols are then filtered to give the final output.
+By default, `test.py` and `transcribe.py` use a `GreedyDecoder` which picks the highest-likelihood output label at each timestep. Repeated and blank symbols are then filtered to give the final output.
 
-A beam search decoder can optionally be used with the installation of the `pytorch-ctc` library as described in the Installation section. The `test` and `predict` scripts have a `--decoder` argument. To use the beam decoder, add `--decoder beam`. The beam decoder enables additional decoding parameters:
+A beam search decoder can optionally be used with the installation of the `pytorch-ctc` library as described in the Installation section. The `test` and `transcribe` scripts have a `--decoder` argument. To use the beam decoder, add `--decoder beam`. The beam decoder enables additional decoding parameters:
 - **beam_width** how many beams to consider at each timestep
 - **lm_path** optional binary KenLM language model to use for decoding
 - **trie_path** trie describing lexicon. required if `lm_path` is supplied
