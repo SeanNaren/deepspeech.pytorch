@@ -15,14 +15,14 @@ windows = {'hamming': scipy.signal.hamming, 'hann': scipy.signal.hann, 'blackman
 
 
 def load_audio(path):
-    sound, sample_rate = torchaudio.load(path)
+    sound, _ = torchaudio.load(path)
     sound = sound.numpy()
     if len(sound.shape) > 1:
         if sound.shape[1] == 1:
             sound = sound.squeeze()
         else:
             sound = sound.mean(axis=1)  # multiple channels, average
-    return sound, sample_rate
+    return sound
 
 
 class AudioParser(object):
@@ -99,7 +99,7 @@ class SpectrogramParser(AudioParser):
         if self.augment:
             y = load_randomly_augmented_audio(audio_path, self.sample_rate)
         else:
-            y, _ = load_audio(audio_path)
+            y = load_audio(audio_path)
         if self.noiseInjector:
             add_noise = np.random.binomial(1, self.noise_prob)
             if add_noise:
@@ -215,7 +215,7 @@ def audio_with_sox(path, sample_rate, start_time, end_time):
                                                                                          tar_filename, start_time,
                                                                                          end_time)
         os.system(sox_params)
-        y, _ = load_audio(tar_filename)
+        y = load_audio(tar_filename)
         return y
 
 
@@ -230,7 +230,7 @@ def augment_audio_with_sox(path, sample_rate, tempo, gain):
                                                                                       augmented_filename,
                                                                                       " ".join(sox_augment_params))
         os.system(sox_params)
-        y, _ = load_audio(augmented_filename)
+        y = load_audio(augmented_filename)
         return y
 
 
