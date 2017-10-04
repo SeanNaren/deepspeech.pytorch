@@ -158,6 +158,14 @@ There is also [Visdom](https://github.com/facebookresearch/visdom) support to vi
 python train.py --visdom
 ```
 
+There is also [Tensorboard](https://github.com/lanpa/tensorboard-pytorch) support to visualise training. Follow the instructions to set up. To use:
+
+```
+python train.py --tensorboard --logdir log_dir/ # Make sure the tensorboard instance is made pointing to this log directory
+```
+
+For both visualisation tools, you can add your own name to the run by changing the `--id` parameter when training.
+
 ### Noise Augmentation/Injection
 
 There is support for two different types of noise; noise augmentation and noise injection.

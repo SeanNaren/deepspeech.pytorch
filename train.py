@@ -38,7 +38,10 @@ parser.add_argument('--silent', dest='silent', action='store_true', help='Turn o
 parser.add_argument('--checkpoint', dest='checkpoint', action='store_true', help='Enables checkpoint saving of model')
 parser.add_argument('--checkpoint_per_batch', default=0, type=int, help='Save checkpoint per batch. 0 means never save')
 parser.add_argument('--visdom', dest='visdom', action='store_true', help='Turn on visdom graphing')
-parser.add_argument('--visdom_id', default='Deepspeech training', help='Identifier for visdom graph')
+parser.add_argument('--tensorboard', dest='tensorboard', action='store_true', help='Turn on tensorboard graphing')
+parser.add_argument('--log_dir', default='visualize/deepspeech_final', help='Location of tensorboard log')
+parser.add_argument('--log_params', dest='log_params', action='store_true', help='Log parameter values and gradients')
+parser.add_argument('--id', default='Deepspeech training', help='Identifier for visdom/tensorboard run')
 parser.add_argument('--save_folder', default='models/', help='Location to save epoch models')
 parser.add_argument('--model_path', default='models/deepspeech_final.pth.tar',
                     help='Location to save best validation model')
@@ -51,9 +54,6 @@ parser.add_argument('--noise_min', default=0.0,
                     help='Minimum noise level to sample from. (1.0 means all noise, not original signal)', type=float)
 parser.add_argument('--noise_max', default=0.5,
                     help='Maximum noise levels to sample from. Maximum 1.0', type=float)
-parser.add_argument('--tensorboard', dest='tensorboard', action='store_true', help='Turn on tensorboard graphing')
-parser.add_argument('--log_dir', default='visualize/deepspeech_final', help='Location of tensorboard log')
-parser.add_argument('--log_params', dest='log_params', action='store_true', help='Log parameter values and gradients')
 parser.add_argument('--no_bucketing', dest='no_bucketing', action='store_true',
                     help='Turn off bucketing and sample from dataset based on sequence length (smallest to largest)')
 
@@ -91,16 +91,15 @@ def main():
     if args.visdom:
         from visdom import Visdom
         viz = Visdom()
-        opts = dict(title=args.visdom_id, ylabel='', xlabel='Epoch', legend=['Loss', 'WER', 'CER'])
+        opts = dict(title=args.id, ylabel='', xlabel='Epoch', legend=['Loss', 'WER', 'CER'])
         viz_window = None
         epochs = torch.arange(1, args.epochs + 1)
     if args.tensorboard:
-        from logger import TensorBoardLogger
         try:
             os.makedirs(args.log_dir)
         except OSError as e:
             if e.errno == errno.EEXIST:
-                print('Directory already exists.')
+                print('Tensorboard log directory already exists.')
                 for file in os.listdir(args.log_dir):
                     file_path = os.path.join(args.log_dir, file)
                     try:
@@ -110,13 +109,14 @@ def main():
                         raise
             else:
                 raise
-        logger = TensorBoardLogger(args.log_dir)
+        from tensorboardX import SummaryWriter
+        tensorboard_writer = SummaryWriter(args.log_dir)
 
     try:
         os.makedirs(save_folder)
     except OSError as e:
         if e.errno == errno.EEXIST:
-            print('Directory already exists.')
+            print('Model Save directory already exists.')
         else:
             raise
     criterion = CTCLoss()
@@ -181,14 +181,13 @@ def main():
         if args.tensorboard and \
                         package['loss_results'] is not None and start_epoch > 0:  # Previous scores to tensorboard logs
             for i in range(start_epoch):
-                info = {
+                values = {
                     'Avg Train Loss': loss_results[i],
                     'Avg WER': wer_results[i],
                     'Avg CER': cer_results[i]
                 }
-                for tag, val in info.items():
-                    logger.scalar_summary(tag, val, i + 1)
-        if not args.no_bucketing and epoch != 0:
+                tensorboard_writer.add_scalars(args.id, values, i + 1)
+        if not args.no_bucketing and start_epoch != 0:
             print("Using bucketing sampler for the following epochs")
             train_dataset = SpectrogramDatasetWithLength(audio_conf=audio_conf, manifest_filepath=args.train_manifest,
                                                          labels=labels,
@@ -345,18 +344,17 @@ def main():
                     update='replace',
                 )
         if args.tensorboard:
-            info = {
+            values = {
                 'Avg Train Loss': avg_loss,
                 'Avg WER': wer,
                 'Avg CER': cer
             }
-            for tag, val in info.items():
-                logger.scalar_summary(tag, val, epoch + 1)
+            tensorboard_writer.add_scalars(args.id, values, epoch + 1)
             if args.log_params:
                 for tag, value in model.named_parameters():
                     tag = tag.replace('.', '/')
-                    logger.histo_summary(tag, to_np(value), epoch + 1)
-                    logger.histo_summary(tag + '/grad', to_np(value.grad), epoch + 1)
+                    tensorboard_writer.add_histogram(tag, to_np(value), epoch + 1)
+                    tensorboard_writer.add_histogram(tag + '/grad', to_np(value.grad), epoch + 1)
         if args.checkpoint:
             file_path = '%s/deepspeech_%d.pth.tar' % (save_folder, epoch + 1)
             torch.save(DeepSpeech.serialize(model, optimizer=optimizer, epoch=epoch, loss_results=loss_results,
