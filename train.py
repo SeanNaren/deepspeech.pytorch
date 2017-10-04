@@ -7,7 +7,7 @@ import time
 import torch
 from torch.autograd import Variable
 from warpctc_pytorch import CTCLoss
-
+import numpy as np
 from data.bucketing_sampler import BucketingSampler, SpectrogramDatasetWithLength
 from data.data_loader import AudioDataLoader, SpectrogramDataset
 from decoder import GreedyDecoder
@@ -91,12 +91,8 @@ def main():
     if args.visdom:
         from visdom import Visdom
         viz = Visdom()
-
-        opts = [dict(title=args.visdom_id + ' Loss', ylabel='Loss', xlabel='Epoch'),
-                dict(title=args.visdom_id + ' WER', ylabel='WER', xlabel='Epoch'),
-                dict(title=args.visdom_id + ' CER', ylabel='CER', xlabel='Epoch')]
-
-        viz_windows = [None, None, None]
+        opts = dict(title=args.visdom_id, ylabel='', xlabel='Epoch', legend=['Loss', 'WER', 'CER'])
+        viz_window = None
         epochs = torch.arange(1, args.epochs + 1)
     if args.tensorboard:
         from logger import TensorBoardLogger
@@ -175,13 +171,13 @@ def main():
         if args.visdom and \
                         package['loss_results'] is not None and start_epoch > 0:  # Add previous scores to visdom graph
             x_axis = epochs[0:start_epoch]
-            y_axis = [loss_results[0:start_epoch], wer_results[0:start_epoch], cer_results[0:start_epoch]]
-            for x in range(len(viz_windows)):
-                viz_windows[x] = viz.line(
-                    X=x_axis,
-                    Y=y_axis[x],
-                    opts=opts[x],
-                )
+            y_axis = torch.stack((loss_results[0:start_epoch], wer_results[0:start_epoch], cer_results[0:start_epoch]),
+                                 dim=1)
+            viz_window = viz.line(
+                X=x_axis,
+                Y=y_axis,
+                opts=opts,
+            )
         if args.tensorboard and \
                         package['loss_results'] is not None and start_epoch > 0:  # Previous scores to tensorboard logs
             for i in range(start_epoch):
@@ -333,23 +329,21 @@ def main():
             epoch + 1, wer=wer, cer=cer))
 
         if args.visdom:
-            # epoch += 1
             x_axis = epochs[0:epoch + 1]
-            y_axis = [loss_results[0:epoch + 1], wer_results[0:epoch + 1], cer_results[0:epoch + 1]]
-            for x in range(len(viz_windows)):
-                if viz_windows[x] is None:
-                    viz_windows[x] = viz.line(
-                        X=x_axis,
-                        Y=y_axis[x],
-                        opts=opts[x],
-                    )
-                else:
-                    viz.line(
-                        X=x_axis,
-                        Y=y_axis[x],
-                        win=viz_windows[x],
-                        update='replace',
-                    )
+            y_axis = torch.stack((loss_results[0:epoch + 1], wer_results[0:epoch + 1], cer_results[0:epoch + 1]), dim=1)
+            if viz_window is None:
+                viz_window = viz.line(
+                    X=x_axis,
+                    Y=y_axis,
+                    opts=opts,
+                )
+            else:
+                viz.line(
+                    X=x_axis.unsqueeze(0).expand(y_axis.size(1), x_axis.size(0)).transpose(0, 1),  # Visdom fix
+                    Y=y_axis,
+                    win=viz_window,
+                    update='replace',
+                )
         if args.tensorboard:
             info = {
                 'Avg Train Loss': avg_loss,
