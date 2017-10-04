@@ -164,6 +164,8 @@ There is also [Tensorboard](https://github.com/lanpa/tensorboard-pytorch) suppor
 python train.py --tensorboard --logdir log_dir/ # Make sure the tensorboard instance is made pointing to this log directory
 ```
 
+For both visualisation tools, you can add your own name to the run by changing the `--id` parameter when training.
+
 ### Noise Augmentation/Injection
 
 There is support for two different types of noise; noise augmentation and noise injection.
