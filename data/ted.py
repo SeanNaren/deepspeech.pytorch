@@ -5,7 +5,8 @@ import argparse
 import subprocess
 import unicodedata
 import io
-from utils import create_manifest, update_progress
+from utils import create_manifest
+from tqdm import tqdm
 
 parser = argparse.ArgumentParser(description='Processes and downloads TED-LIUMv2 dataset.')
 parser.add_argument("--target_dir", default='TEDLIUM_dataset/', type=str, help="Directory to store the dataset.")
@@ -65,7 +66,7 @@ def prepare_dir(ted_dir):
         os.makedirs(txt_dir)
     counter = 0
     entries = os.listdir(os.path.join(ted_dir, "sph"))
-    for sph_file in entries:
+    for sph_file in tqdm(entries, total=len(entries)):
         speaker_name = sph_file.split('.sph')[0]
 
         sph_file_full = os.path.join(ted_dir, "sph", sph_file)
@@ -83,7 +84,6 @@ def prepare_dir(ted_dir):
             with io.FileIO(target_txt_file, "w") as f:
                 f.write(_preprocess_transcript(utterance["transcript"]).encode('utf-8'))
         counter += 1
-        update_progress(counter / float(len(entries)))
 
 
 def main():
