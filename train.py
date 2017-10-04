@@ -99,7 +99,7 @@ def main():
             os.makedirs(args.log_dir)
         except OSError as e:
             if e.errno == errno.EEXIST:
-                print('Directory already exists.')
+                print('Tensorboard log directory already exists.')
                 for file in os.listdir(args.log_dir):
                     file_path = os.path.join(args.log_dir, file)
                     try:
@@ -116,7 +116,7 @@ def main():
         os.makedirs(save_folder)
     except OSError as e:
         if e.errno == errno.EEXIST:
-            print('Directory already exists.')
+            print('Model Save directory already exists.')
         else:
             raise
     criterion = CTCLoss()
