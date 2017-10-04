@@ -4,8 +4,7 @@ import time
 import torch
 from torch.autograd import Variable
 from warpctc_pytorch import CTCLoss
-
-from data.utils import update_progress
+from tqdm import trange
 from model import DeepSpeech, supported_rnns
 
 parser = argparse.ArgumentParser()
@@ -81,16 +80,14 @@ def iteration(input_data):
 
 def run_benchmark(input_data):
     print("Running dry runs...")
-    for n in range(args.dry_runs):
+    for n in trange(args.dry_runs):
         iteration(input_data)
-        update_progress(n / (float(args.dry_runs) - 1))
 
     print("\n Running measured runs...")
     running_time = 0
-    for n in range(args.runs):
+    for n in trange(args.runs):
         start, end = iteration(input_data)
         running_time += end - start
-        update_progress(n / (float(args.runs) - 1))
 
     return running_time / float(args.runs)
 

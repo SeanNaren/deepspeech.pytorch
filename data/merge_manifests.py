@@ -5,8 +5,7 @@ import io
 import os
 
 import subprocess
-
-from utils import update_progress
+from tqdm import trange
 
 parser = argparse.ArgumentParser(description='Merges all manifest CSV files in specified folder.')
 parser.add_argument('--merge_dir', default='manifests/', help='Path to all manifest files you want to merge')
@@ -33,7 +32,7 @@ if prune_max:
 
 new_files = []
 size = len(files)
-for x in range(size):
+for x in trange(size):
     file_path = files[x]
     file_path = file_path.split(',')[0]
     output = subprocess.check_output(
@@ -53,7 +52,6 @@ for x in range(size):
             new_files.append((files[x], duration))
     else:
         new_files.append((files[x], duration))
-    update_progress(x / float(size))
 
 print("\nSorting files by length...")
 
