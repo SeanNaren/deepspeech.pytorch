@@ -9,7 +9,6 @@ from utils import create_manifest
 
 parser = argparse.ArgumentParser(description='Processes and downloads an4.')
 parser.add_argument('--target_dir', default='an4_dataset/', help='Path to save dataset')
-parser.add_argument('--sample_rate', default=16000, type=int, help='Sample rate')
 args = parser.parse_args()
 
 
@@ -36,7 +35,7 @@ def _convert_audio_to_wav(train_path):
             raw_path = line.strip()
             new_path = line.replace('.raw', '.wav').strip()
             cmd = 'sox -t raw -r %d -b 16 -e signed-integer -B -c 1 \"%s\" \"%s\"' % (
-                args.sample_rate, raw_path, new_path)
+                16000, raw_path, new_path)
             os.system(cmd)
 
 
