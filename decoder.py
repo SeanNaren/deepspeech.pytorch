@@ -138,7 +138,7 @@ class BeamCTCDecoder(Decoder):
         except ImportError:
             raise ImportError("BeamCTCDecoder requires pytorch_ctc package.")
         if lm_path is not None:
-            scorer = KenLMScorer(labels, lm_path, trie_path)
+            scorer = KenLMScorer(labels, lm_path, trie_path, blank_index, space_index)
             scorer.set_lm_weight(lm_alpha)
             scorer.set_word_weight(lm_beta1)
             scorer.set_valid_word_weight(lm_beta2)
