@@ -29,7 +29,7 @@ mkdir build; cd build
 cmake ..
 make
 export CUDA_HOME="/usr/local/cuda"
-cd pytorch_binding
+cd ../pytorch_binding
 python setup.py install
 ```
 
@@ -44,15 +44,13 @@ python setup.py install
 
 If you want decoding to support beam search with an optional language model, install pytorch-ctc:
 ```
-git clone --recursive https://github.com/ryanleary/pytorch-ctc.git
+git clone --recursive https://github.com/parlance/pytorch-ctc.git
 cd pytorch-ctc
 pip install -r requirements.txt
-
-# build the extension and install python package (requires gcc-5 or later)
-CC=/path/to/gcc-5 CXX=/path/to/g++-5 python setup.py install
+python setup.py install
 ```
 
-Finally:
+Finally clone this repo and run this within the repo:
 ```
 pip install -r requirements.txt
 ```
