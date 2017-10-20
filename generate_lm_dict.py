@@ -16,7 +16,7 @@ def main():
 
     labels = ''.join(label_data)
 
-    pytorch_ctc.generate_lm_trie(args.dict_path, args.model_path, args.output_path, labels, labels.index('_'),
+    pytorch_ctc.generate_lm_dict(args.dict_path, args.model_path, args.output_path, labels, labels.index('_'),
                                  labels.index(' '))
 
 
