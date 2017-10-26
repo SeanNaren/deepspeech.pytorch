@@ -7,9 +7,7 @@ import time
 import torch
 from torch.autograd import Variable
 from warpctc_pytorch import CTCLoss
-import numpy as np
-from data.bucketing_sampler import BucketingSampler, SpectrogramDatasetWithLength
-from data.data_loader import AudioDataLoader, SpectrogramDataset
+from data.data_loader import AudioDataLoader, SpectrogramDataset, BucketingSampler
 from decoder import GreedyDecoder
 from model import DeepSpeech, supported_rnns
 
@@ -54,8 +52,8 @@ parser.add_argument('--noise_min', default=0.0,
                     help='Minimum noise level to sample from. (1.0 means all noise, not original signal)', type=float)
 parser.add_argument('--noise_max', default=0.5,
                     help='Maximum noise levels to sample from. Maximum 1.0', type=float)
-parser.add_argument('--no_bucketing', dest='no_bucketing', action='store_true',
-                    help='Turn off bucketing and sample from dataset based on sequence length (smallest to largest)')
+parser.add_argument('--no_shuffle', dest='no_shuffle', action='store_true',
+                    help='Turn off shuffling and sample from dataset based on sequence length (smallest to largest)')
 
 
 def to_np(x):
@@ -135,8 +133,9 @@ def main():
                                        normalize=True, augment=args.augment)
     test_dataset = SpectrogramDataset(audio_conf=audio_conf, manifest_filepath=args.val_manifest, labels=labels,
                                       normalize=True, augment=False)
-    train_loader = AudioDataLoader(train_dataset, batch_size=args.batch_size,
-                                   num_workers=args.num_workers)
+    train_sampler = BucketingSampler(train_dataset, batch_size=args.batch_size)
+    train_loader = AudioDataLoader(train_dataset,
+                                   num_workers=args.num_workers, batch_sampler=train_sampler)
     test_loader = AudioDataLoader(test_dataset, batch_size=args.batch_size,
                                   num_workers=args.num_workers)
 
@@ -187,13 +186,9 @@ def main():
                     'Avg CER': cer_results[i]
                 }
                 tensorboard_writer.add_scalars(args.id, values, i + 1)
-        if not args.no_bucketing and start_epoch != 0:
-            print("Using bucketing sampler for the following epochs")
-            train_dataset = SpectrogramDatasetWithLength(audio_conf=audio_conf, manifest_filepath=args.train_manifest,
-                                                         labels=labels,
-                                                         normalize=True, augment=args.augment)
-            sampler = BucketingSampler(train_dataset)
-            train_loader.sampler = sampler
+        if not args.no_shuffle and start_epoch != 0:
+            print("Shuffling batches for the following epochs")
+            train_sampler.shuffle()
     else:
         avg_loss = 0
         start_epoch = 0
@@ -212,7 +207,7 @@ def main():
         model.train()
         end = time.time()
         for i, (data) in enumerate(train_loader, start=start_iter):
-            if i == len(train_loader):
+            if i == len(train_sampler):
                 break
             inputs, targets, input_percentages, target_sizes = data
             # measure data loading time
@@ -263,7 +258,7 @@ def main():
                       'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
                       'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
                       'Loss {loss.val:.4f} ({loss.avg:.4f})\t'.format(
-                    (epoch + 1), (i + 1), len(train_loader), batch_time=batch_time,
+                    (epoch + 1), (i + 1), len(train_sampler), batch_time=batch_time,
                     data_time=data_time, loss=losses))
             if args.checkpoint_per_batch > 0 and i > 0 and (i + 1) % args.checkpoint_per_batch == 0:
                 file_path = '%s/deepspeech_checkpoint_epoch_%d_iter_%d.pth.tar' % (save_folder, epoch + 1, i + 1)
@@ -274,7 +269,7 @@ def main():
                            file_path)
             del loss
             del out
-        avg_loss /= len(train_loader)
+        avg_loss /= len(train_sampler)
 
         print('Training Summary Epoch: [{0}]\t'
               'Average Loss {loss:.3f}\t'.format(
@@ -374,13 +369,9 @@ def main():
             best_wer = wer
 
         avg_loss = 0
-        if not args.no_bucketing and epoch == 0:
-            print("Switching to bucketing sampler for following epochs")
-            train_dataset = SpectrogramDatasetWithLength(audio_conf=audio_conf, manifest_filepath=args.train_manifest,
-                                                         labels=labels,
-                                                         normalize=True, augment=args.augment)
-            sampler = BucketingSampler(train_dataset)
-            train_loader.sampler = sampler
+        if not args.no_shuffle:
+            print("Shuffling batches...")
+            train_sampler.shuffle()
 
 
 if __name__ == '__main__':
