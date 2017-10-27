@@ -1,6 +1,7 @@
 import os
 import subprocess
 from tempfile import NamedTemporaryFile
+from torch.utils.data.sampler import Sampler
 
 import librosa
 import numpy as np
@@ -69,8 +70,8 @@ class NoiseInjection(object):
         noise_end = noise_start + data_len
         noise_dst = audio_with_sox(noise_path, self.sample_rate, noise_start, noise_end)
         assert len(data) == len(noise_dst)
-        noise_energy = np.sqrt(noise_dst.dot(noise_dst)/noise_dst.size)
-        data_energy = np.sqrt(data.dot(data)/data.size)
+        noise_energy = np.sqrt(noise_dst.dot(noise_dst) / noise_dst.size)
+        data_energy = np.sqrt(data.dot(data) / data.size)
         data += noise_level * noise_dst * data_energy / noise_energy
         return data
 
@@ -200,6 +201,28 @@ class AudioDataLoader(DataLoader):
         self.collate_fn = _collate_fn
 
 
+class BucketingSampler(Sampler):
+    def __init__(self, data_source, batch_size=1):
+        """
+        Samples batches assuming they are in order of size to batch similarly sized samples together.
+        """
+        super(BucketingSampler, self).__init__(data_source)
+        self.data_source = data_source
+        ids = list(range(0, len(data_source)))
+        self.bins = [ids[i:i + batch_size] for i in range(0, len(ids), batch_size)]
+
+    def __iter__(self):
+        for ids in self.bins:
+            np.random.shuffle(ids)
+            yield ids
+
+    def __len__(self):
+        return len(self.bins)
+
+    def shuffle(self):
+        np.random.shuffle(self.bins)
+
+
 def get_audio_length(path):
     output = subprocess.check_output(['soxi -D \"%s\"' % path.strip()], shell=True)
     return float(output)
@@ -212,8 +235,8 @@ def audio_with_sox(path, sample_rate, start_time, end_time):
     with NamedTemporaryFile(suffix=".wav") as tar_file:
         tar_filename = tar_file.name
         sox_params = "sox \"{}\" -r {} -c 1 -b 16 -e si {} trim {} ={} >/dev/null 2>&1".format(path, sample_rate,
-                                                                                         tar_filename, start_time,
-                                                                                         end_time)
+                                                                                               tar_filename, start_time,
+                                                                                               end_time)
         os.system(sox_params)
         y = load_audio(tar_filename)
         return y
