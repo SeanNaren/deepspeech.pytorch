@@ -38,47 +38,43 @@ class Decoder(object):
         self.blank_index = blank_index
         self.space_index = space_index
 
-    def convert_to_strings(self, sequences, sizes=None):
+    def convert_to_strings(self, sequences, sizes=None, remove_repetitions=False, return_offsets=False):
         """Given a list of numeric sequences, returns the corresponding strings"""
         strings = []
+        offsets = [] if return_offsets else None
         for x in xrange(len(sequences)):
             seq_len = sizes[x] if sizes is not None else len(sequences[x])
-            string = self._convert_to_string(sequences[x], seq_len)
+            string, string_offsets = self.process_string(sequences[x], seq_len, remove_repetitions)
             strings.append(string)
-        return strings
+            if return_offsets:
+                offsets.append(string_offsets)
+        if return_offsets:
+            return strings, offsets
+        else:
+            return strings
 
-    def _convert_to_string(self, sequence, sizes):
-        return ''.join([self.int_to_char[sequence[i]] for i in range(sizes)])
-
-    def process_strings(self, sequences, remove_repetitions=False):
-        """
-        Given a list of strings, removes blanks and replace space character with space.
-        Option to remove repetitions (e.g. 'abbca' -> 'abca').
-
-        Arguments:
-            sequences: list of 1-d array of integers
-            remove_repetitions (boolean, optional): If true, repeating characters
-                are removed. Defaults to False.
-        """
-        processed_strings = []
-        for sequence in sequences:
-            string = self.process_string(remove_repetitions, sequence).strip()
-            processed_strings.append(string)
-        return processed_strings
-
-    def process_string(self, remove_repetitions, sequence):
+    def process_string(self, sequence, size, remove_repetitions=False):
         string = ''
-        for i, char in enumerate(sequence):
+        offsets = []
+        for i in range(size):
+            char = self.int_to_char[sequence[i]]
             if char != self.int_to_char[self.blank_index]:
-                # if this char is a repetition and remove_repetitions=true,
-                # skip.
-                if remove_repetitions and i != 0 and char == sequence[i - 1]:
+                # if this char is a repetition and remove_repetitions=true, then skip
+                if remove_repetitions and i != 0 and char == self.int_to_char[sequence[i - 1]]:
                     pass
                 elif char == self.labels[self.space_index]:
                     string += ' '
+                    offsets.append(i)
                 else:
                     string = string + char
-        return string
+                    offsets.append(i)
+        return string, offsets
+
+    def convert_offsets(self, offsets, sizes):
+        new_offsets = []
+        for x in range(len(sizes)):
+            new_offsets.append(offsets[x][0:sizes[x]])
+        return new_offsets
 
     def wer(self, s1, s2):
         """
@@ -145,15 +141,16 @@ class BeamCTCDecoder(Decoder):
         else:
             scorer = Scorer()
         self._decoder = CTCBeamDecoder(scorer, labels, top_paths=top_paths, beam_width=beam_width,
-                                       blank_index=blank_index, space_index=space_index, merge_repeated=False)
+                                       blank_index=blank_index, space_index=space_index)
 
     def decode(self, probs, sizes=None):
         sizes = sizes.cpu() if sizes is not None else None
-        out, conf, seq_len = self._decoder.decode(probs.cpu(), sizes)
+        out, conf, seq_len, offsets = self._decoder.decode(probs.cpu(), sizes)
 
         # TODO: support returning multiple paths
-        strings = self.convert_to_strings(out[0], sizes=seq_len[0])
-        return self.process_strings(strings)
+        strings = self.convert_to_strings(out[0], seq_len[0])
+        offsets = self.convert_offsets(offsets[0], seq_len[0])
+        return strings, offsets
 
 
 class GreedyDecoder(Decoder):
@@ -169,5 +166,6 @@ class GreedyDecoder(Decoder):
             strings: sequences of the model's best guess for the transcription on inputs
         """
         _, max_probs = torch.max(probs.transpose(0, 1), 2)
-        strings = self.convert_to_strings(max_probs.view(max_probs.size(0), max_probs.size(1)), sizes)
-        return self.process_strings(strings, remove_repetitions=True)
+        strings, offsets = self.convert_to_strings(max_probs.view(max_probs.size(0), max_probs.size(1)), sizes,
+                                                   remove_repetitions=True, return_offsets=True)
+        return strings, offsets
