@@ -258,6 +258,12 @@ A beam search decoder can optionally be used with the installation of the `pytor
 - **lm_beta1** bonus weight for words
 - **lm_beta2** bonus weight for in-vocabulary words
 
+### Time offsets
+
+Use the `--offsets` flag to get positional information of each character in the transcription when using `transcribe.py` script. The offsets are based on the size
+of the output tensor, which you need to convert into a format required.
+For example, based on default parameters you could multiply the offsets by a scalar (duration of file in seconds / size of output) to get the offsets in seconds.
+
 ## Pre-trained models
 
 Pre-trained models can be found under releases [here](https://github.com/SeanNaren/deepspeech.pytorch/releases).
