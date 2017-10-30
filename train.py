@@ -44,6 +44,8 @@ parser.add_argument('--save_folder', default='models/', help='Location to save e
 parser.add_argument('--model_path', default='models/deepspeech_final.pth.tar',
                     help='Location to save best validation model')
 parser.add_argument('--continue_from', default='', help='Continue from checkpoint model')
+parser.add_argument('--finetune', dest='finetune', action='store_true',
+                    help='Finetune the model from checkpoint "continue_from"')
 parser.add_argument('--augment', dest='augment', action='store_true', help='Use random tempo and gain perturbations.')
 parser.add_argument('--noise_dir', default=None,
                     help='Directory to inject noise into audio. If default, noise Inject not added')
@@ -152,7 +154,7 @@ def main():
                                 momentum=args.momentum, nesterov=True)
     decoder = GreedyDecoder(labels)
 
-    if args.continue_from:
+    if args.continue_from and not args.finetune:
         print("Loading checkpoint model %s" % args.continue_from)
         package = torch.load(args.continue_from)
         model.load_state_dict(package['state_dict'])
@@ -189,10 +191,18 @@ def main():
         if not args.no_shuffle and start_epoch != 0:
             print("Shuffling batches for the following epochs")
             train_sampler.shuffle()
+    elif args.continue_from and args.finetune:
+        print("Fine-tuning checkpoint model %s" % args.continue_from)
+        package = torch.load(args.continue_from)
+        model.load_state_dict(package['state_dict'])
+        avg_loss = 0
+        start_epoch = 0
+        start_iter = 0
     else:
         avg_loss = 0
         start_epoch = 0
         start_iter = 0
+
     if args.cuda:
         model = torch.nn.DataParallel(model).cuda()
 
