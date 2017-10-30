@@ -57,6 +57,9 @@ class BatchRNN(nn.Module):
                             bidirectional=bidirectional, bias=False)
         self.num_directions = 2 if bidirectional else 1
 
+    def flatten_parameters(self):
+        self.rnn.flatten_parameters()
+
     def forward(self, x):
         if self.batch_norm is not None:
             x = self.batch_norm(x)
@@ -87,10 +90,10 @@ class DeepSpeech(nn.Module):
         num_classes = len(self._labels)
 
         self.conv = nn.Sequential(
-            nn.Conv2d(1, 32, kernel_size=(41, 11), stride=(2, 2)),
+            nn.Conv2d(1, 32, kernel_size=(41, 11), stride=(2, 2), padding=(0,10)),
             nn.BatchNorm2d(32),
             nn.Hardtanh(0, 20, inplace=True),
-            nn.Conv2d(32, 32, kernel_size=(21, 11), stride=(2, 1)),
+            nn.Conv2d(32, 32, kernel_size=(21, 11), stride=(2, 1), ),
             nn.BatchNorm2d(32),
             nn.Hardtanh(0, 20, inplace=True)
         )
@@ -139,7 +142,16 @@ class DeepSpeech(nn.Module):
         model = cls(rnn_hidden_size=package['hidden_size'], nb_layers=package['hidden_layers'],
                     labels=package['labels'], audio_conf=package['audio_conf'],
                     rnn_type=supported_rnns[package['rnn_type']])
+        # the blacklist parameters are params that were previous erroneously saved by the model
+        # care should be taken in future versions that if batch_norm on the first rnn is required
+        # that it be named something else
+        blacklist = ['rnns.0.batch_norm.module.weight', 'rnns.0.batch_norm.module.bias', 'rnns.0.batch_norm.module.running_mean', 'rnns.0.batch_norm.module.running_var']
+        for x in blacklist:
+            if x in package['state_dict']:
+                del package['state_dict'][x]
         model.load_state_dict(package['state_dict'])
+        for x in model.rnns:
+            x.flatten_parameters()
         if cuda:
             model = torch.nn.DataParallel(model).cuda()
         return model
