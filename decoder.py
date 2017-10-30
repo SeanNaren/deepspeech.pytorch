@@ -124,7 +124,7 @@ class Decoder(object):
 
 class BeamCTCDecoder(Decoder):
     def __init__(self, labels, beam_width=20, top_paths=1, blank_index=0, space_index=28, lm_path=None, trie_path=None,
-                 lm_alpha=None, lm_beta1=None, lm_beta2=None):
+                 lm_alpha=None, lm_beta1=None, lm_beta2=None, label_size=0, label_margin=-1.0):
         super(BeamCTCDecoder, self).__init__(labels, blank_index=blank_index, space_index=space_index)
         self._beam_width = beam_width
         self._top_n = top_paths
@@ -142,6 +142,7 @@ class BeamCTCDecoder(Decoder):
             scorer = Scorer()
         self._decoder = CTCBeamDecoder(scorer, labels, top_paths=top_paths, beam_width=beam_width,
                                        blank_index=blank_index, space_index=space_index)
+        self._decoder.set_label_selection_parameters(label_size, label_margin)
 
     def decode(self, probs, sizes=None):
         sizes = sizes.cpu() if sizes is not None else None

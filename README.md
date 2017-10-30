@@ -257,6 +257,8 @@ A beam search decoder can optionally be used with the installation of the `pytor
 - **lm_alpha** weight for language model
 - **lm_beta1** bonus weight for words
 - **lm_beta2** bonus weight for in-vocabulary words
+- **label_size** Label selection size controls how many items in each beam are passed through to the beam scorer
+- **label_margin** Controls difference between minimal input score for an item to be passed to the beam scorer
 
 ### Time offsets
 
