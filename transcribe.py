@@ -16,6 +16,7 @@ parser.add_argument('--cuda', action="store_true", help='Use cuda to test model'
 parser.add_argument('--decoder', default="greedy", choices=["greedy", "beam"], type=str, help="Decoder to use")
 beam_args = parser.add_argument_group("Beam Decode Options", "Configurations options for the CTC Beam Search decoder")
 beam_args.add_argument('--beam_width', default=10, type=int, help='Beam width to use')
+beam_args.add_argument('--top_paths', default=1, type=int, help='Number of paths to return')
 beam_args.add_argument('--lm_path', default=None, type=str,
                        help='Path to an (optional) kenlm language model for use with beam search (req\'d with trie)')
 beam_args.add_argument('--trie_path', default=None, type=str,
@@ -40,7 +41,7 @@ if __name__ == '__main__':
     if args.decoder == "beam":
         from decoder import BeamCTCDecoder
 
-        decoder = BeamCTCDecoder(labels, beam_width=args.beam_width, top_paths=1, space_index=labels.index(' '),
+        decoder = BeamCTCDecoder(labels, beam_width=args.beam_width, top_paths=args.top_paths, space_index=labels.index(' '),
                                  blank_index=labels.index('_'), lm_path=args.lm_path,
                                  trie_path=args.trie_path, lm_alpha=args.lm_alpha, lm_beta1=args.lm_beta1,
                                  lm_beta2=args.lm_beta2, label_size=args.label_size, label_margin=args.label_margin)
@@ -53,8 +54,14 @@ if __name__ == '__main__':
     spect = spect.view(1, 1, spect.size(0), spect.size(1))
     out = model(Variable(spect, volatile=True))
     out = out.transpose(0, 1)  # TxNxH
-    decoded_output, decoded_offsets = decoder.decode(out.data)
+    decoded_output, decoded_offsets, confs = decoder.decode(out.data)
+    print(confs.shape)
 
-    print(decoded_output[0])
-    if args.offsets:
-        print(decoded_offsets[0])
+    for pi in range(args.top_paths):
+        print("Path {} (conf: {:.4f}):".format(pi, confs[pi][0]))
+        print(decoded_output[pi][0])
+        if args.offsets:
+            print(decoded_offsets[pi][0])
+            #for x in range(len(decoded_output[pi][0])):
+            #    print("({}, {:.2f}) ".format(decoded_output[pi][0][x], decoded_offsets[pi][0][x]/50), end='')
+            #print("\n")
