@@ -125,7 +125,6 @@ class BeamCTCDecoder(Decoder):
                 utterances.append(utt[0:sizes[p][u]].numpy().tolist())
             results.append(utterances)
         return results
->>>>>>> Stashed changes
 
     def decode(self, probs, sizes=None):
         sizes = sizes.cpu() if sizes is not None else None
