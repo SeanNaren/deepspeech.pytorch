@@ -156,6 +156,16 @@ class DeepSpeech(nn.Module):
             model = torch.nn.DataParallel(model).cuda()
         return model
 
+    @classmethod
+    def load_model_package(cls, package, cuda=False):
+        model = cls(rnn_hidden_size=package['hidden_size'], nb_layers=package['hidden_layers'],
+                    labels=package['labels'], audio_conf=package['audio_conf'],
+                    rnn_type=supported_rnns[package['rnn_type']])
+        model.load_state_dict(package['state_dict'])
+        if cuda:
+            model = torch.nn.DataParallel(model).cuda()
+        return model
+
     @staticmethod
     def serialize(model, optimizer=None, epoch=None, iteration=None, loss_results=None,
                   cer_results=None, wer_results=None, avg_loss=None, meta=None):
