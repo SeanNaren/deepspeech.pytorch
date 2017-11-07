@@ -1,4 +1,4 @@
-import pytorch_ctc
+import ctcdecode
 import json
 import argparse
 
@@ -16,8 +16,8 @@ def main():
 
     labels = ''.join(label_data)
 
-    pytorch_ctc.generate_lm_dict(args.dict_path, args.output_path, labels, kenlm_path=args.lm_path,
-                                 blank_index=labels.index('_'), space_index=labels.index(' '))
+    ctcdecode.generate_lm_dict(args.dict_path, args.output_path, labels, kenlm_path=args.lm_path,
+                               blank_index=labels.index('_'), space_index=labels.index(' '))
 
 
 if __name__ == '__main__':

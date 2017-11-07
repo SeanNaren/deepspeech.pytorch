@@ -92,9 +92,9 @@ class BeamCTCDecoder(Decoder):
         self._top_n = top_paths
 
         try:
-            from pytorch_ctc import CTCBeamDecoder, Scorer, KenLMScorer, DictScorer
+            from ctcdecode import CTCBeamDecoder, Scorer, KenLMScorer, DictScorer
         except ImportError:
-            raise ImportError("BeamCTCDecoder requires pytorch_ctc package.")
+            raise ImportError("BeamCTCDecoder requires ctcdecode package.")
         if lm_path is not None:
             scorer = KenLMScorer(labels, lm_path, trie_path, blank_index, space_index)
             scorer.set_lm_weight(lm_alpha)
