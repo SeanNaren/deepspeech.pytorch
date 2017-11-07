@@ -17,6 +17,7 @@ parser.add_argument('--test_manifest', metavar='DIR',
 parser.add_argument('--batch_size', default=20, type=int, help='Batch size for training')
 parser.add_argument('--num_workers', default=4, type=int, help='Number of workers used in dataloading')
 parser.add_argument('--decoder', default="greedy", choices=["greedy", "beam"], type=str, help="Decoder to use")
+parser.add_argument('--verbose', action="store_true", help="print out decoded output and error of each sample")
 beam_args = parser.add_argument_group("Beam Decode Options", "Configurations options for the CTC Beam Search decoder")
 beam_args.add_argument('--beam_width', default=10, type=int, help='Beam width to use')
 beam_args.add_argument('--lm_path', default=None, type=str,
@@ -25,7 +26,6 @@ beam_args.add_argument('--trie_path', default=None, type=str,
                        help='Path to an (optional) trie dictionary for use with beam search (req\'d with LM)')
 beam_args.add_argument('--lm_alpha', default=0.8, type=float, help='Language model weight')
 beam_args.add_argument('--lm_beta1', default=1, type=float, help='Language model word bonus (all words)')
-beam_args.add_argument('--lm_beta2', default=1, type=float, help='Language model word bonus (IV words)')
 beam_args.add_argument('--label_size', default=0, type=int, help='Label selection size controls how many items in '
                                                                  'each beam are passed through to the beam scorer')
 beam_args.add_argument('--label_margin', default=-1, type=float, help='Controls difference between minimal input score '
@@ -45,9 +45,10 @@ if __name__ == '__main__':
         decoder = BeamCTCDecoder(labels, beam_width=args.beam_width, top_paths=1, space_index=labels.index(' '),
                                  blank_index=labels.index('_'), lm_path=args.lm_path,
                                  trie_path=args.trie_path, lm_alpha=args.lm_alpha, lm_beta1=args.lm_beta1,
-                                 lm_beta2=args.lm_beta2, label_size=args.label_size, label_margin=args.label_margin)
+                                 label_size=args.label_size, label_margin=args.label_margin)
     else:
         decoder = GreedyDecoder(labels, space_index=labels.index(' '), blank_index=labels.index('_'))
+    test_decoder = GreedyDecoder(labels, space_index=labels.index(' '), blank_index=labels.index('_'))
 
     test_dataset = SpectrogramDataset(audio_conf=audio_conf, manifest_filepath=args.test_manifest, labels=labels,
                                       normalize=True)
@@ -74,12 +75,18 @@ if __name__ == '__main__':
         seq_length = out.size(0)
         sizes = input_percentages.mul_(int(seq_length)).int()
 
-        decoded_output, _ = decoder.decode(out.data, sizes)
-        target_strings = decoder.convert_to_strings(split_targets)
+        decoded_output, _, _ = decoder.decode(out.data, sizes)
+        target_strings = test_decoder.convert_to_strings(split_targets)
         wer, cer = 0, 0
         for x in range(len(target_strings)):
-            wer += decoder.wer(decoded_output[x], target_strings[x]) / float(len(target_strings[x].split()))
-            cer += decoder.cer(decoded_output[x], target_strings[x]) / float(len(target_strings[x]))
+            wer_inst = decoder.wer(decoded_output[0][x], target_strings[x]) / float(len(target_strings[x].split()))
+            cer_inst = decoder.cer(decoded_output[0][x], target_strings[x]) / float(len(target_strings[x]))
+            wer += wer_inst
+            cer += cer_inst
+            if args.verbose:
+                print("Ref:", target_strings[x].lower())
+                print("Hyp:", decoded_output[0][x].lower())
+                print("WER:", wer_inst, "CER:", cer_inst, "\n")
         total_cer += cer
         total_wer += wer
 
