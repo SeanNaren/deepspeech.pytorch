@@ -116,7 +116,7 @@ class BeamCTCDecoder(Decoder):
             results.append(utterances)
         return results
 
-    def convert_offsets(self, offsets, sizes):
+    def convert_tensor(self, offsets, sizes):
         results = []
         for p, paths in enumerate(offsets):
             utterances = []
@@ -131,11 +131,12 @@ class BeamCTCDecoder(Decoder):
         # conf is path x batch
         # seq_len is path x batch
         # offsets is path x batch x seq_len
-        out, conf, seq_len, offsets, char_probs = self._decoder.decode(probs.cpu(), sizes)
+        out, conf, seq_lens, offsets, char_probs = self._decoder.decode(probs.cpu(), sizes)
 
-        strings = self.convert_to_strings(out, seq_len)
-        offsets = self.convert_offsets(offsets, seq_len)
-        return strings, offsets, conf.numpy(), self.convert_offsets(char_probs, seq_len)
+        strings = self.convert_to_strings(out, seq_lens)
+        offsets = self.convert_tensor(offsets, seq_lens)
+        char_probs = self.convert_tensor(char_probs, seq_lens)
+        return strings, offsets, conf.numpy(), char_probs
 
 
 class GreedyDecoder(Decoder):
@@ -181,8 +182,9 @@ class GreedyDecoder(Decoder):
             sizes(optional): Size of each sequence in the mini-batch
         Returns:
             strings: sequences of the model's best guess for the transcription on inputs
+            offsets: time step per character predicted
         """
         _, max_probs = torch.max(probs.transpose(0, 1), 2)
         strings, offsets = self.convert_to_strings(max_probs.view(max_probs.size(0), max_probs.size(1)), sizes,
                                                    remove_repetitions=True, return_offsets=True)
-        return [strings], offsets, 0
+        return [strings], offsets, None, None
