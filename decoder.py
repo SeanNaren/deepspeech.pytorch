@@ -79,7 +79,6 @@ class Decoder(object):
             sizes(optional): Size of each sequence in the mini-batch
         Returns:
             string: sequence of the model's best guess for the transcription
-
         """
         raise NotImplementedError
 
@@ -126,6 +125,18 @@ class BeamCTCDecoder(Decoder):
         return results
 
     def decode(self, probs, sizes=None):
+        """
+        Decodes probability output using ctcdecode package.
+        Arguments:
+            probs: Tensor of character probabilities, where probs[c,t]
+                            is the probability of character c at time t
+            sizes: Size of each sequence in the mini-batch
+        Returns:
+            string: sequences of the model's best guess for the transcription
+            offsets: offset information per character in each string
+            conf: confidence scores for each transcription
+            char_probs: character probabilities for each transcription
+        """
         sizes = sizes.cpu() if sizes is not None else None
         # out is path x batch x seq_len
         # conf is path x batch

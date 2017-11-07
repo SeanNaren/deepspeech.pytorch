@@ -40,7 +40,8 @@ if __name__ == '__main__':
     if args.decoder == "beam":
         from decoder import BeamCTCDecoder
 
-        decoder = BeamCTCDecoder(labels, beam_width=args.beam_width, top_paths=args.top_paths, space_index=labels.index(' '),
+        decoder = BeamCTCDecoder(labels, beam_width=args.beam_width, top_paths=args.top_paths,
+                                 space_index=labels.index(' '),
                                  blank_index=labels.index('_'), lm_path=args.lm_path,
                                  trie_path=args.trie_path, lm_alpha=args.lm_alpha, lm_beta=args.lm_beta,
                                  label_size=args.label_size, label_margin=args.label_margin)
@@ -54,13 +55,7 @@ if __name__ == '__main__':
     out = model(Variable(spect, volatile=True))
     out = out.transpose(0, 1)  # TxNxH
     decoded_output, decoded_offsets, confs, char_probs = decoder.decode(out.data)
-    print(confs.shape)
-
     for pi in range(args.top_paths):
-        print("Path {} (conf: {:.4f}):".format(pi, confs[pi][0]))
         print(decoded_output[pi][0])
         if args.offsets:
             print(decoded_offsets[pi][0])
-            #for x in range(len(decoded_output[pi][0])):
-            #    print("({}, {:.2f}) ".format(decoded_output[pi][0][x], decoded_offsets[pi][0][x]/50), end='')
-            #print("\n")
