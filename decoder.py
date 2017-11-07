@@ -86,7 +86,7 @@ class Decoder(object):
 
 class BeamCTCDecoder(Decoder):
     def __init__(self, labels, beam_width=20, top_paths=1, blank_index=0, space_index=28, lm_path=None, trie_path=None,
-                 lm_alpha=None, lm_beta1=None, label_size=0, label_margin=-1.0):
+                 lm_alpha=None, lm_beta=None, label_size=0, label_margin=-1.0):
         super(BeamCTCDecoder, self).__init__(labels, blank_index=blank_index, space_index=space_index)
         self._beam_width = beam_width
         self._top_n = top_paths
@@ -98,7 +98,7 @@ class BeamCTCDecoder(Decoder):
         if lm_path is not None:
             scorer = KenLMScorer(labels, lm_path, trie_path, blank_index, space_index)
             scorer.set_lm_weight(lm_alpha)
-            scorer.set_word_weight(lm_beta1)
+            scorer.set_word_weight(lm_beta)
         elif lm_path is None and trie_path is not None:
             scorer = DictScorer(labels, trie_path, blank_index, space_index)
         else:

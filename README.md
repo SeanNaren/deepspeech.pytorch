@@ -255,7 +255,7 @@ A beam search decoder can optionally be used with the installation of the `ctcde
 - **lm_path** optional binary KenLM language model to use for decoding
 - **trie_path** trie describing lexicon. required if `lm_path` is supplied. May also be used sans `lm_path` for dictionary decoding
 - **lm_alpha** weight for language model
-- **lm_beta1** bonus weight for words
+- **lm_beta** bonus weight for words
 - **label_size** Label selection size controls how many items in each beam are passed through to the beam scorer
 - **label_margin** Controls difference between minimal input score for an item to be passed to the beam scorer
 

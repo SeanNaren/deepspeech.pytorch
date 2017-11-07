@@ -22,7 +22,7 @@ beam_args.add_argument('--lm_path', default=None, type=str,
 beam_args.add_argument('--trie_path', default=None, type=str,
                        help='Path to an (optional) trie dictionary for use with beam search (req\'d with LM)')
 beam_args.add_argument('--lm_alpha', default=0.8, type=float, help='Language model weight')
-beam_args.add_argument('--lm_beta1', default=1, type=float, help='Language model word bonus (all words)')
+beam_args.add_argument('--lm_beta', default=1, type=float, help='Language model word bonus (all words)')
 beam_args.add_argument('--label_size', default=0, type=int, help='Label selection size controls how many items in '
                                                                  'each beam are passed through to the beam scorer')
 beam_args.add_argument('--label_margin', default=-1, type=float, help='Controls difference between minimal input score '
@@ -42,7 +42,7 @@ if __name__ == '__main__':
 
         decoder = BeamCTCDecoder(labels, beam_width=args.beam_width, top_paths=args.top_paths, space_index=labels.index(' '),
                                  blank_index=labels.index('_'), lm_path=args.lm_path,
-                                 trie_path=args.trie_path, lm_alpha=args.lm_alpha, lm_beta1=args.lm_beta1,
+                                 trie_path=args.trie_path, lm_alpha=args.lm_alpha, lm_beta=args.lm_beta,
                                  label_size=args.label_size, label_margin=args.label_margin)
     else:
         decoder = GreedyDecoder(labels, space_index=labels.index(' '), blank_index=labels.index('_'))
