@@ -48,7 +48,6 @@ if __name__ == '__main__':
                                  label_size=args.label_size, label_margin=args.label_margin)
     else:
         decoder = GreedyDecoder(labels, space_index=labels.index(' '), blank_index=labels.index('_'))
-    test_decoder = GreedyDecoder(labels, space_index=labels.index(' '), blank_index=labels.index('_'))
 
     test_dataset = SpectrogramDataset(audio_conf=audio_conf, manifest_filepath=args.test_manifest, labels=labels,
                                       normalize=True)
@@ -76,7 +75,7 @@ if __name__ == '__main__':
         sizes = input_percentages.mul_(int(seq_length)).int()
 
         decoded_output, _, _ = decoder.decode(out.data, sizes)
-        target_strings = test_decoder.convert_to_strings(split_targets)
+        target_strings = decoder.convert_to_strings(split_targets)
         wer, cer = 0, 0
         for x in range(len(target_strings)):
             wer_inst = decoder.wer(decoded_output[0][x], target_strings[x]) / float(len(target_strings[x].split()))
