@@ -127,9 +127,9 @@ if __name__ == '__main__':
     if args.continue_from:  # Starting from previous model
         print("Loading checkpoint model %s" % args.continue_from)
         package = torch.load(args.continue_from, map_location=lambda storage, loc: storage)
-        labels = package['labels']
-        audio_conf = package['audio_conf']
         model = DeepSpeech.load_model_package(package)
+        labels = DeepSpeech.get_labels(model)
+        audio_conf = DeepSpeech.get_audio_conf(model)
         parameters = model.parameters()
         optimizer = torch.optim.SGD(parameters, lr=args.lr,
                                     momentum=args.momentum, nesterov=True)
