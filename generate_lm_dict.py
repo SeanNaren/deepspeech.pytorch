@@ -1,12 +1,12 @@
-import pytorch_ctc
+import ctcdecode
 import json
 import argparse
 
 parser = argparse.ArgumentParser(description='LM Dictionary Generation')
 parser.add_argument('--labels', help='path to label json file', default='labels.json')
 parser.add_argument('--dict_path', help='path to text dictionary (one word per line)', default='vocab.txt')
-parser.add_argument('--model_path', help='path to the kenlm language model', default="lm.kenlm")
-parser.add_argument('--output_path', help='path of output dictionary', default='vocab.dic')
+parser.add_argument('--lm_path', help='path to the kenlm language model (optional)', default=None)
+parser.add_argument('--output_path', help='path of output dictionary trie', default='vocab.dic')
 
 
 def main():
@@ -16,8 +16,8 @@ def main():
 
     labels = ''.join(label_data)
 
-    pytorch_ctc.generate_lm_dict(args.dict_path, args.model_path, args.output_path, labels, labels.index('_'),
-                                 labels.index(' '))
+    ctcdecode.generate_lm_dict(args.dict_path, args.output_path, labels, kenlm_path=args.lm_path,
+                               blank_index=labels.index('_'), space_index=labels.index(' '))
 
 
 if __name__ == '__main__':

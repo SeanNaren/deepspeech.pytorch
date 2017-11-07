@@ -42,10 +42,10 @@ pip install cffi
 python setup.py install
 ```
 
-If you want decoding to support beam search with an optional language model, install pytorch-ctc:
+If you want decoding to support beam search with an optional language model, install ctcdecode:
 ```
-git clone --recursive https://github.com/parlance/pytorch-ctc.git
-cd pytorch-ctc
+git clone --recursive https://github.com/parlance/ctcdecode.git
+cd ctcdecode
 pip install -r requirements.txt
 python setup.py install
 ```
@@ -250,13 +250,12 @@ python transcribe.py --model_path models/deepspeech.pth.tar --audio_path /path/t
 ### Alternate Decoders
 By default, `test.py` and `transcribe.py` use a `GreedyDecoder` which picks the highest-likelihood output label at each timestep. Repeated and blank symbols are then filtered to give the final output.
 
-A beam search decoder can optionally be used with the installation of the `pytorch-ctc` library as described in the Installation section. The `test` and `transcribe` scripts have a `--decoder` argument. To use the beam decoder, add `--decoder beam`. The beam decoder enables additional decoding parameters:
+A beam search decoder can optionally be used with the installation of the `ctcdecode` library as described in the Installation section. The `test` and `transcribe` scripts have a `--decoder` argument. To use the beam decoder, add `--decoder beam`. The beam decoder enables additional decoding parameters:
 - **beam_width** how many beams to consider at each timestep
 - **lm_path** optional binary KenLM language model to use for decoding
-- **trie_path** trie describing lexicon. required if `lm_path` is supplied
+- **trie_path** trie describing lexicon. required if `lm_path` is supplied. May also be used sans `lm_path` for dictionary decoding
 - **lm_alpha** weight for language model
 - **lm_beta1** bonus weight for words
-- **lm_beta2** bonus weight for in-vocabulary words
 - **label_size** Label selection size controls how many items in each beam are passed through to the beam scorer
 - **label_margin** Controls difference between minimal input score for an item to be passed to the beam scorer
 
