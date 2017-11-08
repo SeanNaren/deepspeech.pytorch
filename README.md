@@ -212,6 +212,9 @@ python train.py --continue_from models/deepspeech_checkpoint_epoch_N_iter_N.pth.
 
 This continues from the same training state as well as recreates the visdom graph to continue from if enabled.
 
+If you would like to start from a previous checkpoint model but not continue training, add the `--finetune` flag to restart training
+from the `--continue_from` weights.
+
 ### Choosing batch sizes
 
 Included is a script that can be used to benchmark whether training can occur on your hardware, and the limits on the size of the model/batch
