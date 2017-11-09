@@ -310,12 +310,12 @@ if __name__ == '__main__':
             seq_length = out.size(0)
             sizes = input_percentages.mul_(int(seq_length)).int()
 
-            decoded_output, _ = decoder.decode(out.data, sizes)
+            decoded_output, _, _, _ = decoder.decode(out.data, sizes)
             target_strings = decoder.convert_to_strings(split_targets)
             wer, cer = 0, 0
             for x in range(len(target_strings)):
-                wer += decoder.wer(decoded_output[x], target_strings[x]) / float(len(target_strings[x].split()))
-                cer += decoder.cer(decoded_output[x], target_strings[x]) / float(len(target_strings[x]))
+                wer += decoder.wer(decoded_output[0][x], target_strings[x]) / float(len(target_strings[x].split()))
+                cer += decoder.cer(decoded_output[0][x], target_strings[x]) / float(len(target_strings[x]))
             total_cer += cer
             total_wer += wer
 
