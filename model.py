@@ -4,6 +4,8 @@ from collections import OrderedDict
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.nn.parameter import Parameter
+from torch.autograd import Variable
 
 supported_rnns = {
     'lstm': nn.LSTM,
@@ -69,9 +71,49 @@ class BatchRNN(nn.Module):
         return x
 
 
+class Lookahead(nn.Module):
+    # Wang et al 2016 - Lookahead Convolution Layer for Unidirectional Recurrent Neural Networks
+    # input shape - sequence, batch, feature - TxNxH
+    # output shape - same as input
+    def __init__(self, n_features, context):
+        # should we handle batch_first=True?
+        super(Lookahead, self).__init__()
+        self.n_features = n_features
+        self.weight = Parameter(torch.Tensor(n_features, context + 1))
+        assert context > 0
+        self.context = context
+        self.register_parameter('bias', None)
+        self.init_parameters()
+
+    def init_parameters(self):  # what's a better way initialiase this layer?
+        stdv = 1. / math.sqrt(self.weight.size(1))
+        self.weight.data.uniform_(-stdv, stdv)
+
+    def forward(self, input):
+        seq_len = input.size(0)
+        # pad the 0th dimension (T/sequence) with zeroes whose number = context
+        # Once pytorch's padding functions have settled, should move to those.
+        padding = torch.zeros(self.context, *(input.size()[1:])).type_as(input.data)
+        x = torch.cat((input, Variable(padding)), 0)
+
+        # add lookahead windows (with context+1 width) as a fourth dimension
+        # for each seq-batch-feature combination
+        x = [x[i:i + self.context + 1] for i in range(seq_len)]  # TxLxNxH - sequence, context, batch, feature
+        x = torch.stack(x)
+        x = x.permute(0, 2, 3, 1)  # TxNxHxL - sequence, batch, feature, context
+
+        x = torch.mul(x, self.weight).sum(dim=3)
+        return x
+
+    def __repr__(self):
+        return self.__class__.__name__ + '(' \
+               + 'n_features=' + str(self.n_features) \
+               + ', context=' + str(self.context) + ')'
+
+
 class DeepSpeech(nn.Module):
     def __init__(self, rnn_type=nn.LSTM, labels="abc", rnn_hidden_size=768, nb_layers=5, audio_conf=None,
-                 bidirectional=True):
+                 bidirectional=True, context=20):
         super(DeepSpeech, self).__init__()
 
         # model metadata needed for serialization/deserialization
@@ -83,13 +125,14 @@ class DeepSpeech(nn.Module):
         self._rnn_type = rnn_type
         self._audio_conf = audio_conf or {}
         self._labels = labels
+        self._bidirectional = bidirectional
 
         sample_rate = self._audio_conf.get("sample_rate", 16000)
         window_size = self._audio_conf.get("window_size", 0.02)
         num_classes = len(self._labels)
 
         self.conv = nn.Sequential(
-            nn.Conv2d(1, 32, kernel_size=(41, 11), stride=(2, 2), padding=(0,10)),
+            nn.Conv2d(1, 32, kernel_size=(41, 11), stride=(2, 2), padding=(0, 10)),
             nn.BatchNorm2d(32),
             nn.Hardtanh(0, 20, inplace=True),
             nn.Conv2d(32, 32, kernel_size=(21, 11), stride=(2, 1), ),
@@ -111,6 +154,12 @@ class DeepSpeech(nn.Module):
                            bidirectional=bidirectional)
             rnns.append(('%d' % (x + 1), rnn))
         self.rnns = nn.Sequential(OrderedDict(rnns))
+        self.lookahead = nn.Sequential(
+            # consider adding batch norm?
+            Lookahead(rnn_hidden_size, context=context),
+            nn.Hardtanh(0, 20, inplace=True)
+        ) if not bidirectional else None
+
         fully_connected = nn.Sequential(
             nn.BatchNorm1d(rnn_hidden_size),
             nn.Linear(rnn_hidden_size, num_classes, bias=False)
@@ -129,6 +178,9 @@ class DeepSpeech(nn.Module):
 
         x = self.rnns(x)
 
+        if not self._bidirectional:  # no need for lookahead layer in bidirectional
+            x = self.lookahead(x)
+
         x = self.fc(x)
         x = x.transpose(0, 1)
         # identity in training mode, logsoftmax in eval mode
@@ -140,11 +192,12 @@ class DeepSpeech(nn.Module):
         package = torch.load(path, map_location=lambda storage, loc: storage)
         model = cls(rnn_hidden_size=package['hidden_size'], nb_layers=package['hidden_layers'],
                     labels=package['labels'], audio_conf=package['audio_conf'],
-                    rnn_type=supported_rnns[package['rnn_type']])
+                    rnn_type=supported_rnns[package['rnn_type']], bidirectional=package['bidirectional'])
         # the blacklist parameters are params that were previous erroneously saved by the model
         # care should be taken in future versions that if batch_norm on the first rnn is required
         # that it be named something else
-        blacklist = ['rnns.0.batch_norm.module.weight', 'rnns.0.batch_norm.module.bias', 'rnns.0.batch_norm.module.running_mean', 'rnns.0.batch_norm.module.running_var']
+        blacklist = ['rnns.0.batch_norm.module.weight', 'rnns.0.batch_norm.module.bias',
+                     'rnns.0.batch_norm.module.running_mean', 'rnns.0.batch_norm.module.running_var']
         for x in blacklist:
             if x in package['state_dict']:
                 del package['state_dict'][x]
@@ -159,7 +212,7 @@ class DeepSpeech(nn.Module):
     def load_model_package(cls, package, cuda=False):
         model = cls(rnn_hidden_size=package['hidden_size'], nb_layers=package['hidden_layers'],
                     labels=package['labels'], audio_conf=package['audio_conf'],
-                    rnn_type=supported_rnns[package['rnn_type']])
+                    rnn_type=supported_rnns[package['rnn_type']], bidirectional=package['bidirectional'])
         model.load_state_dict(package['state_dict'])
         if cuda:
             model = torch.nn.DataParallel(model).cuda()
@@ -177,7 +230,8 @@ class DeepSpeech(nn.Module):
             'rnn_type': supported_rnns_inv.get(model._rnn_type, model._rnn_type.__name__.lower()),
             'audio_conf': model._audio_conf,
             'labels': model._labels,
-            'state_dict': model.state_dict()
+            'state_dict': model.state_dict(),
+            'bidirectional': model._bidirectional
         }
         if optimizer is not None:
             package['optim_dict'] = optimizer.state_dict()
