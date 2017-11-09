@@ -2,6 +2,7 @@ import json
 import argparse
 import numpy as np
 import torch
+import sys
 
 from multiprocessing import Pool
 
@@ -19,8 +20,8 @@ parser.add_argument('--model_path', default='models/deepspeech_final.pth.tar',
 parser.add_argument('--logits', default="", type=str, help='Path to logits from test.py')
 parser.add_argument('--test_manifest', metavar='DIR',
                     help='path to validation manifest csv', default='data/test_manifest.csv')
-parser.add_argument('--num_workers', default=4, type=int, help='Number of workers used in dataloading')
-parser.add_argument('--num_scorers', default=16, type=int, help='Number of parallel decodes to run')
+parser.add_argument('--num_workers', default=16, type=int, help='Number of parallel decodes to run')
+parser.add_argument('--output_path', default="tune_results.json", help="Where to save tuning results")
 beam_args = parser.add_argument_group("Beam Decode Options", "Configurations options for the CTC Beam Search decoder")
 beam_args.add_argument('--beam_width', default=10, type=int, help='Beam width to use')
 beam_args.add_argument('--lm_path', default=None, type=str,
@@ -37,9 +38,10 @@ beam_args.add_argument('--label_size', default=0, type=int, help='Label selectio
                                                                  'each beam are passed through to the beam scorer')
 beam_args.add_argument('--label_margin', default=-1, type=float, help='Controls difference between minimal input score '
                                                                       'for an item to be passed to the beam scorer.')
+
 args = parser.parse_args()
 
-def decode_dataset(logits, test_dataset, lm_alpha, lm_beta, mesh_x, mesh_y, labels, batch_size):
+def decode_dataset(logits, test_dataset, batch_size, lm_alpha, lm_beta, mesh_x, mesh_y, labels):
     print("Beginning decode for {}, {}".format(lm_alpha, lm_beta))
     test_loader = AudioDataLoader(test_dataset, batch_size=batch_size, num_workers=0)
     target_decoder = GreedyDecoder(labels, space_index=labels.index(' '), blank_index=labels.index('_'))
@@ -79,6 +81,10 @@ def decode_dataset(logits, test_dataset, lm_alpha, lm_beta, mesh_x, mesh_y, labe
 
 
 if __name__ == '__main__':
+    if args.lm_path is None:
+        print("error: LM must be provided for tuning")
+        sys.exit(1)
+
     model = DeepSpeech.load_model(args.model_path, cuda=False)
     model.eval()
 
@@ -88,13 +94,13 @@ if __name__ == '__main__':
                                       normalize=True)
 
     logits = np.load(args.logits)
-    batch_size = len(logits[0][0])
+    batch_size = logits[0][0].shape[1]
 
     results = []
-    def result_callback(x):
-        results.append(x)
+    def result_callback(result):
+        results.append(result)
 
-    p = Pool(args.num_scorers)
+    p = Pool(args.num_workers)
     
     cand_alphas = np.linspace(args.lm_alpha_from, args.lm_alpha_to, args.lm_num_alphas)
     cand_betas = np.linspace(args.lm_beta_from, args.lm_beta_to, args.lm_num_betas)
@@ -106,8 +112,11 @@ if __name__ == '__main__':
     futures = []
     for index, (alpha, beta, x, y) in enumerate(params_grid):
         print("Scheduling decode for a={}, b={} ({},{}).".format(alpha, beta, x, y))
-        f = p.apply_async(decode_dataset, (logits, test_dataset, alpha, beta, x, y, labels, batch_size), callback=result_callback)
+        f = p.apply_async(decode_dataset, (logits, test_dataset, batch_size, alpha, beta, x, y, labels), callback=result_callback)
         futures.append(f)
     for f in futures:
         f.wait()
-    print(json.dumps(results))
+        print("Result calculated:", f.get())
+    print("Saving tuning results to: {}".format(args.output_path))
+    with open(args.output_path, "w") as fh:
+        json.dump(results, fh)
