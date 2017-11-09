@@ -1,4 +1,9 @@
+import json
 import argparse
+import numpy as np
+import torch
+
+from multiprocessing import Pool
 
 from torch.autograd import Variable
 from tqdm import tqdm
@@ -11,10 +16,11 @@ from model import DeepSpeech
 parser = argparse.ArgumentParser(description='DeepSpeech transcription')
 parser.add_argument('--model_path', default='models/deepspeech_final.pth.tar',
                     help='Path to model file created by training')
-parser.add_argument('--logits', default=None, type=str, help='Path to logits from test.py')
+parser.add_argument('--logits', default="", type=str, help='Path to logits from test.py')
 parser.add_argument('--test_manifest', metavar='DIR',
                     help='path to validation manifest csv', default='data/test_manifest.csv')
 parser.add_argument('--num_workers', default=4, type=int, help='Number of workers used in dataloading')
+parser.add_argument('--num_scorers', default=16, type=int, help='Number of parallel decodes to run')
 beam_args = parser.add_argument_group("Beam Decode Options", "Configurations options for the CTC Beam Search decoder")
 beam_args.add_argument('--beam_width', default=10, type=int, help='Beam width to use')
 beam_args.add_argument('--lm_path', default=None, type=str,
@@ -33,14 +39,16 @@ beam_args.add_argument('--label_margin', default=-1, type=float, help='Controls 
                                                                       'for an item to be passed to the beam scorer.')
 args = parser.parse_args()
 
-def decode_dataset(logits, test_loader, lm_alpha, lm_beta, labels):
+def decode_dataset(logits, test_dataset, lm_alpha, lm_beta, mesh_x, mesh_y, labels, batch_size):
+    print("Beginning decode for {}, {}".format(lm_alpha, lm_beta))
+    test_loader = AudioDataLoader(test_dataset, batch_size=batch_size, num_workers=0)
     target_decoder = GreedyDecoder(labels, space_index=labels.index(' '), blank_index=labels.index('_'))
     decoder = BeamCTCDecoder(labels, beam_width=args.beam_width, top_paths=1, space_index=labels.index(' '),
                              blank_index=labels.index('_'), lm_path=args.lm_path,
                              trie_path=args.trie_path, lm_alpha=lm_alpha, lm_beta=lm_beta,
                              label_size=args.label_size, label_margin=args.label_margin)
     total_cer, total_wer = 0, 0
-    for i, (data) in tqdm(enumerate(test_loader), total=len(test_loader)):
+    for i, (data) in enumerate(test_loader):
         inputs, targets, input_percentages, target_sizes = data
 
         # unflatten targets
@@ -53,7 +61,7 @@ def decode_dataset(logits, test_loader, lm_alpha, lm_beta, labels):
         out = torch.from_numpy(logits[i][0])
         sizes = torch.from_numpy(logits[i][1])
 
-        decoded_output, _, _, _ = decoder.decode(out.data, sizes)
+        decoded_output, _, _, _ = decoder.decode(out, sizes)
         target_strings = target_decoder.convert_to_strings(split_targets)
         wer, cer = 0, 0
         for x in range(len(target_strings)):
@@ -67,11 +75,11 @@ def decode_dataset(logits, test_loader, lm_alpha, lm_beta, labels):
     wer = total_wer / len(test_loader.dataset)
     cer = total_cer / len(test_loader.dataset)
 
-    return (lm_alpha, lm_beta, wer, cer)
+    return [mesh_x, mesh_y, lm_alpha, lm_beta, wer, cer]
 
 
 if __name__ == '__main__':
-    model = DeepSpeech.load_model(args.model_path, cuda=args.cuda)
+    model = DeepSpeech.load_model(args.model_path, cuda=False)
     model.eval()
 
     labels = DeepSpeech.get_labels(model)
@@ -81,7 +89,25 @@ if __name__ == '__main__':
 
     logits = np.load(args.logits)
     batch_size = len(logits[0][0])
-    test_loader = AudioDataLoader(test_dataset, batch_size=batch_size, num_workers=args.num_workers)
 
-    results = decode_dataset(logits, test_loader, lm_alpha, lm_beta, labels)
-    print(results)
+    results = []
+    def result_callback(x):
+        results.append(x)
+
+    p = Pool(args.num_scorers)
+    
+    cand_alphas = np.linspace(args.lm_alpha_from, args.lm_alpha_to, args.lm_num_alphas)
+    cand_betas = np.linspace(args.lm_beta_from, args.lm_beta_to, args.lm_num_betas)
+    params_grid = []
+    for x, alpha in enumerate(cand_alphas):
+        for y, beta in enumerate(cand_betas):
+            params_grid.append((alpha, beta, x, y))
+
+    futures = []
+    for index, (alpha, beta, x, y) in enumerate(params_grid):
+        print("Scheduling decode for a={}, b={} ({},{}).".format(alpha, beta, x, y))
+        f = p.apply_async(decode_dataset, (logits, test_dataset, alpha, beta, x, y, labels, batch_size), callback=result_callback)
+        futures.append(f)
+    for f in futures:
+        f.wait()
+    print(json.dumps(results))

@@ -20,7 +20,7 @@ parser.add_argument('--num_workers', default=4, type=int, help='Number of worker
 parser.add_argument('--decoder', default="greedy", choices=["greedy", "beam", "none"], type=str, help="Decoder to use")
 parser.add_argument('--verbose', action="store_true", help="print out decoded output and error of each sample")
 no_decoder_args = parser.add_argument_group("No Decoder Options", "Configuration options for when no decoder is specified")
-no_decoder_args.add_argument('--output_path', default=None, type=str, "Where to save raw acoustic output")
+no_decoder_args.add_argument('--output_path', default=None, type=str, help="Where to save raw acoustic output")
 beam_args = parser.add_argument_group("Beam Decode Options", "Configurations options for the CTC Beam Search decoder")
 beam_args.add_argument('--beam_width', default=10, type=int, help='Beam width to use')
 beam_args.add_argument('--lm_path', default=None, type=str,
@@ -82,7 +82,7 @@ if __name__ == '__main__':
 
         if decoder is None:
             # add output to data array, and continue
-            output_data.append((out.data.numpy(), sizes.numpy()))
+            output_data.append((out.data.cpu().numpy(), sizes.numpy()))
             continue
 
         decoded_output, _, _, _ = decoder.decode(out.data, sizes)
