@@ -56,8 +56,8 @@ parser.add_argument('--noise_max', default=0.5,
                     help='Maximum noise levels to sample from. Maximum 1.0', type=float)
 parser.add_argument('--no_shuffle', dest='no_shuffle', action='store_true',
                     help='Turn off shuffling and sample from dataset based on sequence length (smallest to largest)')
-parser.add_argument('--bidirectional', action='store_true', default=False, 
-                    help='add --bidirectional for bidirectional or omit for unidirectional rnn')
+parser.add_argument('--no_bidirectional', dest='bidirectional', action='store_false', default=True,
+                    help='Turn off bi-directional RNNs, introduces lookahead convolution')
 
 def to_np(x):
     return x.data.cpu().numpy()

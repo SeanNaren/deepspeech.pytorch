@@ -70,6 +70,7 @@ class BatchRNN(nn.Module):
             x = x.view(x.size(0), x.size(1), 2, -1).sum(2).view(x.size(0), x.size(1), -1)  # (TxNxH*2) -> (TxNxH) by sum
         return x
 
+
 class Lookahead(nn.Module):
     # Wang et al 2016 - Lookahead Convolution Layer for Unidirectional Recurrent Neural Networks
     # input shape - sequence, batch, feature - TxNxH
@@ -78,39 +79,41 @@ class Lookahead(nn.Module):
         # should we handle batch_first=True?
         super(Lookahead, self).__init__()
         self.n_features = n_features
-        self.weight = Parameter(torch.Tensor(n_features, context+1))
+        self.weight = Parameter(torch.Tensor(n_features, context + 1))
         assert context > 0
-        self.context = context 
+        self.context = context
         self.register_parameter('bias', None)
         self.init_parameters()
-                      
-    def init_parameters(self): # what's a better way initialiase this layer?
-        stdv = 1. / math.sqrt(self.weight.size(1)) 
+
+    def init_parameters(self):  # what's a better way initialiase this layer?
+        stdv = 1. / math.sqrt(self.weight.size(1))
         self.weight.data.uniform_(-stdv, stdv)
 
-    def forward(self, input):               
+    def forward(self, input):
         seq_len = input.size(0)
         # pad the 0th dimension (T/sequence) with zeroes whose number = context
-        # Once pytorch's padding functions have settled, should move to those.        
-        x = torch.cat((input, Variable(torch.zeros(self.context, *(input.size()[1:])))), 0)
-        
+        # Once pytorch's padding functions have settled, should move to those.
+        padding = torch.zeros(self.context, *(input.size()[1:])).type_as(input.data)
+        x = torch.cat((input, Variable(padding)), 0)
+
         # add lookahead windows (with context+1 width) as a fourth dimension
         # for each seq-batch-feature combination
-        x = [x[i:i+self.context+1] for i in range(seq_len)] # TxLxNxH - sequence, context, batch, feature
-        x = torch.stack(tuple(x))
-        x = x.permute(0, 2, 3, 1) # TxNxHxL - sequence, batch, feature, context
-               
+        x = [x[i:i + self.context + 1] for i in range(seq_len)]  # TxLxNxH - sequence, context, batch, feature
+        x = torch.stack(x)
+        x = x.permute(0, 2, 3, 1)  # TxNxHxL - sequence, batch, feature, context
+
         x = torch.mul(x, self.weight).sum(dim=3)
         return x
 
     def __repr__(self):
         return self.__class__.__name__ + '(' \
-            + 'n_features=' + str(self.n_features) \
-            + ', context=' + str(self.context) + ')'
+               + 'n_features=' + str(self.n_features) \
+               + ', context=' + str(self.context) + ')'
+
 
 class DeepSpeech(nn.Module):
     def __init__(self, rnn_type=nn.LSTM, labels="abc", rnn_hidden_size=768, nb_layers=5, audio_conf=None,
-                 bidirectional=True):
+                 bidirectional=True, context=20):
         super(DeepSpeech, self).__init__()
 
         # model metadata needed for serialization/deserialization
@@ -129,7 +132,7 @@ class DeepSpeech(nn.Module):
         num_classes = len(self._labels)
 
         self.conv = nn.Sequential(
-            nn.Conv2d(1, 32, kernel_size=(41, 11), stride=(2, 2), padding=(0,10)),
+            nn.Conv2d(1, 32, kernel_size=(41, 11), stride=(2, 2), padding=(0, 10)),
             nn.BatchNorm2d(32),
             nn.Hardtanh(0, 20, inplace=True),
             nn.Conv2d(32, 32, kernel_size=(21, 11), stride=(2, 1), ),
@@ -151,11 +154,12 @@ class DeepSpeech(nn.Module):
                            bidirectional=bidirectional)
             rnns.append(('%d' % (x + 1), rnn))
         self.rnns = nn.Sequential(OrderedDict(rnns))
-        self.lookahead = nn.Sequential(           
+        self.lookahead = nn.Sequential(
             # consider adding batch norm?
-            Lookahead(rnn_hidden_size, context=3),
-            nn.Hardtanh(0, 20, inplace=True) # relu20                
-        )
+            Lookahead(rnn_hidden_size, context=context),
+            nn.Hardtanh(0, 20, inplace=True)
+        ) if not bidirectional else None
+
         fully_connected = nn.Sequential(
             nn.BatchNorm1d(rnn_hidden_size),
             nn.Linear(rnn_hidden_size, num_classes, bias=False)
@@ -173,8 +177,8 @@ class DeepSpeech(nn.Module):
         x = x.transpose(1, 2).transpose(0, 1).contiguous()  # TxNxH
 
         x = self.rnns(x)
-        
-        if self._bidirectional==False: # no need for lookahead layer in bidirectional
+
+        if not self._bidirectional:  # no need for lookahead layer in bidirectional
             x = self.lookahead(x)
 
         x = self.fc(x)
@@ -192,7 +196,8 @@ class DeepSpeech(nn.Module):
         # the blacklist parameters are params that were previous erroneously saved by the model
         # care should be taken in future versions that if batch_norm on the first rnn is required
         # that it be named something else
-        blacklist = ['rnns.0.batch_norm.module.weight', 'rnns.0.batch_norm.module.bias', 'rnns.0.batch_norm.module.running_mean', 'rnns.0.batch_norm.module.running_var']
+        blacklist = ['rnns.0.batch_norm.module.weight', 'rnns.0.batch_norm.module.bias',
+                     'rnns.0.batch_norm.module.running_mean', 'rnns.0.batch_norm.module.running_var']
         for x in blacklist:
             if x in package['state_dict']:
                 del package['state_dict'][x]
