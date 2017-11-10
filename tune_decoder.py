@@ -26,12 +26,14 @@ beam_args = parser.add_argument_group("Beam Decode Options", "Configurations opt
 beam_args.add_argument('--beam_width', default=10, type=int, help='Beam width to use')
 beam_args.add_argument('--lm_path', default=None, type=str,
                        help='Path to an (optional) kenlm language model for use with beam search (req\'d with trie)')
-beam_args.add_argument('--trie_path', default=None, type=str,
+beam_args.add_argument('--dict_path', default=None, type=str,
                        help='Path to an (optional) trie dictionary for use with beam search (req\'d with LM)')
 beam_args.add_argument('--lm_alpha_from', default=1, type=float, help='Language model weight start tuning')
 beam_args.add_argument('--lm_alpha_to', default=3.2, type=float, help='Language model weight end tuning')
-beam_args.add_argument('--lm_beta_from', default=0.0, type=float, help='Language model word bonus (all words) start tuning')
-beam_args.add_argument('--lm_beta_to', default=0.45, type=float, help='Language model word bonus (all words) end tuning')
+beam_args.add_argument('--lm_beta_from', default=0.0, type=float,
+                       help='Language model word bonus (all words) start tuning')
+beam_args.add_argument('--lm_beta_to', default=0.45, type=float,
+                       help='Language model word bonus (all words) end tuning')
 beam_args.add_argument('--lm_num_alphas', default=45, type=float, help='Number of alpha candidates for tuning')
 beam_args.add_argument('--lm_num_betas', default=8, type=float, help='Number of beta candidates for tuning')
 beam_args.add_argument('--label_size', default=0, type=int, help='Label selection size controls how many items in '
@@ -41,13 +43,14 @@ beam_args.add_argument('--label_margin', default=-1, type=float, help='Controls 
 
 args = parser.parse_args()
 
+
 def decode_dataset(logits, test_dataset, batch_size, lm_alpha, lm_beta, mesh_x, mesh_y, labels):
     print("Beginning decode for {}, {}".format(lm_alpha, lm_beta))
     test_loader = AudioDataLoader(test_dataset, batch_size=batch_size, num_workers=0)
     target_decoder = GreedyDecoder(labels, space_index=labels.index(' '), blank_index=labels.index('_'))
     decoder = BeamCTCDecoder(labels, beam_width=args.beam_width, top_paths=1, space_index=labels.index(' '),
                              blank_index=labels.index('_'), lm_path=args.lm_path,
-                             trie_path=args.trie_path, lm_alpha=lm_alpha, lm_beta=lm_beta,
+                             dict_path=args.dict_path, lm_alpha=lm_alpha, lm_beta=lm_beta,
                              label_size=args.label_size, label_margin=args.label_margin)
     total_cer, total_wer = 0, 0
     for i, (data) in enumerate(test_loader):
@@ -97,11 +100,14 @@ if __name__ == '__main__':
     batch_size = logits[0][0].shape[1]
 
     results = []
+
+
     def result_callback(result):
         results.append(result)
 
+
     p = Pool(args.num_workers)
-    
+
     cand_alphas = np.linspace(args.lm_alpha_from, args.lm_alpha_to, args.lm_num_alphas)
     cand_betas = np.linspace(args.lm_beta_from, args.lm_beta_to, args.lm_num_betas)
     params_grid = []
@@ -112,7 +118,8 @@ if __name__ == '__main__':
     futures = []
     for index, (alpha, beta, x, y) in enumerate(params_grid):
         print("Scheduling decode for a={}, b={} ({},{}).".format(alpha, beta, x, y))
-        f = p.apply_async(decode_dataset, (logits, test_dataset, batch_size, alpha, beta, x, y, labels), callback=result_callback)
+        f = p.apply_async(decode_dataset, (logits, test_dataset, batch_size, alpha, beta, x, y, labels),
+                          callback=result_callback)
         futures.append(f)
     for f in futures:
         f.wait()

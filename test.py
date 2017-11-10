@@ -19,13 +19,14 @@ parser.add_argument('--batch_size', default=20, type=int, help='Batch size for t
 parser.add_argument('--num_workers', default=4, type=int, help='Number of workers used in dataloading')
 parser.add_argument('--decoder', default="greedy", choices=["greedy", "beam", "none"], type=str, help="Decoder to use")
 parser.add_argument('--verbose', action="store_true", help="print out decoded output and error of each sample")
-no_decoder_args = parser.add_argument_group("No Decoder Options", "Configuration options for when no decoder is specified")
+no_decoder_args = parser.add_argument_group("No Decoder Options", "Configuration options for when no decoder is "
+                                                                  "specified")
 no_decoder_args.add_argument('--output_path', default=None, type=str, help="Where to save raw acoustic output")
 beam_args = parser.add_argument_group("Beam Decode Options", "Configurations options for the CTC Beam Search decoder")
 beam_args.add_argument('--beam_width', default=10, type=int, help='Beam width to use')
 beam_args.add_argument('--lm_path', default=None, type=str,
                        help='Path to an (optional) kenlm language model for use with beam search (req\'d with trie)')
-beam_args.add_argument('--trie_path', default=None, type=str,
+beam_args.add_argument('--dict_path', default=None, type=str,
                        help='Path to an (optional) trie dictionary for use with beam search (req\'d with LM)')
 beam_args.add_argument('--lm_alpha', default=0.8, type=float, help='Language model weight')
 beam_args.add_argument('--lm_beta', default=1, type=float, help='Language model word bonus (all words)')
@@ -47,7 +48,7 @@ if __name__ == '__main__':
 
         decoder = BeamCTCDecoder(labels, beam_width=args.beam_width, top_paths=1, space_index=labels.index(' '),
                                  blank_index=labels.index('_'), lm_path=args.lm_path,
-                                 trie_path=args.trie_path, lm_alpha=args.lm_alpha, lm_beta=args.lm_beta,
+                                 dict_path=args.dict_path, lm_alpha=args.lm_alpha, lm_beta=args.lm_beta,
                                  label_size=args.label_size, label_margin=args.label_margin)
     elif args.decoder == "greedy":
         decoder = GreedyDecoder(labels, space_index=labels.index(' '), blank_index=labels.index('_'))
