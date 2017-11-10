@@ -1,5 +1,6 @@
 import argparse
 
+import numpy as np
 from torch.autograd import Variable
 from tqdm import tqdm
 
@@ -16,8 +17,10 @@ parser.add_argument('--test_manifest', metavar='DIR',
                     help='path to validation manifest csv', default='data/test_manifest.csv')
 parser.add_argument('--batch_size', default=20, type=int, help='Batch size for training')
 parser.add_argument('--num_workers', default=4, type=int, help='Number of workers used in dataloading')
-parser.add_argument('--decoder', default="greedy", choices=["greedy", "beam"], type=str, help="Decoder to use")
+parser.add_argument('--decoder', default="greedy", choices=["greedy", "beam", "none"], type=str, help="Decoder to use")
 parser.add_argument('--verbose', action="store_true", help="print out decoded output and error of each sample")
+no_decoder_args = parser.add_argument_group("No Decoder Options", "Configuration options for when no decoder is specified")
+no_decoder_args.add_argument('--output_path', default=None, type=str, help="Where to save raw acoustic output")
 beam_args = parser.add_argument_group("Beam Decode Options", "Configurations options for the CTC Beam Search decoder")
 beam_args.add_argument('--beam_width', default=10, type=int, help='Beam width to use')
 beam_args.add_argument('--lm_path', default=None, type=str,
@@ -46,14 +49,17 @@ if __name__ == '__main__':
                                  blank_index=labels.index('_'), lm_path=args.lm_path,
                                  trie_path=args.trie_path, lm_alpha=args.lm_alpha, lm_beta=args.lm_beta,
                                  label_size=args.label_size, label_margin=args.label_margin)
-    else:
+    elif args.decoder == "greedy":
         decoder = GreedyDecoder(labels, space_index=labels.index(' '), blank_index=labels.index('_'))
+    else:
+        decoder = None
     target_decoder = GreedyDecoder(labels, space_index=labels.index(' '), blank_index=labels.index('_'))
     test_dataset = SpectrogramDataset(audio_conf=audio_conf, manifest_filepath=args.test_manifest, labels=labels,
                                       normalize=True)
     test_loader = AudioDataLoader(test_dataset, batch_size=args.batch_size,
                                   num_workers=args.num_workers)
     total_cer, total_wer = 0, 0
+    output_data = []
     for i, (data) in tqdm(enumerate(test_loader), total=len(test_loader)):
         inputs, targets, input_percentages, target_sizes = data
 
@@ -74,6 +80,11 @@ if __name__ == '__main__':
         seq_length = out.size(0)
         sizes = input_percentages.mul_(int(seq_length)).int()
 
+        if decoder is None:
+            # add output to data array, and continue
+            output_data.append((out.data.cpu().numpy(), sizes.numpy()))
+            continue
+
         decoded_output, _, _, _ = decoder.decode(out.data, sizes)
         target_strings = target_decoder.convert_to_strings(split_targets)
         wer, cer = 0, 0
@@ -89,9 +100,12 @@ if __name__ == '__main__':
         total_cer += cer
         total_wer += wer
 
-    wer = total_wer / len(test_loader.dataset)
-    cer = total_cer / len(test_loader.dataset)
+    if decoder is not None:
+        wer = total_wer / len(test_loader.dataset)
+        cer = total_cer / len(test_loader.dataset)
 
-    print('Test Summary \t'
-          'Average WER {wer:.3f}\t'
-          'Average CER {cer:.3f}\t'.format(wer=wer * 100, cer=cer * 100))
+        print('Test Summary \t'
+              'Average WER {wer:.3f}\t'
+              'Average CER {cer:.3f}\t'.format(wer=wer * 100, cer=cer * 100))
+    else:
+        np.save(args.output_path, output_data)

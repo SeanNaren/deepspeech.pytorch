@@ -269,6 +269,18 @@ class DeepSpeech(nn.Module):
         model_is_cuda = next(model.parameters()).is_cuda
         return model.module._audio_conf if model_is_cuda else model._audio_conf
 
+    @staticmethod
+    def get_meta(model):
+        model_is_cuda = next(model.parameters()).is_cuda
+        m = model.module if model_is_cuda else model
+        meta = {
+            "version": m._version,
+            "hidden_size": m._hidden_size,
+            "hidden_layers": m._hidden_layers,
+            "rnn_type": supported_rnns_inv[m._rnn_type]
+        }
+        return meta
+
 
 if __name__ == '__main__':
     import os.path
