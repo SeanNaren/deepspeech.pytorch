@@ -24,7 +24,7 @@ beam_args.add_argument('--beam_width', default=10, type=int, help='Beam width to
 beam_args.add_argument('--top_paths', default=1, type=int, help='Number of paths to return')
 beam_args.add_argument('--lm_path', default=None, type=str,
                        help='Path to an (optional) kenlm language model for use with beam search (req\'d with trie)')
-beam_args.add_argument('--trie_path', default=None, type=str,
+beam_args.add_argument('--dict_path', default=None, type=str,
                        help='Path to an (optional) trie dictionary for use with beam search (req\'d with LM)')
 beam_args.add_argument('--lm_alpha', default=1.9, type=float, help='Language model weight')
 beam_args.add_argument('--lm_beta', default=0, type=float, help='Language model word bonus (all words)')
@@ -50,11 +50,11 @@ def word_decode(decoder, data, time_div=50, window=5, model=None):
             },
             "language_model": {
                 "name": os.path.basename(args.lm_path) if args.lm_path else None,
-                "dict": os.path.basename(args.trie_path) if args.trie_path else None
+                "dict": os.path.basename(args.dict_path) if args.dict_path else None
             },
             "decoder": {
                 "lm": args.lm_path is not None,
-                "dict": args.trie_path is not None,
+                "dict": args.dict_path is not None,
                 "alpha": args.lm_alpha if args.lm_path is not None else None,
                 "beta": args.lm_beta if args.lm_path is not None else None,
                 "type": args.decoder,
@@ -102,7 +102,7 @@ if __name__ == '__main__':
         decoder = BeamCTCDecoder(labels, beam_width=args.beam_width, top_paths=args.top_paths,
                                  space_index=labels.index(' '),
                                  blank_index=labels.index('_'), lm_path=args.lm_path,
-                                 trie_path=args.trie_path, lm_alpha=args.lm_alpha, lm_beta=args.lm_beta,
+                                 dict_path=args.dict_path, lm_alpha=args.lm_alpha, lm_beta=args.lm_beta,
                                  label_size=args.label_size, label_margin=args.label_margin)
     else:
         decoder = GreedyDecoder(labels, space_index=labels.index(' '), blank_index=labels.index('_'))

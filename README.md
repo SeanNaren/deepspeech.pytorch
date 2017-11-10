@@ -256,7 +256,7 @@ By default, `test.py` and `transcribe.py` use a `GreedyDecoder` which picks the 
 A beam search decoder can optionally be used with the installation of the `ctcdecode` library as described in the Installation section. The `test` and `transcribe` scripts have a `--decoder` argument. To use the beam decoder, add `--decoder beam`. The beam decoder enables additional decoding parameters:
 - **beam_width** how many beams to consider at each timestep
 - **lm_path** optional binary KenLM language model to use for decoding
-- **trie_path** trie describing lexicon. required if `lm_path` is supplied. May also be used sans `lm_path` for dictionary decoding
+- **dict_path** dictionary describing lexicon. required if `lm_path` is supplied. May also be used sans `lm_path` for dictionary decoding
 - **lm_alpha** weight for language model
 - **lm_beta** bonus weight for words
 - **label_size** Label selection size controls how many items in each beam are passed through to the beam scorer
