@@ -31,11 +31,14 @@ class Decoder(object):
         space_index (int, optional): index for the space ' ' character. Defaults to 28.
     """
 
-    def __init__(self, labels, blank_index=0, space_index=28):
+    def __init__(self, labels, blank_index=0):
         # e.g. labels = "_'ABCDEFGHIJKLMNOPQRSTUVWXYZ#"
         self.labels = labels
         self.int_to_char = dict([(i, c) for (i, c) in enumerate(labels)])
         self.blank_index = blank_index
+        space_index = len(labels)  # To prevent errors in decode, we add an out of bounds index for the space
+        if ' ' in labels:
+            space_index = labels.index(' ')
         self.space_index = space_index
 
     def wer(self, s1, s2):
@@ -66,6 +69,7 @@ class Decoder(object):
             s1 (string): space-separated sentence
             s2 (string): space-separated sentence
         """
+        s1, s2, = s1.replace(' ', ''), s2.replace(' ', '')
         return Lev.distance(s1, s2)
 
     def decode(self, probs, sizes=None):
@@ -84,43 +88,40 @@ class Decoder(object):
 
 
 class BeamCTCDecoder(Decoder):
-    def __init__(self, labels, beam_width=20, top_paths=1, blank_index=0, space_index=28, lm_path=None, dict_path=None,
-                 lm_alpha=None, lm_beta=None, label_size=0, label_margin=-1.0):
-        super(BeamCTCDecoder, self).__init__(labels, blank_index=blank_index, space_index=space_index)
-        self._beam_width = beam_width
-        self._top_n = top_paths
-
+    def __init__(self, labels, lm_path=None, alpha=0, beta=0, cutoff_top_n=40, cutoff_prob=1.0, beam_width=100,
+                 num_processes=4, blank_index=0):
+        super(BeamCTCDecoder, self).__init__(labels)
         try:
-            from ctcdecode import CTCBeamDecoder, Scorer, KenLMScorer, DictScorer
+            from ctcdecode import CTCBeamDecoder
         except ImportError:
-            raise ImportError("BeamCTCDecoder requires ctcdecode package.")
-        if lm_path is not None:
-            scorer = KenLMScorer(labels, lm_path, dict_path, blank_index, space_index)
-            scorer.set_lm_weight(lm_alpha)
-            scorer.set_word_weight(lm_beta)
-        elif lm_path is None and dict_path is not None:
-            scorer = DictScorer(labels, dict_path, blank_index, space_index)
-        else:
-            scorer = Scorer()
-        self._decoder = CTCBeamDecoder(scorer, labels, top_paths=top_paths, beam_width=beam_width,
-                                       blank_index=blank_index, space_index=space_index)
-        self._decoder.set_label_selection_parameters(label_size, label_margin)
+            raise ImportError("BeamCTCDecoder requires paddledecoder package.")
+        self._decoder = CTCBeamDecoder(labels, lm_path, alpha, beta, cutoff_top_n, cutoff_prob, beam_width,
+                                       num_processes, blank_index)
 
     def convert_to_strings(self, out, seq_len):
         results = []
-        for p, paths in enumerate(out):
+        for b, batch in enumerate(out):
             utterances = []
-            for u, utt in enumerate(paths):
-                utterances.append(''.join(map(lambda x: self.int_to_char[x], utt[0:seq_len[p][u]])))
+            for p, utt in enumerate(batch):
+                size = seq_len[b][p]
+                if size > 0:
+                    transcript = ''.join(map(lambda x: self.int_to_char[x], utt[0:size]))
+                else:
+                    transcript = ''
+                utterances.append(transcript)
             results.append(utterances)
         return results
 
     def convert_tensor(self, offsets, sizes):
         results = []
-        for p, paths in enumerate(offsets):
+        for b, batch in enumerate(offsets):
             utterances = []
-            for u, utt in enumerate(paths):
-                utterances.append(utt[0:sizes[p][u]].numpy().tolist())
+            for p, utt in enumerate(batch):
+                size = sizes[b][p]
+                if sizes[b][p] > 0:
+                    utterances.append(utt[0:size])
+                else:
+                    utterances.append(torch.IntTensor())
             results.append(utterances)
         return results
 
@@ -133,26 +134,18 @@ class BeamCTCDecoder(Decoder):
             sizes: Size of each sequence in the mini-batch
         Returns:
             string: sequences of the model's best guess for the transcription
-            offsets: offset information per character in each string
-            conf: confidence scores for each transcription
-            char_probs: character probabilities for each transcription
         """
-        sizes = sizes.cpu() if sizes is not None else None
-        # out is path x batch x seq_len
-        # conf is path x batch
-        # seq_len is path x batch
-        # offsets is path x batch x seq_len
-        out, conf, seq_lens, offsets, char_probs = self._decoder.decode(probs.cpu(), sizes)
+        probs = probs.cpu().transpose(0, 1).contiguous()
+        out, scores, offsets, seq_lens = self._decoder.decode(probs)
 
         strings = self.convert_to_strings(out, seq_lens)
         offsets = self.convert_tensor(offsets, seq_lens)
-        char_probs = self.convert_tensor(char_probs, seq_lens)
-        return strings, offsets, conf.numpy(), char_probs
+        return strings, offsets
 
 
 class GreedyDecoder(Decoder):
-    def __init__(self, labels, blank_index=0, space_index=28):
-        super(GreedyDecoder, self).__init__(labels, blank_index=blank_index, space_index=space_index)
+    def __init__(self, labels, blank_index=0):
+        super(GreedyDecoder, self).__init__(labels, blank_index)
         self._top_n = 1
 
     def convert_to_strings(self, sequences, sizes=None, remove_repetitions=False, return_offsets=False):
@@ -162,7 +155,7 @@ class GreedyDecoder(Decoder):
         for x in xrange(len(sequences)):
             seq_len = sizes[x] if sizes is not None else len(sequences[x])
             string, string_offsets = self.process_string(sequences[x], seq_len, remove_repetitions)
-            strings.append(string)
+            strings.append([string])  # We only return one path
             if return_offsets:
                 offsets.append(string_offsets)
         if return_offsets:
@@ -202,4 +195,4 @@ class GreedyDecoder(Decoder):
         _, max_probs = torch.max(probs.transpose(0, 1), 2)
         strings, offsets = self.convert_to_strings(max_probs.view(max_probs.size(0), max_probs.size(1)), sizes,
                                                    remove_repetitions=True, return_offsets=True)
-        return [strings], offsets, None, None
+        return strings, offsets

@@ -316,8 +316,9 @@ if __name__ == '__main__':
             target_strings = decoder.convert_to_strings(split_targets)
             wer, cer = 0, 0
             for x in range(len(target_strings)):
-                wer += decoder.wer(decoded_output[0][x], target_strings[x]) / float(len(target_strings[x].split()))
-                cer += decoder.cer(decoded_output[0][x], target_strings[x]) / float(len(target_strings[x]))
+                transcript, reference = decoded_output[x][0], target_strings[x][0]
+                wer += decoder.wer(transcript, reference) / float(len(reference.split()))
+                cer += decoder.cer(transcript, reference) / float(len(reference))
             total_cer += cer
             total_wer += wer
 
