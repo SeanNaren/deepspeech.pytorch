@@ -157,7 +157,7 @@ class GreedyDecoder(Decoder):
             string, string_offsets = self.process_string(sequences[x], seq_len, remove_repetitions)
             strings.append([string])  # We only return one path
             if return_offsets:
-                offsets.append([string_offsets])
+                offsets.append(torch.IntTensor([string_offsets]))
         if return_offsets:
             return strings, offsets
         else:
