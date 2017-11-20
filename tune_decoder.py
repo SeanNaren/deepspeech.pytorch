@@ -1,17 +1,13 @@
-import json
 import argparse
-import numpy as np
-import torch
+import json
 import sys
-
 from multiprocessing import Pool
 
-from torch.autograd import Variable
-from tqdm import tqdm
-
-from decoder import GreedyDecoder, BeamCTCDecoder
+import numpy as np
+import torch
 
 from data.data_loader import SpectrogramDataset, AudioDataLoader
+from decoder import GreedyDecoder, BeamCTCDecoder
 from model import DeepSpeech
 
 parser = argparse.ArgumentParser(description='DeepSpeech transcription')
@@ -26,8 +22,6 @@ beam_args = parser.add_argument_group("Beam Decode Options", "Configurations opt
 beam_args.add_argument('--beam_width', default=10, type=int, help='Beam width to use')
 beam_args.add_argument('--lm_path', default=None, type=str,
                        help='Path to an (optional) kenlm language model for use with beam search (req\'d with trie)')
-beam_args.add_argument('--dict_path', default=None, type=str,
-                       help='Path to an (optional) trie dictionary for use with beam search (req\'d with LM)')
 beam_args.add_argument('--lm_alpha_from', default=1, type=float, help='Language model weight start tuning')
 beam_args.add_argument('--lm_alpha_to', default=3.2, type=float, help='Language model weight end tuning')
 beam_args.add_argument('--lm_beta_from', default=0.0, type=float,
@@ -36,10 +30,11 @@ beam_args.add_argument('--lm_beta_to', default=0.45, type=float,
                        help='Language model word bonus (all words) end tuning')
 beam_args.add_argument('--lm_num_alphas', default=45, type=float, help='Number of alpha candidates for tuning')
 beam_args.add_argument('--lm_num_betas', default=8, type=float, help='Number of beta candidates for tuning')
-beam_args.add_argument('--label_size', default=0, type=int, help='Label selection size controls how many items in '
-                                                                 'each beam are passed through to the beam scorer')
-beam_args.add_argument('--label_margin', default=-1, type=float, help='Controls difference between minimal input score '
-                                                                      'for an item to be passed to the beam scorer.')
+beam_args.add_argument('--cutoff_top_n', default=40, type=int,
+                       help='Cutoff number in pruning, only top cutoff_top_n characters with highest probs in '
+                            'vocabulary will be used in beam search, default 40.')
+beam_args.add_argument('--cutoff_prob', default=1.0, type=float,
+                       help='Cutoff probability in pruning,default 1.0, no pruning.')
 
 args = parser.parse_args()
 
@@ -47,11 +42,10 @@ args = parser.parse_args()
 def decode_dataset(logits, test_dataset, batch_size, lm_alpha, lm_beta, mesh_x, mesh_y, labels):
     print("Beginning decode for {}, {}".format(lm_alpha, lm_beta))
     test_loader = AudioDataLoader(test_dataset, batch_size=batch_size, num_workers=0)
-    target_decoder = GreedyDecoder(labels, space_index=labels.index(' '), blank_index=labels.index('_'))
-    decoder = BeamCTCDecoder(labels, beam_width=args.beam_width, top_paths=1, space_index=labels.index(' '),
+    target_decoder = GreedyDecoder(labels, blank_index=labels.index('_'))
+    decoder = BeamCTCDecoder(labels, beam_width=args.beam_width, cutoff_top_n=args.cutoff_top_n,
                              blank_index=labels.index('_'), lm_path=args.lm_path,
-                             dict_path=args.dict_path, lm_alpha=lm_alpha, lm_beta=lm_beta,
-                             label_size=args.label_size, label_margin=args.label_margin)
+                             alpha=lm_alpha, beta=lm_beta, num_processes=1)
     total_cer, total_wer = 0, 0
     for i, (data) in enumerate(test_loader):
         inputs, targets, input_percentages, target_sizes = data
@@ -70,8 +64,9 @@ def decode_dataset(logits, test_dataset, batch_size, lm_alpha, lm_beta, mesh_x, 
         target_strings = target_decoder.convert_to_strings(split_targets)
         wer, cer = 0, 0
         for x in range(len(target_strings)):
-            wer_inst = decoder.wer(decoded_output[0][x], target_strings[x]) / float(len(target_strings[x].split()))
-            cer_inst = decoder.cer(decoded_output[0][x], target_strings[x]) / float(len(target_strings[x]))
+            transcript, reference = decoded_output[x][0], target_strings[x][0]
+            wer_inst = decoder.wer(transcript, reference) / float(len(reference.split()))
+            cer_inst = decoder.cer(transcript, reference) / float(len(reference))
             wer += wer_inst
             cer += cer_inst
         total_cer += cer

@@ -5,6 +5,7 @@ import os
 import time
 
 import torch
+from tqdm import tqdm
 from torch.autograd import Variable
 from warpctc_pytorch import CTCLoss
 from data.data_loader import AudioDataLoader, SpectrogramDataset, BucketingSampler
@@ -58,6 +59,7 @@ parser.add_argument('--no_shuffle', dest='no_shuffle', action='store_true',
                     help='Turn off shuffling and sample from dataset based on sequence length (smallest to largest)')
 parser.add_argument('--no_bidirectional', dest='bidirectional', action='store_false', default=True,
                     help='Turn off bi-directional RNNs, introduces lookahead convolution')
+
 
 def to_np(x):
     return x.data.cpu().numpy()
@@ -292,7 +294,7 @@ if __name__ == '__main__':
         start_iter = 0  # Reset start iteration for next epoch
         total_cer, total_wer = 0, 0
         model.eval()
-        for i, (data) in enumerate(test_loader):  # test
+        for i, (data) in tqdm(enumerate(test_loader), total=len(test_loader)):
             inputs, targets, input_percentages, target_sizes = data
 
             inputs = Variable(inputs, volatile=True)
@@ -312,12 +314,13 @@ if __name__ == '__main__':
             seq_length = out.size(0)
             sizes = input_percentages.mul_(int(seq_length)).int()
 
-            decoded_output, _, _, _ = decoder.decode(out.data, sizes)
+            decoded_output, _ = decoder.decode(out.data, sizes)
             target_strings = decoder.convert_to_strings(split_targets)
             wer, cer = 0, 0
             for x in range(len(target_strings)):
-                wer += decoder.wer(decoded_output[0][x], target_strings[x]) / float(len(target_strings[x].split()))
-                cer += decoder.cer(decoded_output[0][x], target_strings[x]) / float(len(target_strings[x]))
+                transcript, reference = decoded_output[x][0], target_strings[x][0]
+                wer += decoder.wer(transcript, reference) / float(len(reference.split()))
+                cer += decoder.cer(transcript, reference) / float(len(reference))
             total_cer += cer
             total_wer += wer
 

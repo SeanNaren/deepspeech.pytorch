@@ -39,11 +39,11 @@ class SequenceWise(nn.Module):
         return tmpstr
 
 
-class InferenceBatchLogSoftmax(nn.Module):
+class InferenceBatchSoftmax(nn.Module):
     def forward(self, input_):
         if not self.training:
             batch_size = input_.size()[0]
-            return torch.stack([F.log_softmax(input_[i]) for i in range(batch_size)], 0)
+            return torch.stack([F.softmax(input_[i]) for i in range(batch_size)], 0)
         else:
             return input_
 
@@ -167,7 +167,7 @@ class DeepSpeech(nn.Module):
         self.fc = nn.Sequential(
             SequenceWise(fully_connected),
         )
-        self.inference_log_softmax = InferenceBatchLogSoftmax()
+        self.inference_softmax = InferenceBatchSoftmax()
 
     def forward(self, x):
         x = self.conv(x)
@@ -183,8 +183,8 @@ class DeepSpeech(nn.Module):
 
         x = self.fc(x)
         x = x.transpose(0, 1)
-        # identity in training mode, logsoftmax in eval mode
-        x = self.inference_log_softmax(x)
+        # identity in training mode, softmax in eval mode
+        x = self.inference_softmax(x)
         return x
 
     @classmethod
