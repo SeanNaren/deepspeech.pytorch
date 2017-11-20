@@ -146,7 +146,6 @@ class BeamCTCDecoder(Decoder):
 class GreedyDecoder(Decoder):
     def __init__(self, labels, blank_index=0):
         super(GreedyDecoder, self).__init__(labels, blank_index)
-        self._top_n = 1
 
     def convert_to_strings(self, sequences, sizes=None, remove_repetitions=False, return_offsets=False):
         """Given a list of numeric sequences, returns the corresponding strings"""
@@ -157,7 +156,7 @@ class GreedyDecoder(Decoder):
             string, string_offsets = self.process_string(sequences[x], seq_len, remove_repetitions)
             strings.append([string])  # We only return one path
             if return_offsets:
-                offsets.append(torch.IntTensor([string_offsets]))
+                offsets.append([string_offsets])
         if return_offsets:
             return strings, offsets
         else:
@@ -178,7 +177,7 @@ class GreedyDecoder(Decoder):
                 else:
                     string = string + char
                     offsets.append(i)
-        return string, offsets
+        return string, torch.IntTensor(offsets)
 
     def decode(self, probs, sizes=None):
         """

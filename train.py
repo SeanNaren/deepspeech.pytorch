@@ -5,6 +5,7 @@ import os
 import time
 
 import torch
+from tqdm import tqdm
 from torch.autograd import Variable
 from warpctc_pytorch import CTCLoss
 from data.data_loader import AudioDataLoader, SpectrogramDataset, BucketingSampler
@@ -293,7 +294,7 @@ if __name__ == '__main__':
         start_iter = 0  # Reset start iteration for next epoch
         total_cer, total_wer = 0, 0
         model.eval()
-        for i, (data) in enumerate(test_loader):  # test
+        for i, (data) in tqdm(enumerate(test_loader), total=len(test_loader)):
             inputs, targets, input_percentages, target_sizes = data
 
             inputs = Variable(inputs, volatile=True)
