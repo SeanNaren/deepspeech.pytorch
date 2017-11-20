@@ -86,7 +86,7 @@ if __name__ == '__main__':
             output_data.append((out.data.cpu().numpy(), sizes.numpy()))
             continue
 
-        decoded_output, _, _, _ = decoder.decode(out.data, sizes)
+        decoded_output, _, = decoder.decode(out.data, sizes)
         target_strings = target_decoder.convert_to_strings(split_targets)
         wer, cer = 0, 0
         for x in range(len(target_strings)):
