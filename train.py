@@ -59,6 +59,7 @@ parser.add_argument('--no_shuffle', dest='no_shuffle', action='store_true',
 parser.add_argument('--no_bidirectional', dest='bidirectional', action='store_false', default=True,
                     help='Turn off bi-directional RNNs, introduces lookahead convolution')
 
+
 def to_np(x):
     return x.data.cpu().numpy()
 
@@ -312,7 +313,7 @@ if __name__ == '__main__':
             seq_length = out.size(0)
             sizes = input_percentages.mul_(int(seq_length)).int()
 
-            decoded_output, _, _, _ = decoder.decode(out.data, sizes)
+            decoded_output, _ = decoder.decode(out.data, sizes)
             target_strings = decoder.convert_to_strings(split_targets)
             wer, cer = 0, 0
             for x in range(len(target_strings)):
