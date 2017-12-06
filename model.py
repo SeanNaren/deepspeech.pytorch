@@ -43,7 +43,7 @@ class InferenceBatchSoftmax(nn.Module):
     def forward(self, input_):
         if not self.training:
             batch_size = input_.size()[0]
-            return torch.stack([F.softmax(input_[i]) for i in range(batch_size)], 0)
+            return torch.stack([F.softmax(input_[i], dim=1) for i in range(batch_size)], 0)
         else:
             return input_
 
