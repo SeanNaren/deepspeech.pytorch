@@ -60,6 +60,9 @@ parser.add_argument('--no_shuffle', dest='no_shuffle', action='store_true',
 parser.add_argument('--no_bidirectional', dest='bidirectional', action='store_false', default=True,
                     help='Turn off bi-directional RNNs, introduces lookahead convolution')
 
+torch.manual_seed(123456)
+torch.cuda.manual_seed_all(123456)
+
 
 def to_np(x):
     return x.data.cpu().numpy()
