@@ -9,6 +9,10 @@ from utils import create_manifest
 
 parser = argparse.ArgumentParser(description='Processes and downloads an4.')
 parser.add_argument('--target_dir', default='an4_dataset/', help='Path to save dataset')
+parser.add_argument('--min_duration', default=1, type=int,
+                    help='Prunes training samples shorter than the min duration (given in seconds, default 1)')
+parser.add_argument('--max_duration', default=15, type=int,
+                    help='Prunes training samples longer than the max duration (given in seconds, default 15)')
 args = parser.parse_args()
 
 
@@ -75,8 +79,8 @@ def main():
     train_path = args.target_dir + '/train/'
     test_path = args.target_dir + '/test/'
     print ('\n', 'Creating manifests...')
-    create_manifest(train_path, 'an4_train')
-    create_manifest(test_path, 'an4_val')
+    create_manifest(train_path, 'an4_train_manifest.csv', args.min_duration, args.max_duration)
+    create_manifest(test_path, 'an4_val_manifest.csv')
 
 
 if __name__ == '__main__':

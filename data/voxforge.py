@@ -17,7 +17,10 @@ parser = argparse.ArgumentParser(description='Processes and downloads VoxForge d
 parser.add_argument("--target_dir", default='voxforge_dataset/', type=str, help="Directory to store the dataset.")
 parser.add_argument('--sample_rate', default=16000,
                     type=int, help='Sample rate')
-
+parser.add_argument('--min_duration', default=1, type=int,
+                    help='Prunes training samples shorter than the min duration (given in seconds, default 1)')
+parser.add_argument('--max_duration', default=15, type=int,
+                    help='Prunes training samples longer than the max duration (given in seconds, default 15)')
 args = parser.parse_args()
 
 
@@ -92,4 +95,4 @@ if __name__ == '__main__':
     for f in tqdm(all_files, total=len(all_files)):
         prepare_sample(f.replace(".tgz", ""), VOXFORGE_URL_16kHz + '/' + f, target_dir)
     print('Creating manifests...')
-    create_manifest(target_dir, 'voxforge_train')
+    create_manifest(target_dir, 'voxforge_train_manifest.csv', args.min_duration, args.max_duration)
