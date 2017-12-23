@@ -24,8 +24,8 @@ LIBRI_SPEECH_URLS = {
     "val": ["http://www.openslr.org/resources/12/dev-clean.tar.gz",
             "http://www.openslr.org/resources/12/dev-other.tar.gz"],
 
-    "test": ["http://www.openslr.org/resources/12/test-clean.tar.gz",
-             "http://www.openslr.org/resources/12/test-other.tar.gz"]
+    "test_clean": ["http://www.openslr.org/resources/12/test-clean.tar.gz"],
+    "test_other": ["http://www.openslr.org/resources/12/test-other.tar.gz"]
 }
 
 
