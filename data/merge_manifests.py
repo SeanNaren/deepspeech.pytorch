@@ -4,67 +4,28 @@ import argparse
 import io
 import os
 
-import subprocess
-from tqdm import trange
+from tqdm import tqdm
+from utils import order_and_prune_files
 
 parser = argparse.ArgumentParser(description='Merges all manifest CSV files in specified folder.')
 parser.add_argument('--merge_dir', default='manifests/', help='Path to all manifest files you want to merge')
-parser.add_argument('--min_duration', default=-1, type=int,
-                    help='Optionally prunes any samples shorter than the min duration (given in seconds, default off)')
-parser.add_argument('--max_duration', default=-1, type=int,
-                    help='Optionally prunes any samples longer than the max duration (given in seconds, default off)')
+parser.add_argument('--min_duration', default=1, type=int,
+                    help='Prunes any samples shorter than the min duration (given in seconds, default 1)')
+parser.add_argument('--max_duration', default=15, type=int,
+                    help='Prunes any samples longer than the max duration (given in seconds, default 15)')
 parser.add_argument('--output_path', default='merged_manifest.csv', help='Output path to merged manifest')
 
 args = parser.parse_args()
 
-files = []
+file_paths = []
 for file in os.listdir(args.merge_dir):
     if file.endswith(".csv"):
         with open(os.path.join(args.merge_dir, file), 'r') as fh:
-            files += fh.readlines()
-
-prune_min = args.min_duration >= 0
-prune_max = args.max_duration >= 0
-if prune_min:
-    print("Pruning files with minimum duration %d" % (args.min_duration))
-if prune_max:
-    print("Pruning files with  maximum duration of %d" % (args.max_duration))
-
-new_files = []
-size = len(files)
-for x in trange(size):
-    file_path = files[x]
-    file_path = file_path.split(',')[0]
-    output = subprocess.check_output(
-        ['soxi -D \"%s\"' % file_path.strip()],
-        shell=True
-    )
-    duration = float(output)
-    if prune_min or prune_max:
-        duration_fit = True
-        if prune_min:
-            if duration < args.min_duration:
-                duration_fit = False
-        if prune_max:
-            if duration > args.max_duration:
-                duration_fit = False
-        if duration_fit:
-            new_files.append((files[x], duration))
-    else:
-        new_files.append((files[x], duration))
-
-print("\nSorting files by length...")
-
-
-def func(element):
-    return element[1]
-
-
-new_files.sort(key=func)
-
-print("Saving new manifest...")
-
-with io.FileIO(args.output_path, 'w') as f:
-    for file_path in new_files:
-        sample = file_path[0].strip() + '\n'
-        f.write(sample.encode('utf-8'))
+            file_paths += fh.readlines()
+file_paths = [file_path.split(',')[0] for file_path in file_paths]
+file_paths = order_and_prune_files(file_paths, args.min_duration, args.max_duration)
+with io.FileIO(args.output_path, "w") as file:
+    for wav_path in tqdm(file_paths, total=len(file_paths)):
+        transcript_path = wav_path.replace('/wav/', '/txt/').replace('.wav', '.txt')
+        sample = os.path.abspath(wav_path) + ',' + os.path.abspath(transcript_path) + '\n'
+        file.write(sample.encode('utf-8'))
