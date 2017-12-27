@@ -20,7 +20,7 @@ windows = {'hamming': scipy.signal.hamming, 'hann': scipy.signal.hann, 'blackman
 
 
 def load_audio(path):
-    sound, _ = torchaudio.load(path)
+    sound, _ = torchaudio.load(path, normalization=True)
     sound = sound.numpy()
     if len(sound.shape) > 1:
         if sound.shape[1] == 1:
