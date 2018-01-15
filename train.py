@@ -141,6 +141,15 @@ if __name__ == '__main__':
                                     momentum=args.momentum, nesterov=True)
         if not args.finetune:  # Don't want to restart training
             optimizer.load_state_dict(package['optim_dict'])
+
+            # Temporary fix for pytorch #2830 & #1442 while pull request #3658 in not incorporated in a release
+            # TODO : remove when a new release of pytorch include pull request #3658
+            if args.cuda:
+                for state in optimizer.state.values():
+                    for k, v in state.items():
+                        if torch.is_tensor(v):
+                            state[k] = v.cuda()
+
             start_epoch = int(package.get('epoch', 1)) - 1  # Index start at 0 for training
             start_iter = package.get('iteration', None)
             if start_iter is None:
