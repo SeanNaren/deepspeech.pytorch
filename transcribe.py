@@ -36,13 +36,12 @@ beam_args.add_argument('--lm_workers', default=1, type=int, help='Number of LM p
 args = parser.parse_args()
 
 
-def decode_results(decoded_output, decoded_offsets):
+def decode_results(model, decoded_output, decoded_offsets):
     results = {
         "output": [],
         "_meta": {
             "acoustic_model": {
-                "name": os.path.basename(args.model_path),
-                **DeepSpeech.get_meta(model)
+                "name": os.path.basename(args.model_path)
             },
             "language_model": {
                 "name": os.path.basename(args.lm_path) if args.lm_path else None,
@@ -55,6 +54,7 @@ def decode_results(decoded_output, decoded_offsets):
             }
         }
     }
+    results['_meta']['acoustic_model'].update(DeepSpeech.get_meta(model))
 
     for b in range(len(decoded_output)):
         for pi in range(min(args.top_paths, len(decoded_output[b]))):
@@ -88,4 +88,4 @@ if __name__ == '__main__':
     out = model(Variable(spect, volatile=True))
     out = out.transpose(0, 1)  # TxNxH
     decoded_output, decoded_offsets = decoder.decode(out.data)
-    print(json.dumps(decode_results(decoded_output, decoded_offsets)))
+    print(json.dumps(decode_results(model, decoded_output, decoded_offsets)))
