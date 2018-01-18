@@ -7,16 +7,16 @@ from utils import create_manifest
 import shutil
 
 parser = argparse.ArgumentParser(description='Processes and downloads LibriSpeech dataset.')
-parser.add_argument("--target_dir", default='LibriSpeech_dataset/', type=str, help="Directory to store the dataset.")
-parser.add_argument('--sample_rate', default=16000, type=int, help='Sample rate')
-parser.add_argument('--files_to_use', default="train-clean-100.tar.gz,"
+parser.add_argument("--target-dir", default='LibriSpeech_dataset/', type=str, help="Directory to store the dataset.")
+parser.add_argument('--sample-rate', default=16000, type=int, help='Sample rate')
+parser.add_argument('--files-to-use', default="train-clean-100.tar.gz,"
                                               "train-clean-360.tar.gz,train-other-500.tar.gz,"
                                               "dev-clean.tar.gz,dev-other.tar.gz,"
                                               "test-clean.tar.gz,test-other.tar.gz", type=str,
                     help='list of file names to download')
-parser.add_argument('--min_duration', default=1, type=int,
+parser.add_argument('--min-duration', default=1, type=int,
                     help='Prunes training samples shorter than the min duration (given in seconds, default 1)')
-parser.add_argument('--max_duration', default=15, type=int,
+parser.add_argument('--max-duration', default=15, type=int,
                     help='Prunes training samples longer than the max duration (given in seconds, default 15)')
 args = parser.parse_args()
 

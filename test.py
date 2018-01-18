@@ -10,31 +10,31 @@ from data.data_loader import SpectrogramDataset, AudioDataLoader
 from model import DeepSpeech
 
 parser = argparse.ArgumentParser(description='DeepSpeech transcription')
-parser.add_argument('--model_path', default='models/deepspeech_final.pth.tar',
+parser.add_argument('--model-path', default='models/deepspeech_final.pth.tar',
                     help='Path to model file created by training')
 parser.add_argument('--cuda', action="store_true", help='Use cuda to test model')
-parser.add_argument('--test_manifest', metavar='DIR',
+parser.add_argument('--test-manifest', metavar='DIR',
                     help='path to validation manifest csv', default='data/test_manifest.csv')
-parser.add_argument('--batch_size', default=20, type=int, help='Batch size for training')
-parser.add_argument('--num_workers', default=4, type=int, help='Number of workers used in dataloading')
+parser.add_argument('--batch-size', default=20, type=int, help='Batch size for training')
+parser.add_argument('--num-workers', default=4, type=int, help='Number of workers used in dataloading')
 parser.add_argument('--decoder', default="greedy", choices=["greedy", "beam", "none"], type=str, help="Decoder to use")
 parser.add_argument('--verbose', action="store_true", help="print out decoded output and error of each sample")
 no_decoder_args = parser.add_argument_group("No Decoder Options", "Configuration options for when no decoder is "
                                                                   "specified")
-no_decoder_args.add_argument('--output_path', default=None, type=str, help="Where to save raw acoustic output")
+no_decoder_args.add_argument('--output-path', default=None, type=str, help="Where to save raw acoustic output")
 beam_args = parser.add_argument_group("Beam Decode Options", "Configurations options for the CTC Beam Search decoder")
-beam_args.add_argument('--top_paths', default=1, type=int, help='number of beams to return')
-beam_args.add_argument('--beam_width', default=10, type=int, help='Beam width to use')
-beam_args.add_argument('--lm_path', default=None, type=str,
+beam_args.add_argument('--top-paths', default=1, type=int, help='number of beams to return')
+beam_args.add_argument('--beam-width', default=10, type=int, help='Beam width to use')
+beam_args.add_argument('--lm-path', default=None, type=str,
                        help='Path to an (optional) kenlm language model for use with beam search (req\'d with trie)')
 beam_args.add_argument('--alpha', default=0.8, type=float, help='Language model weight')
 beam_args.add_argument('--beta', default=1, type=float, help='Language model word bonus (all words)')
-beam_args.add_argument('--cutoff_top_n', default=40, type=int,
+beam_args.add_argument('--cutoff-top-n', default=40, type=int,
                        help='Cutoff number in pruning, only top cutoff_top_n characters with highest probs in '
                             'vocabulary will be used in beam search, default 40.')
-beam_args.add_argument('--cutoff_prob', default=1.0, type=float,
+beam_args.add_argument('--cutoff-prob', default=1.0, type=float,
                        help='Cutoff probability in pruning,default 1.0, no pruning.')
-beam_args.add_argument('--lm_workers', default=1, type=int, help='Number of LM processes to use')
+beam_args.add_argument('--lm-workers', default=1, type=int, help='Number of LM processes to use')
 args = parser.parse_args()
 
 if __name__ == '__main__':

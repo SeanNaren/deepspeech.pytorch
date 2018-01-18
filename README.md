@@ -12,7 +12,7 @@ Creates a network based on the [DeepSpeech2](http://arxiv.org/pdf/1512.02595v1.p
 * Noise injection for online training to improve noise robustness.
 * Audio augmentation to improve noise robustness.
 * Easy start/stop capabilities in the event of crash or hard stop during training.
-* Visdom/Tensorboard support for visualising training graphs.
+* Visdom/Tensorboard support for visualizing training graphs.
 
 # Installation
 
@@ -102,7 +102,7 @@ In order to do this you must create the following folder structure and put the c
 
 ```
 cd data/
-mkdir LibriSpeech/ # This can be anything as long as you specify the directory path as --target_dir when running the librispeech.py script
+mkdir LibriSpeech/ # This can be anything as long as you specify the directory path as --target-dir when running the librispeech.py script
 mkdir LibriSpeech/val/
 mkdir LibriSpeech/test/
 mkdir LibriSpeech/train/
@@ -115,7 +115,7 @@ Optionally you can specify the exact librispeech files you want if you don't wan
 
 ```
 cd data/
-python librispeech.py --files_to_use "train-clean-100.tar.gz, train-clean-360.tar.gz,train-other-500.tar.gz, dev-clean.tar.gz,dev-other.tar.gz, test-clean.tar.gz,test-other.tar.gz"
+python librispeech.py --files-to-use "train-clean-100.tar.gz, train-clean-360.tar.gz,train-other-500.tar.gz, dev-clean.tar.gz,dev-other.tar.gz, test-clean.tar.gz,test-other.tar.gz"
 ```
 
 ### Custom Dataset
@@ -138,27 +138,27 @@ containing all the manifests you want to merge. You can also prune short and lon
 
 ```
 cd data/
-python merge_manifests.py --output_path merged_manifest.csv --merge_dir all_manifests/ --min_duration 1 --max_duration 15 # durations in seconds
+python merge_manifests.py --output-path merged_manifest.csv --merge-dir all-manifests/ --min-duration 1 --max-duration 15 # durations in seconds
 ```
 
 ## Training
 
 ```
-python train.py --train_manifest data/train_manifest.csv --val_manifest data/val_manifest.csv
+python train.py --train-manifest data/train_manifest.csv --val-manifest data/val_manifest.csv
 ```
 
 Use `python train.py --help` for more parameters and options.
 
-There is also [Visdom](https://github.com/facebookresearch/visdom) support to visualise training. Once a server has been started, to use:
+There is also [Visdom](https://github.com/facebookresearch/visdom) support to visualize training. Once a server has been started, to use:
 
 ```
 python train.py --visdom
 ```
 
-There is also [Tensorboard](https://github.com/lanpa/tensorboard-pytorch) support to visualise training. Follow the instructions to set up. To use:
+There is also [Tensorboard](https://github.com/lanpa/tensorboard-pytorch) support to visualize training. Follow the instructions to set up. To use:
 
 ```
-python train.py --tensorboard --logdir log_dir/ # Make sure the tensorboard instance is made pointing to this log directory
+python train.py --tensorboard --logdir log_dir/ # Make sure the Tensorboard instance is made pointing to this log directory
 ```
 
 For both visualisation tools, you can add your own name to the run by changing the `--id` parameter when training.
@@ -176,13 +176,13 @@ Applies small changes to the tempo and gain when loading audio to increase robus
 Dynamically adds noise into the training data to increase robustness. To use, first fill a directory up with all the noise files you want to sample from.
 The dataloader will randomly pick samples from this directory.
 
-To enable noise injection, use the `--noise_dir /path/to/noise/dir/` to specify where your noise files are. There are a few noise parameters to tweak, such as
-`--noise_prob` to determine the probability that noise is added, and the `--noise_min`, `--noise_max` parameters to determine the minimum and maximum noise to add in training.
+To enable noise injection, use the `--noise-dir /path/to/noise/dir/` to specify where your noise files are. There are a few noise parameters to tweak, such as
+`--noise_prob` to determine the probability that noise is added, and the `--noise-min`, `--noise-max` parameters to determine the minimum and maximum noise to add in training.
 
 Included is a script to inject noise into an audio file to hear what different noise levels/files would sound like. Useful for curating the noise dataset.
 
 ```
-python noise_inject.py --input_path /path/to/input.wav --noise_path /path/to/noise.wav --output_path /path/to/input_injected.wav --noise_level 0.5 # higher levels means more noise
+python noise_inject.py --input-path /path/to/input.wav --noise-path /path/to/noise.wav --output-path /path/to/input_injected.wav --noise-level 0.5 # higher levels means more noise
 ```
 
 ### Checkpoints
@@ -197,7 +197,7 @@ python train.py --checkpoint
 To enable checkpoints every N batches through the epoch as well as epoch saving:
 
 ```
-python train.py --checkpoint --checkpoint_per_batch N # N is the number of batches to wait till saving a checkpoint at this batch.
+python train.py --checkpoint --checkpoint-per-batch N # N is the number of batches to wait till saving a checkpoint at this batch.
 ```
 
 Note for the batch checkpointing system to work, you cannot change the batch size when loading a checkpointed model from it's original training
@@ -206,13 +206,13 @@ run.
 To continue from a checkpointed model that has been saved:
 
 ```
-python train.py --continue_from models/deepspeech_checkpoint_epoch_N_iter_N.pth.tar
+python train.py --continue-from models/deepspeech_checkpoint_epoch_N_iter_N.pth.tar
 ```
 
 This continues from the same training state as well as recreates the visdom graph to continue from if enabled.
 
 If you would like to start from a previous checkpoint model but not continue training, add the `--finetune` flag to restart training
-from the `--continue_from` weights.
+from the `--continue-from` weights.
 
 ### Choosing batch sizes
 
@@ -220,7 +220,7 @@ Included is a script that can be used to benchmark whether training can occur on
 sizes you can use. To use:
 
 ```
-python benchmark.py --batch_size 32
+python benchmark.py --batch-size 32
 ```
 
 Use the flag `--help` to see other parameters that can be used with the script.
@@ -230,7 +230,7 @@ Use the flag `--help` to see other parameters that can be used with the script.
 Saved models contain the metadata of their training process. To see the metadata run the below command:
 
 ```
-python model.py --model_path models/deepspeech.pth.tar
+python model.py --model-path models/deepspeech.pth.tar
 ```
 
 To also note, there is no final softmax layer on the model as when trained, warp-ctc does this softmax internally. This will have to also be implemented in complex decoders if anything is built on top of the model, so take this into consideration!
@@ -240,13 +240,13 @@ To also note, there is no final softmax layer on the model as when trained, warp
 To evaluate a trained model on a test set (has to be in the same format as the training set):
 
 ```
-python test.py --model_path models/deepspeech.pth.tar --test_manifest /path/to/test_manifest.csv --cuda
+python test.py --model-path models/deepspeech.pth.tar --test-manifest /path/to/test_manifest.csv --cuda
 ```
 
 An example script to output a transcription has been provided:
 
 ```
-python transcribe.py --model_path models/deepspeech.pth.tar --audio_path /path/to/audio.wav
+python transcribe.py --model-path models/deepspeech.pth.tar --audio-path /path/to/audio.wav
 ```
 
 ### Alternate Decoders

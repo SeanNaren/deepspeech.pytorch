@@ -8,10 +8,10 @@ import wget
 from utils import create_manifest
 
 parser = argparse.ArgumentParser(description='Processes and downloads an4.')
-parser.add_argument('--target_dir', default='an4_dataset/', help='Path to save dataset')
-parser.add_argument('--min_duration', default=1, type=int,
+parser.add_argument('--target-dir', default='an4_dataset/', help='Path to save dataset')
+parser.add_argument('--min-duration', default=1, type=int,
                     help='Prunes training samples shorter than the min duration (given in seconds, default 1)')
-parser.add_argument('--max_duration', default=15, type=int,
+parser.add_argument('--max-duration', default=15, type=int,
                     help='Prunes training samples longer than the max duration (given in seconds, default 15)')
 args = parser.parse_args()
 
