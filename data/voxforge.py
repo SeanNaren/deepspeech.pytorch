@@ -14,12 +14,12 @@ from utils import create_manifest
 VOXFORGE_URL_16kHz = 'http://www.repository.voxforge1.org/downloads/SpeechCorpus/Trunk/Audio/Main/16kHz_16bit/'
 
 parser = argparse.ArgumentParser(description='Processes and downloads VoxForge dataset.')
-parser.add_argument("--target_dir", default='voxforge_dataset/', type=str, help="Directory to store the dataset.")
-parser.add_argument('--sample_rate', default=16000,
+parser.add_argument("--target-dir", default='voxforge_dataset/', type=str, help="Directory to store the dataset.")
+parser.add_argument('--sample-rate', default=16000,
                     type=int, help='Sample rate')
-parser.add_argument('--min_duration', default=1, type=int,
+parser.add_argument('--min-duration', default=1, type=int,
                     help='Prunes training samples shorter than the min duration (given in seconds, default 1)')
-parser.add_argument('--max_duration', default=15, type=int,
+parser.add_argument('--max-duration', default=15, type=int,
                     help='Prunes training samples longer than the max duration (given in seconds, default 15)')
 args = parser.parse_args()
 

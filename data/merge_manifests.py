@@ -8,12 +8,12 @@ from tqdm import tqdm
 from utils import order_and_prune_files
 
 parser = argparse.ArgumentParser(description='Merges all manifest CSV files in specified folder.')
-parser.add_argument('--merge_dir', default='manifests/', help='Path to all manifest files you want to merge')
-parser.add_argument('--min_duration', default=1, type=int,
+parser.add_argument('--merge-dir', default='manifests/', help='Path to all manifest files you want to merge')
+parser.add_argument('--min-duration', default=1, type=int,
                     help='Prunes any samples shorter than the min duration (given in seconds, default 1)')
-parser.add_argument('--max_duration', default=15, type=int,
+parser.add_argument('--max-duration', default=15, type=int,
                     help='Prunes any samples longer than the max duration (given in seconds, default 15)')
-parser.add_argument('--output_path', default='merged_manifest.csv', help='Output path to merged manifest')
+parser.add_argument('--output-path', default='merged_manifest.csv', help='Output path to merged manifest')
 
 args = parser.parse_args()
 
