@@ -160,8 +160,24 @@ class SpectrogramDataset(Dataset, SpectrogramParser):
     def parse_transcript(self, transcript_path):
         with open(transcript_path, 'r') as transcript_file:
             transcript = transcript_file.read().replace('\n', '')
-        transcript = list(filter(None, [self.labels_map.get(x) for x in list(transcript)]))
-        return transcript
+        # Convert to self.char_map indexes
+        max_label_size = len(max(self.labels_map.keys(), key=(lambda x: len(x))))
+        result = []
+        i = 0
+        while i < len(transcript):
+            for j in range(max_label_size, 0, -1):
+                # If there is enough chars left in the transcript...
+                if len(transcript) - i >= j:
+                    label = self.labels_map.get(transcript[i:i+j])
+                    # If we found a label of that size...
+                    if label is not None:
+                        result.append(label)
+                        i += j
+                        break
+                    elif j == 1:
+                        # If we didn't find any label for this position, go to the next char anyway
+                        i += 1
+        return result
 
     def __len__(self):
         return self.size
