@@ -8,14 +8,14 @@ import subprocess
 from utils import create_manifest
 
 parser = argparse.ArgumentParser(description='Downloads and processes Mozilla Common Voice dataset.')
-parser.add_argument("--target_dir", default='CommonVoice_dataset/', type=str, help="Directory to store the dataset.")
-parser.add_argument("--tar_path", type=str, help="Path to the Common Voice *.tar file if downloaded (Optional).")
-parser.add_argument('--sample_rate', default=16000, type=int, help='Sample rate')
-parser.add_argument('--min_duration', default=1, type=int,
+parser.add_argument("--target-dir", default='CommonVoice_dataset/', type=str, help="Directory to store the dataset.")
+parser.add_argument("--tar-path", type=str, help="Path to the Common Voice *.tar file if downloaded (Optional).")
+parser.add_argument('--sample-rate', default=16000, type=int, help='Sample rate')
+parser.add_argument('--min-duration', default=1, type=int,
                     help='Prunes training samples shorter than the min duration (given in seconds, default 1)')
-parser.add_argument('--max_duration', default=15, type=int,
+parser.add_argument('--max-duration', default=15, type=int,
                     help='Prunes training samples longer than the max duration (given in seconds, default 15)')
-parser.add_argument('--files_to_process', default="cv-valid-dev.csv,cv-valid-test.csv,cv-valid-train.csv",
+parser.add_argument('--files-to-process', default="cv-valid-dev.csv,cv-valid-test.csv,cv-valid-train.csv",
                     type=str, help='list of *.csv file names to process')
 args = parser.parse_args()
 COMMON_VOICE_URL = "https://common-voice-data-download.s3.amazonaws.com/cv_corpus_v1.tar.gz"

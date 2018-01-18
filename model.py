@@ -286,7 +286,7 @@ if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser(description='DeepSpeech model information')
-    parser.add_argument('--model_path', default='models/deepspeech_final.pth.tar',
+    parser.add_argument('--model-path', default='models/deepspeech_final.pth.tar',
                         help='Path to model file created by training')
     args = parser.parse_args()
     package = torch.load(args.model_path, map_location=lambda storage, loc: storage)
