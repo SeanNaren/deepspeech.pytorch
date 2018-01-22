@@ -3,6 +3,7 @@ import argparse
 import wget
 import subprocess
 from utils import create_manifest
+import tarfile
 
 parser = argparse.ArgumentParser(description='Processes and downloads Mozilla Common Voice dataset.')
 parser.add_argument("--target_dir", default='common_voice/', type=str, help="Directory to store the dataset.")
@@ -48,19 +49,22 @@ def main():
         print("Downloading Mozilla Common Voice corpus...")
         wget.download(COMMON_VOICE_URL, target_dl_dir)
     split_types = args.split_types.lower().split(',')
-    
-    print("Unpacking {}...".format(filename))
-    tar = tarfile.open(target_filename)
-    tar.extractall(target_dl_dir)
-    tar.close()
+
+
+    unpacked_dir = os.path.join(target_dl_dir, "cv_corpus_v1")
+    if not os.path.exists(unpacked_dir):
+        print("Unpacking {}...".format(target_file))
+        tar = tarfile.open(target_file)
+        tar.extractall(target_dl_dir)
+        tar.close()
 
     for split_type in split_types:
         assert split_type in SPLITS_BY_TYPE, "{} split type is not supported. {} are supported".format(split_type,
                                                                                                 SPLITS_BY_TYPE.keys())
         for split in SPLITS_BY_TYPE[split_type]:
             print("Processing {} split ...".format(split))
-            split_dir = os.path.join(target_dl_dir, split)
-            transcription_file =  os.path.join(target_dl_dir, split + ".csv")
+            split_dir = os.path.join(unpacked_dir, split)
+            transcription_file = os.path.join(unpacked_dir,split + ".csv")
 
             wav_dir = os.path.join(split_dir, "wav")
             txt_dir = os.path.join(split_dir, "txt")
@@ -75,7 +79,7 @@ def main():
                         wav_recording_path = os.path.join(wav_dir, f.replace(".mp3", ".wav"))
                         txt_path = os.path.join(txt_dir,  f.replace(".mp3", ".txt"))
                         if not os.path.exists(wav_recording_path):
-                            subprocess.call(["sox {}  -r {} -b 16 -c 1 {}".format(os.path.join(split_dir, f), "16000",
+                            subprocess.call(["sox \"{}\"  -r {} -b 16 -c 1 \"{}\"".format(os.path.join(split_dir, f), "16000",
                                                                             wav_recording_path)], shell=True)
                         if not os.path.exists(txt_path):
                             with open(txt_path, "w") as f:
