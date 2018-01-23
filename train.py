@@ -4,11 +4,13 @@ import json
 import os
 import time
 
-import torch
-from tqdm import tqdm
+import torch.distributed as dist
+import torch.utils.data.distributed
 from torch.autograd import Variable
+from tqdm import tqdm
 from warpctc_pytorch import CTCLoss
-from data.data_loader import AudioDataLoader, SpectrogramDataset, BucketingSampler
+
+from data.data_loader import AudioDataLoader, SpectrogramDataset, BucketingSampler, DistributedBucketingSampler
 from decoder import GreedyDecoder
 from model import DeepSpeech, supported_rnns
 
@@ -59,6 +61,11 @@ parser.add_argument('--no-shuffle', dest='no_shuffle', action='store_true',
                     help='Turn off shuffling and sample from dataset based on sequence length (smallest to largest)')
 parser.add_argument('--no-bidirectional', dest='bidirectional', action='store_false', default=True,
                     help='Turn off bi-directional RNNs, introduces lookahead convolution')
+parser.add_argument('--dist_url', default='tcp://127.0.0.1:1550', type=str,
+                    help='url used to set up distributed training')
+parser.add_argument('--dist_backend', default='gloo', type=str, help='distributed backend')
+parser.add_argument('--world_size', default=1, type=int, help='number of distributed processes')
+parser.add_argument('--rank', default=0, type=int, help='The rank of this process')
 
 torch.manual_seed(123456)
 torch.cuda.manual_seed_all(123456)
@@ -89,6 +96,10 @@ class AverageMeter(object):
 
 if __name__ == '__main__':
     args = parser.parse_args()
+    args.distributed = args.world_size > 1
+    if args.distributed:
+        dist.init_process_group(backend=args.dist_backend, init_method=args.dist_url,
+                                world_size=args.world_size, rank=args.rank)
     save_folder = args.save_folder
 
     loss_results, cer_results, wer_results = torch.Tensor(args.epochs), torch.Tensor(args.epochs), torch.Tensor(
@@ -202,18 +213,26 @@ if __name__ == '__main__':
                                        normalize=True, augment=args.augment)
     test_dataset = SpectrogramDataset(audio_conf=audio_conf, manifest_filepath=args.val_manifest, labels=labels,
                                       normalize=True, augment=False)
-    train_sampler = BucketingSampler(train_dataset, batch_size=args.batch_size)
+    if not args.distributed:
+        train_sampler = BucketingSampler(train_dataset, batch_size=args.batch_size)
+    else:
+        train_sampler = DistributedBucketingSampler(train_dataset, batch_size=args.batch_size,
+                                                    num_replicas=args.world_size, rank=args.rank)
     train_loader = AudioDataLoader(train_dataset,
                                    num_workers=args.num_workers, batch_sampler=train_sampler)
     test_loader = AudioDataLoader(test_dataset, batch_size=args.batch_size,
                                   num_workers=args.num_workers)
 
-    if not args.no_shuffle and start_epoch != 0:
+    # TODO temp workaround for distribution, use round-robin for first epoch if distributed
+    if (not args.no_shuffle and start_epoch != 0) or args.distributed:
         print("Shuffling batches for the following epochs")
-        train_sampler.shuffle()
+        train_sampler.shuffle(start_epoch)
 
-    if args.cuda:
+    if args.cuda and not args.distributed:
         model = torch.nn.DataParallel(model).cuda()
+    elif args.cuda and args.distributed:
+        model.cuda()
+        model = torch.nn.parallel.DistributedDataParallel(model)
 
     print(model)
     print("Number of parameters: %d" % DeepSpeech.get_param_size(model))
@@ -393,4 +412,4 @@ if __name__ == '__main__':
         avg_loss = 0
         if not args.no_shuffle:
             print("Shuffling batches...")
-            train_sampler.shuffle()
+            train_sampler.shuffle(epoch)
