@@ -240,13 +240,13 @@ To also note, there is no final softmax layer on the model as when trained, warp
 To evaluate a trained model on a test set (has to be in the same format as the training set):
 
 ```
-python test.py --model-path models/deepspeech.pth.tar --test-manifest /path/to/test_manifest.csv --cuda
+python test.py --model-path models/deepspeech.pth --test-manifest /path/to/test_manifest.csv --cuda
 ```
 
 An example script to output a transcription has been provided:
 
 ```
-python transcribe.py --model-path models/deepspeech.pth.tar --audio-path /path/to/audio.wav
+python transcribe.py --model-path models/deepspeech.pth --audio-path /path/to/audio.wav
 ```
 
 ### Alternate Decoders
