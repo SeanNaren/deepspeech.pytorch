@@ -10,7 +10,7 @@ from data.data_loader import SpectrogramDataset, AudioDataLoader
 from model import DeepSpeech
 
 parser = argparse.ArgumentParser(description='DeepSpeech transcription')
-parser.add_argument('--model-path', default='models/deepspeech_final.pth.tar',
+parser.add_argument('--model-path', default='models/deepspeech_final.pth',
                     help='Path to model file created by training')
 parser.add_argument('--cuda', action="store_true", help='Use cuda to test model')
 parser.add_argument('--test-manifest', metavar='DIR',

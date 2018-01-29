@@ -11,7 +11,7 @@ from decoder import GreedyDecoder, BeamCTCDecoder
 from model import DeepSpeech
 
 parser = argparse.ArgumentParser(description='DeepSpeech transcription')
-parser.add_argument('--model-path', default='models/deepspeech_final.pth.tar',
+parser.add_argument('--model-path', default='models/deepspeech_final.pth',
                     help='Path to model file created by training')
 parser.add_argument('--logits', default="", type=str, help='Path to logits from test.py')
 parser.add_argument('--test-manifest', metavar='DIR',
