@@ -13,7 +13,7 @@ import os.path
 import json
 
 parser = argparse.ArgumentParser(description='DeepSpeech transcription')
-parser.add_argument('--model-path', default='models/deepspeech_final.pth.tar',
+parser.add_argument('--model-path', default='models/deepspeech_final.pth',
                     help='Path to model file created by training')
 parser.add_argument('--audio-path', default='audio.wav',
                     help='Audio file to predict on')
