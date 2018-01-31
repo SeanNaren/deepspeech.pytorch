@@ -76,9 +76,8 @@ if __name__ == '__main__':
         if args.cuda:
             inputs = inputs.cuda()
 
-        out = model(inputs)
-        out = out.transpose(0, 1)  # TxNxH
-        seq_length = out.size(0)
+        out = model(inputs)  # NxTxH
+        seq_length = out.size(1)
         sizes = input_percentages.mul_(int(seq_length)).int()
 
         if decoder is None:
