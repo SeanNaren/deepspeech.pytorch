@@ -135,7 +135,7 @@ class BeamCTCDecoder(Decoder):
         Returns:
             string: sequences of the model's best guess for the transcription
         """
-        probs = probs.cpu().transpose(0, 1).contiguous()
+        probs = probs.cpu()
         out, scores, offsets, seq_lens = self._decoder.decode(probs, sizes)
 
         strings = self.convert_to_strings(out, seq_lens)
@@ -185,13 +185,13 @@ class GreedyDecoder(Decoder):
         repeated elements in the sequence, as well as blanks.
 
         Arguments:
-            probs: Tensor of character probabilities from the network. Expected shape of seq_length x batch x output_dim
+            probs: Tensor of character probabilities from the network. Expected shape of batch x seq_length x output_dim
             sizes(optional): Size of each sequence in the mini-batch
         Returns:
             strings: sequences of the model's best guess for the transcription on inputs
             offsets: time step per character predicted
         """
-        _, max_probs = torch.max(probs.transpose(0, 1), 2)
+        _, max_probs = torch.max(probs, 2)
         strings, offsets = self.convert_to_strings(max_probs.view(max_probs.size(0), max_probs.size(1)), sizes,
                                                    remove_repetitions=True, return_offsets=True)
         return strings, offsets
