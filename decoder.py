@@ -136,7 +136,7 @@ class BeamCTCDecoder(Decoder):
             string: sequences of the model's best guess for the transcription
         """
         probs = probs.cpu().transpose(0, 1).contiguous()
-        out, scores, offsets, seq_lens = self._decoder.decode(probs)
+        out, scores, offsets, seq_lens = self._decoder.decode(probs, sizes)
 
         strings = self.convert_to_strings(out, seq_lens)
         offsets = self.convert_tensor(offsets, seq_lens)
