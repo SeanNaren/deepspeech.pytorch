@@ -60,7 +60,7 @@ def decode_dataset(logits, test_dataset, batch_size, lm_alpha, lm_beta, mesh_x, 
         out = torch.from_numpy(logits[i][0])
         sizes = torch.from_numpy(logits[i][1])
 
-        decoded_output, _, _, _ = decoder.decode(out, sizes)
+        decoded_output, _, = decoder.decode(out, sizes)
         target_strings = target_decoder.convert_to_strings(split_targets)
         wer, cer = 0, 0
         for x in range(len(target_strings)):
