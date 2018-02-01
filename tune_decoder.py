@@ -92,7 +92,7 @@ if __name__ == '__main__':
                                       normalize=True)
 
     logits = np.load(args.logits)
-    batch_size = logits[0][0].shape[1]
+    batch_size = logits[0][0].shape[0]
 
     results = []
 
