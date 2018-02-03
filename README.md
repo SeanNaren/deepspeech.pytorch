@@ -163,6 +163,20 @@ python train.py --tensorboard --logdir log_dir/ # Make sure the Tensorboard inst
 
 For both visualisation tools, you can add your own name to the run by changing the `--id` parameter when training.
 
+## Multi-GPU Training
+
+We support multi-GPU training via the distributed parallel wrapper (see [here](https://github.com/NVIDIA/sentiment-discovery/blob/master/analysis/scale.md) and [here](https://github.com/SeanNaren/deepspeech.pytorch/issues/211) to see why we don't use DataParallel).
+
+To use multi-GPU:
+
+```
+python -m multiproc python train.py --visdom --cuda # Add your parameters as normal, multiproc will scale to all GPUs automatically
+```
+
+multiproc will open a log for all processes other than the main process.
+
+We suggest using the gloo backend which defaults to TCP if Infiniband isn't available. Using NCCL2 is also possible as a backend. More information [here](http://pytorch.org/docs/master/distributed.html#distributed-basics).
+
 ### Noise Augmentation/Injection
 
 There is support for two different types of noise; noise augmentation and noise injection.

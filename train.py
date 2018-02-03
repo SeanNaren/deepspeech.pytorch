@@ -11,6 +11,7 @@ from tqdm import tqdm
 from warpctc_pytorch import CTCLoss
 
 from data.data_loader import AudioDataLoader, SpectrogramDataset, BucketingSampler, DistributedBucketingSampler
+from data.distributed import DistributedDataParallel
 from decoder import GreedyDecoder
 from model import DeepSpeech, supported_rnns
 
@@ -61,11 +62,15 @@ parser.add_argument('--no-shuffle', dest='no_shuffle', action='store_true',
                     help='Turn off shuffling and sample from dataset based on sequence length (smallest to largest)')
 parser.add_argument('--no-bidirectional', dest='bidirectional', action='store_false', default=True,
                     help='Turn off bi-directional RNNs, introduces lookahead convolution')
-parser.add_argument('--dist_url', default='tcp://127.0.0.1:1550', type=str,
+parser.add_argument('--dist-url', default='tcp://127.0.0.1:1550', type=str,
                     help='url used to set up distributed training')
-parser.add_argument('--dist_backend', default='gloo', type=str, help='distributed backend')
-parser.add_argument('--world_size', default=1, type=int, help='number of distributed processes')
-parser.add_argument('--rank', default=0, type=int, help='The rank of this process')
+parser.add_argument('--dist-backend', default='gloo', type=str, help='distributed backend')
+parser.add_argument('--world-size', default=1, type=int,
+                    help='number of distributed processes')
+parser.add_argument('--rank', default=0, type=int,
+                    help='The rank of this process')
+parser.add_argument('--gpu-rank', default=None,
+                    help='If using distributed parallel for multi-gpu, sets the GPU for the process')
 
 torch.manual_seed(123456)
 torch.cuda.manual_seed_all(123456)
@@ -97,22 +102,26 @@ class AverageMeter(object):
 if __name__ == '__main__':
     args = parser.parse_args()
     args.distributed = args.world_size > 1
+    main_proc = True
     if args.distributed:
+        if args.gpu_rank:
+            torch.cuda.set_device(int(args.gpu_rank))
         dist.init_process_group(backend=args.dist_backend, init_method=args.dist_url,
                                 world_size=args.world_size, rank=args.rank)
+        main_proc = args.rank == 0  # Only the first proc should save models
     save_folder = args.save_folder
 
     loss_results, cer_results, wer_results = torch.Tensor(args.epochs), torch.Tensor(args.epochs), torch.Tensor(
         args.epochs)
     best_wer = None
-    if args.visdom:
+    if args.visdom and main_proc:
         from visdom import Visdom
 
         viz = Visdom()
         opts = dict(title=args.id, ylabel='', xlabel='Epoch', legend=['Loss', 'WER', 'CER'])
         viz_window = None
         epochs = torch.arange(1, args.epochs + 1)
-    if args.tensorboard:
+    if args.tensorboard and main_proc:
         try:
             os.makedirs(args.log_dir)
         except OSError as e:
@@ -162,7 +171,7 @@ if __name__ == '__main__':
             avg_loss = int(package.get('avg_loss', 0))
             loss_results, cer_results, wer_results = package['loss_results'], package[
                 'cer_results'], package['wer_results']
-            if args.visdom and \
+            if main_proc and args.visdom and \
                             package[
                                 'loss_results'] is not None and start_epoch > 0:  # Add previous scores to visdom graph
                 x_axis = epochs[0:start_epoch]
@@ -174,7 +183,7 @@ if __name__ == '__main__':
                     Y=y_axis,
                     opts=opts,
                 )
-            if args.tensorboard and \
+            if main_proc and args.tensorboard and \
                             package[
                                 'loss_results'] is not None and start_epoch > 0:  # Previous scores to tensorboard logs
                 for i in range(start_epoch):
@@ -223,8 +232,7 @@ if __name__ == '__main__':
     test_loader = AudioDataLoader(test_dataset, batch_size=args.batch_size,
                                   num_workers=args.num_workers)
 
-    # TODO temp workaround for distribution, use round-robin for first epoch if distributed
-    if (not args.no_shuffle and start_epoch != 0) or args.distributed:
+    if not args.no_shuffle and start_epoch != 0:
         print("Shuffling batches for the following epochs")
         train_sampler.shuffle(start_epoch)
 
@@ -232,7 +240,7 @@ if __name__ == '__main__':
         model = torch.nn.DataParallel(model).cuda()
     elif args.cuda and args.distributed:
         model.cuda()
-        model = torch.nn.parallel.DistributedDataParallel(model)
+        model = DistributedDataParallel(model)
 
     print(model)
     print("Number of parameters: %d" % DeepSpeech.get_param_size(model))
@@ -299,7 +307,7 @@ if __name__ == '__main__':
                       'Loss {loss.val:.4f} ({loss.avg:.4f})\t'.format(
                     (epoch + 1), (i + 1), len(train_sampler), batch_time=batch_time,
                     data_time=data_time, loss=losses))
-            if args.checkpoint_per_batch > 0 and i > 0 and (i + 1) % args.checkpoint_per_batch == 0:
+            if args.checkpoint_per_batch > 0 and i > 0 and (i + 1) % args.checkpoint_per_batch == 0 and main_proc:
                 file_path = '%s/deepspeech_checkpoint_epoch_%d_iter_%d.pth.tar' % (save_folder, epoch + 1, i + 1)
                 print("Saving checkpoint model to %s" % file_path)
                 torch.save(DeepSpeech.serialize(model, optimizer=optimizer, epoch=epoch, iteration=i,
@@ -363,7 +371,7 @@ if __name__ == '__main__':
               'Average CER {cer:.3f}\t'.format(
             epoch + 1, wer=wer, cer=cer))
 
-        if args.visdom:
+        if args.visdom and main_proc:
             x_axis = epochs[0:epoch + 1]
             y_axis = torch.stack((loss_results[0:epoch + 1], wer_results[0:epoch + 1], cer_results[0:epoch + 1]), dim=1)
             if viz_window is None:
@@ -379,7 +387,7 @@ if __name__ == '__main__':
                     win=viz_window,
                     update='replace',
                 )
-        if args.tensorboard:
+        if args.tensorboard and main_proc:
             values = {
                 'Avg Train Loss': avg_loss,
                 'Avg WER': wer,
@@ -391,7 +399,7 @@ if __name__ == '__main__':
                     tag = tag.replace('.', '/')
                     tensorboard_writer.add_histogram(tag, to_np(value), epoch + 1)
                     tensorboard_writer.add_histogram(tag + '/grad', to_np(value.grad), epoch + 1)
-        if args.checkpoint:
+        if args.checkpoint and main_proc:
             file_path = '%s/deepspeech_%d.pth.tar' % (save_folder, epoch + 1)
             torch.save(DeepSpeech.serialize(model, optimizer=optimizer, epoch=epoch, loss_results=loss_results,
                                             wer_results=wer_results, cer_results=cer_results),
@@ -402,7 +410,7 @@ if __name__ == '__main__':
         optimizer.load_state_dict(optim_state)
         print('Learning rate annealed to: {lr:.6f}'.format(lr=optim_state['param_groups'][0]['lr']))
 
-        if best_wer is None or best_wer > wer:
+        if (best_wer is None or best_wer > wer) and main_proc:
             print("Found better validated model, saving to %s" % args.model_path)
             torch.save(DeepSpeech.serialize(model, optimizer=optimizer, epoch=epoch, loss_results=loss_results,
                                             wer_results=wer_results, cer_results=cer_results)
