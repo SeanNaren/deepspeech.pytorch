@@ -225,6 +225,7 @@ if __name__ == '__main__':
     for epoch in range(start_epoch, args.epochs):
         model.train()
         end = time.time()
+        start_epoch_time = time.time()
         for i, (data) in enumerate(train_loader, start=start_iter):
             if i == len(train_sampler):
                 break
@@ -290,9 +291,11 @@ if __name__ == '__main__':
             del out
         avg_loss /= len(train_sampler)
 
+        epoch_time = time.time() - start_epoch_time
         print('Training Summary Epoch: [{0}]\t'
+              'Time taken (s): {epoch_time:.0f}\t'
               'Average Loss {loss:.3f}\t'.format(
-            epoch + 1, loss=avg_loss))
+            epoch + 1, epoch_time=epoch_time, loss=avg_loss))
 
         start_iter = 0  # Reset start iteration for next epoch
         total_cer, total_wer = 0, 0
