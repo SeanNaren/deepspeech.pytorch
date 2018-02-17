@@ -39,7 +39,7 @@ beam_args.add_argument('--cutoff-prob', default=1.0, type=float,
 args = parser.parse_args()
 
 
-def decode_dataset(logits, test_dataset, batch_size, lm_alpha, lm_beta, mesh_x, mesh_y, labels):
+def decode_dataset(logits, test_dataset, batch_size, lm_alpha, lm_beta, mesh_x, mesh_y, labels, grid_index):
     print("Beginning decode for {}, {}".format(lm_alpha, lm_beta))
     test_loader = AudioDataLoader(test_dataset, batch_size=batch_size, num_workers=0)
     target_decoder = GreedyDecoder(labels, blank_index=labels.index('_'))
@@ -75,7 +75,7 @@ def decode_dataset(logits, test_dataset, batch_size, lm_alpha, lm_beta, mesh_x, 
     wer = total_wer / len(test_loader.dataset)
     cer = total_cer / len(test_loader.dataset)
 
-    return [mesh_x, mesh_y, lm_alpha, lm_beta, wer, cer]
+    return [grid_index, mesh_x, mesh_y, lm_alpha, lm_beta, wer, cer]
 
 
 if __name__ == '__main__':
@@ -113,7 +113,7 @@ if __name__ == '__main__':
     futures = []
     for index, (alpha, beta, x, y) in enumerate(params_grid):
         print("Scheduling decode for a={}, b={} ({},{}).".format(alpha, beta, x, y))
-        f = p.apply_async(decode_dataset, (logits, test_dataset, batch_size, alpha, beta, x, y, labels),
+        f = p.apply_async(decode_dataset, (logits, test_dataset, batch_size, alpha, beta, x, y, labels, index),
                           callback=result_callback)
         futures.append(f)
     for f in futures:
