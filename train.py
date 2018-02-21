@@ -57,6 +57,8 @@ parser.add_argument('--noise-max', default=0.5,
                     help='Maximum noise levels to sample from. Maximum 1.0', type=float)
 parser.add_argument('--no-shuffle', dest='no_shuffle', action='store_true',
                     help='Turn off shuffling and sample from dataset based on sequence length (smallest to largest)')
+parser.add_argument('--no-sortaGrad', dest='no_sorta_grad', action='store_true',
+                    help='Turn off ordering of dataset on sequence length for the first epoch.')
 parser.add_argument('--no-bidirectional', dest='bidirectional', action='store_false', default=True,
                     help='Turn off bi-directional RNNs, introduces lookahead convolution')
 
@@ -208,7 +210,7 @@ if __name__ == '__main__':
     test_loader = AudioDataLoader(test_dataset, batch_size=args.batch_size,
                                   num_workers=args.num_workers)
 
-    if not args.no_shuffle and start_epoch != 0:
+    if (not args.no_shuffle and start_epoch != 0) or args.no_sorta_grad:
         print("Shuffling batches for the following epochs")
         train_sampler.shuffle()
 
