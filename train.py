@@ -251,7 +251,7 @@ if __name__ == '__main__':
         model = torch.nn.DataParallel(model).cuda()
     elif args.cuda and args.distributed:
         model.cuda()
-        model = DistributedDataParallel(model)
+        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=(args.gpu_rank,) if args.rank else None)
 
     print(model)
     print("Number of parameters: %d" % DeepSpeech.get_param_size(model))
