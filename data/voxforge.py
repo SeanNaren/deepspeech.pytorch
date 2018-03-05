@@ -44,6 +44,10 @@ def prepare_sample(recording_name, url, target_folder):
     txt_dir = os.path.join(target_folder, "txt")
     if not os.path.exists(txt_dir):
         os.makedirs(txt_dir)
+    # check if sample is processed
+    filename_set = set(['_'.join(wav_file.split('_')[:-1]) for wav_file in os.listdir(wav_dir)])
+    if recording_name in filename_set:
+        return
 
     request = urllib.request.Request(url)
     response = urllib.request.urlopen(request)
@@ -93,6 +97,6 @@ if __name__ == '__main__':
     content = response.read()
     all_files = re.findall("href\=\"(.*\.tgz)\"", content.decode("utf-8"))
     for f in tqdm(all_files, total=len(all_files)):
-        prepare_sample(f.replace(".tgz", ""), VOXFORGE_URL_16kHz + '/' + f, target_dir)
+        prepare_sample(f.replace(".tgz", ""), VOXFORGE_URL_16kHz + f, target_dir)
     print('Creating manifests...')
     create_manifest(target_dir, 'voxforge_train_manifest.csv', args.min_duration, args.max_duration)
