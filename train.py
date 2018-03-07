@@ -6,7 +6,6 @@ import time
 
 import torch.distributed as dist
 import torch.utils.data.distributed
-from torch.autograd import Variable
 from tqdm import tqdm
 from warpctc_pytorch import CTCLoss
 
@@ -253,7 +252,8 @@ if __name__ == '__main__':
         model = torch.nn.DataParallel(model, device_ids=args.device_ids).cuda()
     elif args.cuda and args.distributed:
         model.cuda()
-        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=(int(args.gpu_rank),) if args.rank else None)
+        model = torch.nn.parallel.DistributedDataParallel(model,
+                                                          device_ids=(int(args.gpu_rank),) if args.rank else None)
 
     print(model)
     print("Number of parameters: %d" % DeepSpeech.get_param_size(model))
@@ -270,22 +270,17 @@ if __name__ == '__main__':
             if i == len(train_sampler):
                 break
             inputs, targets, input_percentages, target_sizes = data
+            input_sizes = input_percentages.mul_(int(inputs.size(3))).int()
             # measure data loading time
             data_time.update(time.time() - end)
-            inputs = Variable(inputs, requires_grad=False)
-            target_sizes = Variable(target_sizes, requires_grad=False)
-            targets = Variable(targets, requires_grad=False)
 
             if args.cuda:
                 inputs = inputs.cuda()
 
-            out = model(inputs)
+            out, output_sizes = model(inputs, input_sizes)
             out = out.transpose(0, 1)  # TxNxH
 
-            seq_length = out.size(0)
-            sizes = Variable(input_percentages.mul_(int(seq_length)).int(), requires_grad=False)
-
-            loss = criterion(out, targets, sizes, target_sizes)
+            loss = criterion(out, targets, output_sizes, target_sizes)
             loss = loss / inputs.size(0)  # average the loss by minibatch
 
             loss_sum = loss.data.sum()
@@ -307,9 +302,6 @@ if __name__ == '__main__':
             # SGD step
             optimizer.step()
 
-            if args.cuda:
-                torch.cuda.synchronize()
-
             # measure elapsed time
             batch_time.update(time.time() - end)
             end = time.time()
@@ -318,8 +310,7 @@ if __name__ == '__main__':
                       'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
                       'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
                       'Loss {loss.val:.4f} ({loss.avg:.4f})\t'.format(
-                    (epoch + 1), (i + 1), len(train_sampler), batch_time=batch_time,
-                    data_time=data_time, loss=losses))
+                    (epoch + 1), (i + 1), len(train_sampler), batch_time=batch_time, data_time=data_time, loss=losses))
             if args.checkpoint_per_batch > 0 and i > 0 and (i + 1) % args.checkpoint_per_batch == 0 and main_proc:
                 file_path = '%s/deepspeech_checkpoint_epoch_%d_iter_%d.pth.tar' % (save_folder, epoch + 1, i + 1)
                 print("Saving checkpoint model to %s" % file_path)
@@ -334,8 +325,7 @@ if __name__ == '__main__':
         epoch_time = time.time() - start_epoch_time
         print('Training Summary Epoch: [{0}]\t'
               'Time taken (s): {epoch_time:.0f}\t'
-              'Average Loss {loss:.3f}\t'.format(
-            epoch + 1, epoch_time=epoch_time, loss=avg_loss))
+              'Average Loss {loss:.3f}\t'.format(epoch + 1, epoch_time=epoch_time, loss=avg_loss))
 
         start_iter = 0  # Reset start iteration for next epoch
         total_cer, total_wer = 0, 0
@@ -343,6 +333,7 @@ if __name__ == '__main__':
         with torch.no_grad():
             for i, (data) in tqdm(enumerate(test_loader), total=len(test_loader)):
                 inputs, targets, input_percentages, target_sizes = data
+                input_sizes = input_percentages.mul_(int(inputs.size(3))).int()
 
                 # unflatten targets
                 split_targets = []
@@ -354,11 +345,9 @@ if __name__ == '__main__':
                 if args.cuda:
                     inputs = inputs.cuda()
 
-                out = model(inputs)  # NxTxH
-                seq_length = out.size(1)
-                sizes = input_percentages.mul_(int(seq_length)).int()
+                out, output_sizes = model(inputs, input_sizes)
 
-                decoded_output, _ = decoder.decode(out.data, sizes)
+                decoded_output, _ = decoder.decode(out.data, output_sizes)
                 target_strings = decoder.convert_to_strings(split_targets)
                 wer, cer = 0, 0
                 for x in range(len(target_strings)):
@@ -367,9 +356,6 @@ if __name__ == '__main__':
                     cer += decoder.cer(transcript, reference) / float(len(reference))
                 total_cer += cer
                 total_wer += wer
-
-                if args.cuda:
-                    torch.cuda.synchronize()
                 del out
             wer = total_wer / len(test_loader.dataset)
             cer = total_cer / len(test_loader.dataset)
@@ -380,56 +366,55 @@ if __name__ == '__main__':
             cer_results[epoch] = cer
             print('Validation Summary Epoch: [{0}]\t'
                   'Average WER {wer:.3f}\t'
-                  'Average CER {cer:.3f}\t'.format(
-                epoch + 1, wer=wer, cer=cer))
+                  'Average CER {cer:.3f}\t'.format(epoch + 1, wer=wer, cer=cer))
 
-        if args.visdom and main_proc:
-            x_axis = epochs[0:epoch + 1]
-            y_axis = torch.stack((loss_results[0:epoch + 1], wer_results[0:epoch + 1], cer_results[0:epoch + 1]), dim=1)
-            if viz_window is None:
-                viz_window = viz.line(
-                    X=x_axis,
-                    Y=y_axis,
-                    opts=opts,
-                )
-            else:
-                viz.line(
-                    X=x_axis.unsqueeze(0).expand(y_axis.size(1), x_axis.size(0)).transpose(0, 1),  # Visdom fix
-                    Y=y_axis,
-                    win=viz_window,
-                    update='replace',
-                )
-        if args.tensorboard and main_proc:
-            values = {
-                'Avg Train Loss': avg_loss,
-                'Avg WER': wer,
-                'Avg CER': cer
-            }
-            tensorboard_writer.add_scalars(args.id, values, epoch + 1)
-            if args.log_params:
-                for tag, value in model.named_parameters():
-                    tag = tag.replace('.', '/')
-                    tensorboard_writer.add_histogram(tag, to_np(value), epoch + 1)
-                    tensorboard_writer.add_histogram(tag + '/grad', to_np(value.grad), epoch + 1)
-        if args.checkpoint and main_proc:
-            file_path = '%s/deepspeech_%d.pth.tar' % (save_folder, epoch + 1)
-            torch.save(DeepSpeech.serialize(model, optimizer=optimizer, epoch=epoch, loss_results=loss_results,
-                                            wer_results=wer_results, cer_results=cer_results),
-                       file_path)
-        # anneal lr
-        optim_state = optimizer.state_dict()
-        optim_state['param_groups'][0]['lr'] = optim_state['param_groups'][0]['lr'] / args.learning_anneal
-        optimizer.load_state_dict(optim_state)
-        print('Learning rate annealed to: {lr:.6f}'.format(lr=optim_state['param_groups'][0]['lr']))
+            if args.visdom and main_proc:
+                x_axis = epochs[0:epoch + 1]
+                y_axis = torch.stack(
+                    (loss_results[0:epoch + 1], wer_results[0:epoch + 1], cer_results[0:epoch + 1]), dim=1)
+                if viz_window is None:
+                    viz_window = viz.line(
+                        X=x_axis,
+                        Y=y_axis,
+                        opts=opts,
+                    )
+                else:
+                    viz.line(
+                        X=x_axis.unsqueeze(0).expand(y_axis.size(1), x_axis.size(0)).transpose(0, 1),  # Visdom fix
+                        Y=y_axis,
+                        win=viz_window,
+                        update='replace',
+                    )
+            if args.tensorboard and main_proc:
+                values = {
+                    'Avg Train Loss': avg_loss,
+                    'Avg WER': wer,
+                    'Avg CER': cer
+                }
+                tensorboard_writer.add_scalars(args.id, values, epoch + 1)
+                if args.log_params:
+                    for tag, value in model.named_parameters():
+                        tag = tag.replace('.', '/')
+                        tensorboard_writer.add_histogram(tag, to_np(value), epoch + 1)
+                        tensorboard_writer.add_histogram(tag + '/grad', to_np(value.grad), epoch + 1)
+            if args.checkpoint and main_proc:
+                file_path = '%s/deepspeech_%d.pth.tar' % (save_folder, epoch + 1)
+                torch.save(DeepSpeech.serialize(model, optimizer=optimizer, epoch=epoch, loss_results=loss_results,
+                                                wer_results=wer_results, cer_results=cer_results),
+                           file_path)
+                # anneal lr
+                optim_state = optimizer.state_dict()
+                optim_state['param_groups'][0]['lr'] = optim_state['param_groups'][0]['lr'] / args.learning_anneal
+                optimizer.load_state_dict(optim_state)
+                print('Learning rate annealed to: {lr:.6f}'.format(lr=optim_state['param_groups'][0]['lr']))
 
-        if (best_wer is None or best_wer > wer) and main_proc:
-            print("Found better validated model, saving to %s" % args.model_path)
-            torch.save(DeepSpeech.serialize(model, optimizer=optimizer, epoch=epoch, loss_results=loss_results,
-                                            wer_results=wer_results, cer_results=cer_results)
-                       , args.model_path)
-            best_wer = wer
+            if (best_wer is None or best_wer > wer) and main_proc:
+                print("Found better validated model, saving to %s" % args.model_path)
+                torch.save(DeepSpeech.serialize(model, optimizer=optimizer, epoch=epoch, loss_results=loss_results,
+                                                wer_results=wer_results, cer_results=cer_results), args.model_path)
+                best_wer = wer
 
-        avg_loss = 0
-        if not args.no_shuffle:
-            print("Shuffling batches...")
-            train_sampler.shuffle(epoch)
+                avg_loss = 0
+            if not args.no_shuffle:
+                print("Shuffling batches...")
+                train_sampler.shuffle(epoch)

@@ -63,6 +63,7 @@ if __name__ == '__main__':
     output_data = []
     for i, (data) in tqdm(enumerate(test_loader), total=len(test_loader)):
         inputs, targets, input_percentages, target_sizes = data
+        input_sizes = Variable(input_percentages.mul_(int(inputs.size(3))).int(), requires_grad=False)
 
         # unflatten targets
         split_targets = []
@@ -74,16 +75,14 @@ if __name__ == '__main__':
         if args.cuda:
             inputs = inputs.cuda()
 
-        out = model(inputs)  # NxTxH
-        seq_length = out.size(1)
-        sizes = input_percentages.mul_(int(seq_length)).int()
+        out, output_sizes = model(inputs, input_sizes)
 
         if decoder is None:
             # add output to data array, and continue
-            output_data.append((out.data.cpu().numpy(), sizes.numpy()))
+            output_data.append((out.data.cpu().numpy(), output_sizes.data.cpu().numpy()))
             continue
 
-        decoded_output, _, = decoder.decode(out.data, sizes)
+        decoded_output, _ = decoder.decode(out.data, output_sizes.data)
         target_strings = target_decoder.convert_to_strings(split_targets)
         for x in range(len(target_strings)):
             transcript, reference = decoded_output[x][0], target_strings[x][0]
