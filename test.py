@@ -98,11 +98,11 @@ if __name__ == '__main__':
             if args.verbose:
                 print("Ref:", reference.lower())
                 print("Hyp:", transcript.lower())
-                print("WER:", wer_inst / len(reference.split()), "CER:", cer_inst / len(reference), "\n")
+                print("WER:", float(wer_inst) / len(reference.split()), "CER:", float(cer_inst) / len(reference), "\n")
 
     if decoder is not None:
-        wer = total_wer / num_tokens
-        cer = total_cer / num_chars
+        wer = float(total_wer) / num_tokens
+        cer = float(total_cer) / num_chars
 
         print('Test Summary \t'
               'Average WER {wer:.3f}\t'
