@@ -1,26 +1,18 @@
-FROM pytorch
-
-# based on https://github.com/SeanNaren/deepspeech.pytorch installation guidelines
-# and of course work by from SeanNaren - kudos to him!
-# 
-# build command: 
-#    $ nvidia-docker build -t  deepspeech2.docker .
-# run command: 
-#    $ nvidia-docker run -ti -v `pwd`/data:/workspace/data -p 8888:8888 deepspeech2.docker
+FROM floydhub/pytorch:0.3.0-gpu.cuda9cudnn7-py3.24
 
 # install basics 
 RUN apt-get update -y
-#RUN apt-get upgrade -y
 RUN apt-get install -y git cmake tree htop bmon iotop
 
 # install python deps
 RUN pip install cffi tensorboardX
 
+WORKDIR /workspace/
+
 # install warp-CTC
 RUN git clone https://github.com/SeanNaren/warp-ctc.git
 RUN cd warp-ctc; mkdir build; cd build; cmake ..; make
-RUN export CUDA_HOME="/usr/local/cuda"
-RUN cd warp-ctc; cd pytorch_binding; python setup.py install
+RUN cd warp-ctc; cd pytorch_binding; CUDA_HOME="/usr/local/cuda" python setup.py install
 
 # install pytorch audio
 RUN apt-get install -y sox libsox-dev libsox-fmt-all
