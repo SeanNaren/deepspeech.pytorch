@@ -54,6 +54,21 @@ Finally clone this repo and run this within the repo:
 pip install -r requirements.txt
 ```
 
+## Docker
+
+There is no official Dockerhub image, however a Dockerfile is provided to build on your own systems.
+
+```
+sudo nvidia-docker build -t  deepspeech2.docker .
+sudo nvidia-docker run -ti -v `pwd`/data:/workspace/data -p 8888:8888 deepspeech2.docker # Opens a Jupyter notebook, mounting the /data drive in the container
+```
+
+If you'd prefer bash:
+
+```
+nvidia-docker run -ti -v `pwd`/data:/workspace/data --entrypoint=/bin/bash deepspeech2.docker # Opens a bash terminal, mounting the /data drive in the container
+
+```
 # Usage
 
 ## Dataset
