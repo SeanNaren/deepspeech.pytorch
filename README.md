@@ -60,13 +60,13 @@ There is no official Dockerhub image, however a Dockerfile is provided to build 
 
 ```
 sudo nvidia-docker build -t  deepspeech2.docker .
-sudo nvidia-docker run -ti -v `pwd`/data:/workspace/data -p 8888:8888 deepspeech2.docker # Opens a Jupyter notebook, mount the /data drive in the container
+sudo nvidia-docker run -ti -v `pwd`/data:/workspace/data -p 8888:8888 deepspeech2.docker # Opens a Jupyter notebook, mounting the /data drive in the container
 ```
 
 If you'd prefer bash:
 
 ```
-nvidia-docker run -ti -v `pwd`/data:/workspace/data --entrypoint=/bin/bash deepspeech2.docker # Opens a Jupyter notebook, mount the /data drive in the container
+nvidia-docker run -ti -v `pwd`/data:/workspace/data --entrypoint=/bin/bash deepspeech2.docker # Opens a bash terminal, mounting the /data drive in the container
 
 ```
 # Usage
