@@ -86,6 +86,5 @@ if __name__ == '__main__':
     spect = parser.parse_audio(args.audio_path).contiguous()
     spect = spect.view(1, 1, spect.size(0), spect.size(1))
     out = model(Variable(spect, volatile=True))
-    out = out.transpose(0, 1)  # TxNxH
     decoded_output, decoded_offsets = decoder.decode(out.data)
     print(json.dumps(decode_results(model, decoded_output, decoded_offsets)))
