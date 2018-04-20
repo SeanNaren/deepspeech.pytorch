@@ -60,7 +60,7 @@ def decode_results(model, decoded_output, decoded_offsets):
         for pi in range(min(args.top_paths, len(decoded_output[b]))):
             result = {'transcription': decoded_output[b][pi]}
             if args.offsets:
-                result['offsets'] = decoded_offsets[b][pi]
+                result['offsets'] = decoded_offsets[b][pi].tolist()
             results['output'].append(result)
     return results
 
