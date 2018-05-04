@@ -73,6 +73,8 @@ parser.add_argument('--rank', default=0, type=int,
                     help='The rank of this process')
 parser.add_argument('--gpu-rank', default=None,
                     help='If using distributed parallel for multi-gpu, sets the GPU for the process')
+parser.add_argument('--device-ids', default=None, nargs='+', type=int,
+                    help='If using cuda, sets the GPU devices for the process')
 
 torch.manual_seed(123456)
 torch.cuda.manual_seed_all(123456)
@@ -248,7 +250,7 @@ if __name__ == '__main__':
         train_sampler.shuffle(start_epoch)
 
     if args.cuda and not args.distributed:
-        model = torch.nn.DataParallel(model).cuda()
+        model = torch.nn.DataParallel(model, device_ids=args.device_ids).cuda()
     elif args.cuda and args.distributed:
         model.cuda()
         model = torch.nn.parallel.DistributedDataParallel(model, device_ids=(args.gpu_rank,) if args.rank else None)
@@ -292,7 +294,7 @@ if __name__ == '__main__':
                 print("WARNING: received an inf loss, setting loss value to 0")
                 loss_value = 0
             else:
-                loss_value = loss.data[0]
+                loss_value = loss.item()
 
             avg_loss += loss_value
             losses.update(loss_value, inputs.size(0))
@@ -301,7 +303,7 @@ if __name__ == '__main__':
             optimizer.zero_grad()
             loss.backward()
 
-            torch.nn.utils.clip_grad_norm(model.parameters(), args.max_norm)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_norm)
             # SGD step
             optimizer.step()
 
