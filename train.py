@@ -32,6 +32,8 @@ parser.add_argument('--hidden-layers', default=5, type=int, help='Number of RNN 
 parser.add_argument('--rnn-type', default='gru', help='Type of the RNN. rnn|gru|lstm are supported')
 parser.add_argument('--epochs', default=70, type=int, help='Number of training epochs')
 parser.add_argument('--cuda', dest='cuda', action='store_true', help='Use cuda to train model')
+parser.add_argument('--device-ids', default=None, nargs='+', type=int,
+                    help='If using cuda, sets the GPU devices for the process')
 parser.add_argument('--lr', '--learning-rate', default=3e-4, type=float, help='initial learning rate')
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
 parser.add_argument('--max-norm', default=400, type=int, help='Norm cutoff to prevent explosion of gradients')
@@ -73,8 +75,6 @@ parser.add_argument('--rank', default=0, type=int,
                     help='The rank of this process')
 parser.add_argument('--gpu-rank', default=None,
                     help='If using distributed parallel for multi-gpu, sets the GPU for the process')
-parser.add_argument('--device-ids', default=None, nargs='+', type=int,
-                    help='If using cuda, sets the GPU devices for the process')
 
 torch.manual_seed(123456)
 torch.cuda.manual_seed_all(123456)
@@ -340,49 +340,48 @@ if __name__ == '__main__':
         start_iter = 0  # Reset start iteration for next epoch
         total_cer, total_wer = 0, 0
         model.eval()
-        for i, (data) in tqdm(enumerate(test_loader), total=len(test_loader)):
-            inputs, targets, input_percentages, target_sizes = data
+        with torch.no_grad():
+            for i, (data) in tqdm(enumerate(test_loader), total=len(test_loader)):
+                inputs, targets, input_percentages, target_sizes = data
 
-            inputs = Variable(inputs, volatile=True)
+                # unflatten targets
+                split_targets = []
+                offset = 0
+                for size in target_sizes:
+                    split_targets.append(targets[offset:offset + size])
+                    offset += size
 
-            # unflatten targets
-            split_targets = []
-            offset = 0
-            for size in target_sizes:
-                split_targets.append(targets[offset:offset + size])
-                offset += size
+                if args.cuda:
+                    inputs = inputs.cuda()
 
-            if args.cuda:
-                inputs = inputs.cuda()
+                out = model(inputs)  # NxTxH
+                seq_length = out.size(1)
+                sizes = input_percentages.mul_(int(seq_length)).int()
 
-            out = model(inputs)  # NxTxH
-            seq_length = out.size(1)
-            sizes = input_percentages.mul_(int(seq_length)).int()
+                decoded_output, _ = decoder.decode(out.data, sizes)
+                target_strings = decoder.convert_to_strings(split_targets)
+                wer, cer = 0, 0
+                for x in range(len(target_strings)):
+                    transcript, reference = decoded_output[x][0], target_strings[x][0]
+                    wer += decoder.wer(transcript, reference) / float(len(reference.split()))
+                    cer += decoder.cer(transcript, reference) / float(len(reference))
+                total_cer += cer
+                total_wer += wer
 
-            decoded_output, _ = decoder.decode(out.data, sizes)
-            target_strings = decoder.convert_to_strings(split_targets)
-            wer, cer = 0, 0
-            for x in range(len(target_strings)):
-                transcript, reference = decoded_output[x][0], target_strings[x][0]
-                wer += decoder.wer(transcript, reference) / float(len(reference.split()))
-                cer += decoder.cer(transcript, reference) / float(len(reference))
-            total_cer += cer
-            total_wer += wer
-
-            if args.cuda:
-                torch.cuda.synchronize()
-            del out
-        wer = total_wer / len(test_loader.dataset)
-        cer = total_cer / len(test_loader.dataset)
-        wer *= 100
-        cer *= 100
-        loss_results[epoch] = avg_loss
-        wer_results[epoch] = wer
-        cer_results[epoch] = cer
-        print('Validation Summary Epoch: [{0}]\t'
-              'Average WER {wer:.3f}\t'
-              'Average CER {cer:.3f}\t'.format(
-            epoch + 1, wer=wer, cer=cer))
+                if args.cuda:
+                    torch.cuda.synchronize()
+                del out
+            wer = total_wer / len(test_loader.dataset)
+            cer = total_cer / len(test_loader.dataset)
+            wer *= 100
+            cer *= 100
+            loss_results[epoch] = avg_loss
+            wer_results[epoch] = wer
+            cer_results[epoch] = cer
+            print('Validation Summary Epoch: [{0}]\t'
+                  'Average WER {wer:.3f}\t'
+                  'Average CER {cer:.3f}\t'.format(
+                epoch + 1, wer=wer, cer=cer))
 
         if args.visdom and main_proc:
             x_axis = epochs[0:epoch + 1]

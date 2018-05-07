@@ -17,6 +17,6 @@ args = parser.parse_args()
 noise_injector = NoiseInjection()
 data = load_audio(args.input_path)
 mixed_data = noise_injector.inject_noise_sample(data, args.noise_path, args.noise_level)
-mixed_data = torch.FloatTensor(mixed_data).unsqueeze(1)  # Add channels dim
+mixed_data = torch.tensor(mixed_data, dtype=torch.float).unsqueeze(1)  # Add channels dim
 torchaudio.save(args.output_path, mixed_data, args.sample_rate)
 print('Saved mixed file to %s' % args.output_path)

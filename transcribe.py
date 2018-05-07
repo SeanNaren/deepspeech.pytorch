@@ -5,6 +5,7 @@ warnings.simplefilter('ignore')
 
 from decoder import GreedyDecoder
 
+import torch
 from torch.autograd import Variable
 
 from data.data_loader import SpectrogramParser
@@ -67,24 +68,26 @@ def decode_results(model, decoded_output, decoded_offsets):
 
 if __name__ == '__main__':
     model = DeepSpeech.load_model(args.model_path, cuda=args.cuda)
-    model.eval()
 
-    labels = DeepSpeech.get_labels(model)
-    audio_conf = DeepSpeech.get_audio_conf(model)
+    with torch.no_grad():
+        model.eval()
 
-    if args.decoder == "beam":
-        from decoder import BeamCTCDecoder
+        labels = DeepSpeech.get_labels(model)
+        audio_conf = DeepSpeech.get_audio_conf(model)
 
-        decoder = BeamCTCDecoder(labels, lm_path=args.lm_path, alpha=args.alpha, beta=args.beta,
-                                 cutoff_top_n=args.cutoff_top_n, cutoff_prob=args.cutoff_prob,
-                                 beam_width=args.beam_width, num_processes=args.lm_workers)
-    else:
-        decoder = GreedyDecoder(labels, blank_index=labels.index('_'))
+        if args.decoder == "beam":
+            from decoder import BeamCTCDecoder
 
-    parser = SpectrogramParser(audio_conf, normalize=True)
+            decoder = BeamCTCDecoder(labels, lm_path=args.lm_path, alpha=args.alpha, beta=args.beta,
+                                     cutoff_top_n=args.cutoff_top_n, cutoff_prob=args.cutoff_prob,
+                                     beam_width=args.beam_width, num_processes=args.lm_workers)
+        else:
+            decoder = GreedyDecoder(labels, blank_index=labels.index('_'))
 
-    spect = parser.parse_audio(args.audio_path).contiguous()
-    spect = spect.view(1, 1, spect.size(0), spect.size(1))
-    out = model(Variable(spect, volatile=True))
-    decoded_output, decoded_offsets = decoder.decode(out.data)
-    print(json.dumps(decode_results(model, decoded_output, decoded_offsets)))
+        parser = SpectrogramParser(audio_conf, normalize=True)
+
+        spect = parser.parse_audio(args.audio_path).contiguous()
+        spect = spect.view(1, 1, spect.size(0), spect.size(1))
+        out = model(spect)
+        decoded_output, decoded_offsets = decoder.decode(out.data)
+        print(json.dumps(decode_results(model, decoded_output, decoded_offsets)))
