@@ -105,7 +105,7 @@ class BeamCTCDecoder(Decoder):
             for p, utt in enumerate(batch):
                 size = seq_len[b][p]
                 if size > 0:
-                    transcript = ''.join(map(lambda x: self.int_to_char[x], utt[0:size]))
+                    transcript = ''.join(map(lambda x: self.int_to_char[x.item()], utt[0:size]))
                 else:
                     transcript = ''
                 utterances.append(transcript)
