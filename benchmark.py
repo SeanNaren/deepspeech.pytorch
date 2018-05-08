@@ -2,7 +2,6 @@ import argparse
 import json
 import time
 import torch
-from torch.autograd import Variable
 from tqdm import tqdm
 from warpctc_pytorch import CTCLoss
 from tqdm import trange
@@ -74,19 +73,17 @@ seconds = int(args.seconds)
 batch_size = int(args.batch_size)
 
 
-def iteration(data):
-    target = torch.IntTensor(int(batch_size * ((seconds * 100) / 2))).fill_(1)  # targets, align half of the audio
-    target_size = torch.IntTensor(batch_size).fill_(int((seconds * 100) / 2))
-    input_percentages = torch.IntTensor(batch_size).fill_(1)
+def iteration(inputs):
+    # targets, align half of the audio
+    targets = torch.ones(int(batch_size * ((seconds * 100) / 2)))
+    target_sizes = torch.empty(batch_size, dtype=torch.int).fill_(int((seconds * 100) / 2))
+    input_percentages = torch.ones(batch_size).fill_(1)
 
-    inputs = Variable(data, requires_grad=False)
-    target_sizes = Variable(target_size, requires_grad=False)
-    targets = Variable(target, requires_grad=False)
     out = model(inputs)
     out = out.transpose(0, 1)  # TxNxH
 
     seq_length = out.size(0)
-    sizes = Variable(input_percentages.mul_(int(seq_length)).int(), requires_grad=False)
+    sizes = input_percentages.mul_(int(seq_length)).int()
     loss = criterion(out, targets, sizes, target_sizes)
     loss = loss / inputs.size(0)  # average the loss by minibatch
     # compute gradient

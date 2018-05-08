@@ -1,4 +1,4 @@
-FROM nvidia/cuda:9.0-cudnn7-devel-ubuntu16.04
+FROM nvidia/cuda:9.1-cudnn7-devel-ubuntu16.04
 
 WORKDIR /workspace/
 
@@ -28,7 +28,7 @@ ENV PATH=$CONDA_PREFIX/bin:$PATH
 ENV CONDA_AUTO_UPDATE_CONDA=false
 RUN conda install -y "conda>=4.4.11" && conda clean -ya
 
-RUN conda install pytorch torchvision cuda90 -c pytorch && conda clean -ya
+RUN conda install pytorch torchvision cuda91 -c pytorch && conda clean -ya
 
 # Install HDF5 Python bindings
 RUN conda install -y \
@@ -60,13 +60,7 @@ RUN cd ctcdecode; pip install .
 ADD . /workspace/deepspeech.pytorch
 RUN cd deepspeech.pytorch; pip install -r requirements.txt
 
-# Set-up Docker to PyCharm remote debugging
-RUN apt-get install -y openssh-server
-RUN mkdir /var/run/sshd
-RUN echo 'root:testssh' | chpasswd
-RUN sed -i 's/PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
-RUN sed 's@session\s*required\s*pam_loginuid.so@session optional pam_loginuid.so@g' -i /etc/pam.d/sshd
-RUN echo "export VISIBLE=now" >> /etc/profile
-RUN service ssh restart
-
-WORKDIR /workspace/deepspeech.pytorch
+# launch jupiter
+RUN pip install jupyter
+RUN mkdir data; mkdir notebooks;
+CMD jupyter-notebook --ip="*" --no-browser --allow-root
