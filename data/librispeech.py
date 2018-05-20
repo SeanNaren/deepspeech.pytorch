@@ -4,6 +4,7 @@ import tarfile
 import argparse
 import subprocess
 from utils import create_manifest
+from tqdm import tqdm
 import shutil
 
 parser = argparse.ArgumentParser(description='Processes and downloads LibriSpeech dataset.')
@@ -94,7 +95,7 @@ def main():
             os.remove(target_filename)
             print("Converting flac files to wav and extracting transcripts...")
             assert os.path.exists(extracted_dir), "Archive {} was not properly uncompressed.".format(filename)
-            for root, subdirs, files in os.walk(extracted_dir):
+            for root, subdirs, files in tqdm(os.walk(extracted_dir)):
                 for f in files:
                     if f.find(".flac") != -1:
                         _process_file(wav_dir=split_wav_dir, txt_dir=split_txt_dir,

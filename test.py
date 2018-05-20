@@ -1,12 +1,11 @@
 import argparse
 
 import numpy as np
-from torch.autograd import Variable
+import torch
 from tqdm import tqdm
 
-from decoder import GreedyDecoder
-
 from data.data_loader import SpectrogramDataset, AudioDataLoader
+from decoder import GreedyDecoder
 from model import DeepSpeech
 
 parser = argparse.ArgumentParser(description='DeepSpeech transcription')
@@ -38,6 +37,7 @@ beam_args.add_argument('--lm-workers', default=1, type=int, help='Number of LM p
 args = parser.parse_args()
 
 if __name__ == '__main__':
+    torch.set_grad_enabled(False)
     model = DeepSpeech.load_model(args.model_path, cuda=args.cuda)
     model.eval()
 
@@ -63,8 +63,6 @@ if __name__ == '__main__':
     output_data = []
     for i, (data) in tqdm(enumerate(test_loader), total=len(test_loader)):
         inputs, targets, input_percentages, target_sizes = data
-
-        inputs = Variable(inputs, volatile=True)
 
         # unflatten targets
         split_targets = []
