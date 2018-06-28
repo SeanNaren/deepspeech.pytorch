@@ -56,6 +56,8 @@ RUN cd audio; python setup.py install
 RUN git clone --recursive https://github.com/parlance/ctcdecode.git
 RUN cd ctcdecode; pip install .
 
+ENV LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
+
 # install deepspeech2 pytorch implementation
 ADD . /workspace/deepspeech.pytorch
 RUN cd deepspeech.pytorch; pip install -r requirements.txt
