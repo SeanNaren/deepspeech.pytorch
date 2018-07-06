@@ -184,7 +184,7 @@ We support multi-GPU training via the distributed parallel wrapper (see [here](h
 To use multi-GPU:
 
 ```
-python -m multiproc python train.py --visdom --cuda # Add your parameters as normal, multiproc will scale to all GPUs automatically
+python -m multiproc train.py --visdom --cuda # Add your parameters as normal, multiproc will scale to all GPUs automatically
 ```
 
 multiproc will open a log for all processes other than the main process.
