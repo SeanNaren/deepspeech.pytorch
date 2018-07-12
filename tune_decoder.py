@@ -83,7 +83,9 @@ if __name__ == '__main__':
         print("error: LM must be provided for tuning")
         sys.exit(1)
 
-    model = DeepSpeech.load_model(args.model_path, cuda=False)
+    model = DeepSpeech.load_model(args.model_path)
+    if args.cuda:
+        model.cuda()
     model.eval()
 
     labels = DeepSpeech.get_labels(model)
