@@ -5,6 +5,7 @@ import io
 import os
 from tqdm import tqdm
 import subprocess
+import torch.distributed as dist
 
 
 def create_manifest(data_path, output_path, min_duration=None, max_duration=None):
@@ -34,3 +35,10 @@ def order_and_prune_files(file_paths, min_duration, max_duration):
 
     duration_file_paths.sort(key=func)
     return [x[0] for x in duration_file_paths]  # Remove durations
+
+def reduce_tensor(tensor, world_size):
+    rt = tensor.clone()
+    dist.all_reduce(rt, op=dist.reduce_op.SUM)
+    rt /= world_size
+    return rt
+

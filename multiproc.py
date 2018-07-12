@@ -4,6 +4,13 @@ import subprocess
 
 argslist = list(sys.argv)[1:]
 world_size = torch.cuda.device_count()
+device_ids = None
+if '--device-ids' in argslist: # Manually specified GPU IDs
+    device_ids = argslist[argslist.index('--device-ids') + 1].strip().split(',')
+    world_size = len(device_ids)
+    # Remove GPU IDs since these are not for the training script
+    argslist.pop(argslist.index('--device-ids') + 1)
+    argslist.pop(argslist.index('--device-ids'))
 
 if '--world-size' in argslist:
     argslist[argslist.index('--world-size') + 1] = str(world_size)
@@ -20,7 +27,10 @@ for i in range(world_size):
         argslist.append('--rank')
         argslist.append(str(i))
     if '--gpu-rank' in argslist:
-        argslist[argslist.index('--gpu-rank') + 1] = str(i)
+        if device_ids:
+            argslist[argslist.index('--gpu-rank') + 1] = str(device_ids[i])
+        else:
+            argslist[argslist.index('--gpu-rank') + 1] = str(i)
     else:
         argslist.append('--gpu-rank')
         argslist.append(str(i))
