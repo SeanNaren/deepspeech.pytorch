@@ -42,7 +42,8 @@ class SequenceWise(nn.Module):
 class MaskConv(nn.Module):
     def __init__(self, seq_module):
         """
-        Adds padding to the output of the module based on the given lengths
+        Adds padding to the output of the module based on the given lengths. This is to ensure that the
+        results of the model do not change when batch sizes change during inference.
         Input needs to be in the shape of (BxCxDxT)
         :param seq_module: The sequential module containing the conv stack.
         """
@@ -57,10 +58,12 @@ class MaskConv(nn.Module):
         """
         for module in self.seq_module:
             x = module(x)
+            mask = torch.ByteTensor(x.size()).fill_(0).cuda()  # TODO don't hard-code cuda
             for i, length in enumerate(lengths):
                 length = length.item()
-                if (x[i].size(2) - length) > 0:
-                    x[i].narrow(2, length, x[i].size(2) - length).fill_(0)
+                if (mask[i].size(2) - length) > 0:
+                    mask[i].narrow(2, length, mask[i].size(2) - length).fill_(1)
+            x = x.masked_fill(mask, 0)
         return x, lengths
 
 
@@ -80,7 +83,7 @@ class BatchRNN(nn.Module):
         self.bidirectional = bidirectional
         self.batch_norm = SequenceWise(nn.BatchNorm1d(input_size)) if batch_norm else None
         self.rnn = rnn_type(input_size=input_size, hidden_size=hidden_size,
-                            bidirectional=bidirectional, bias=False)
+                            bidirectional=bidirectional, bias=True)
         self.num_directions = 2 if bidirectional else 1
 
     def flatten_parameters(self):
@@ -91,10 +94,9 @@ class BatchRNN(nn.Module):
             x = self.batch_norm(x)
         x = nn.utils.rnn.pack_padded_sequence(x, output_lengths)
         x, h = self.rnn(x)
-        if self.bidirectional:
-            x = x._replace(
-                data=x.data[:, :self.hidden_size] + x.data[:, self.hidden_size:])  # sum bidirectional outputs
         x, _ = nn.utils.rnn.pad_packed_sequence(x)
+        if self.bidirectional:
+            x = x.view(x.size(0), x.size(1), 2, -1).sum(2).view(x.size(0), x.size(1), -1)  # (TxNxH*2) -> (TxNxH) by sum
         return x
 
 
@@ -206,7 +208,7 @@ class DeepSpeech(nn.Module):
         x = x.transpose(1, 2).transpose(0, 1).contiguous()  # TxNxH
 
         for rnn in self.rnns:
-            x = rnn(x, output_lengths.numpy())
+            x = rnn(x, output_lengths)
 
         if not self._bidirectional:  # no need for lookahead layer in bidirectional
             x = self.lookahead(x)
@@ -231,7 +233,7 @@ class DeepSpeech(nn.Module):
         return seq_len.int()
 
     @classmethod
-    def load_model(cls, path, cuda=False):
+    def load_model(cls, path):
         package = torch.load(path, map_location=lambda storage, loc: storage)
         model = cls(rnn_hidden_size=package['hidden_size'], nb_layers=package['hidden_layers'],
                     labels=package['labels'], audio_conf=package['audio_conf'],
@@ -247,25 +249,20 @@ class DeepSpeech(nn.Module):
         model.load_state_dict(package['state_dict'])
         for x in model.rnns:
             x.flatten_parameters()
-        if cuda:
-            model = torch.nn.DataParallel(model).cuda()
         return model
 
     @classmethod
-    def load_model_package(cls, package, cuda=False):
+    def load_model_package(cls, package):
         model = cls(rnn_hidden_size=package['hidden_size'], nb_layers=package['hidden_layers'],
                     labels=package['labels'], audio_conf=package['audio_conf'],
                     rnn_type=supported_rnns[package['rnn_type']], bidirectional=package.get('bidirectional', True))
         model.load_state_dict(package['state_dict'])
-        if cuda:
-            model = torch.nn.DataParallel(model).cuda()
         return model
 
     @staticmethod
     def serialize(model, optimizer=None, epoch=None, iteration=None, loss_results=None,
                   cer_results=None, wer_results=None, avg_loss=None, meta=None):
-        model_is_cuda = next(model.parameters()).is_cuda
-        model = model.module if model_is_cuda else model
+        model = model.module if DeepSpeech.is_parallel(model) else model
         package = {
             'version': model._version,
             'hidden_size': model._hidden_size,
@@ -294,8 +291,7 @@ class DeepSpeech(nn.Module):
 
     @staticmethod
     def get_labels(model):
-        model_is_cuda = next(model.parameters()).is_cuda
-        return model.module._labels if model_is_cuda else model._labels
+        return model.module._labels if model.is_parallel(model) else model._labels
 
     @staticmethod
     def get_param_size(model):
@@ -309,13 +305,11 @@ class DeepSpeech(nn.Module):
 
     @staticmethod
     def get_audio_conf(model):
-        model_is_cuda = next(model.parameters()).is_cuda
-        return model.module._audio_conf if model_is_cuda else model._audio_conf
+        return model.module._audio_conf if DeepSpeech.is_parallel(model) else model._audio_conf
 
     @staticmethod
     def get_meta(model):
-        model_is_cuda = next(model.parameters()).is_cuda
-        m = model.module if model_is_cuda else model
+        m = model.module if DeepSpeech.is_parallel(model) else model
         meta = {
             "version": m._version,
             "hidden_size": m._hidden_size,
@@ -323,6 +317,11 @@ class DeepSpeech(nn.Module):
             "rnn_type": supported_rnns_inv[m._rnn_type]
         }
         return meta
+
+    @staticmethod
+    def is_parallel(model):
+        return isinstance(model, torch.nn.parallel.DataParallel) or \
+               isinstance(model, torch.nn.parallel.DistributedDataParallel)
 
 
 if __name__ == '__main__':

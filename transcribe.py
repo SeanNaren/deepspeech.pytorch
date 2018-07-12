@@ -69,7 +69,9 @@ def decode_results(model, decoded_output, decoded_offsets):
 
 if __name__ == '__main__':
     torch.set_grad_enabled(False)
-    model = DeepSpeech.load_model(args.model_path, cuda=args.cuda)
+    model = DeepSpeech.load_model(args.model_path)
+    if args.cuda:
+        model.cuda()
     model.eval()
 
     labels = DeepSpeech.get_labels(model)

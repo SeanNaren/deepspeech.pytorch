@@ -38,7 +38,9 @@ args = parser.parse_args()
 
 if __name__ == '__main__':
     torch.set_grad_enabled(False)
-    model = DeepSpeech.load_model(args.model_path, cuda=args.cuda)
+    model = DeepSpeech.load_model(args.model_path)
+    if args.cuda:
+        model.cuda()
     model.eval()
 
     labels = DeepSpeech.get_labels(model)
@@ -63,7 +65,7 @@ if __name__ == '__main__':
     output_data = []
     for i, (data) in tqdm(enumerate(test_loader), total=len(test_loader)):
         inputs, targets, input_percentages, target_sizes = data
-        input_sizes = Variable(input_percentages.mul_(int(inputs.size(3))).int(), requires_grad=False)
+        input_sizes = input_percentages.mul_(int(inputs.size(3))).int()
 
         # unflatten targets
         split_targets = []
@@ -79,7 +81,7 @@ if __name__ == '__main__':
 
         if decoder is None:
             # add output to data array, and continue
-            output_data.append((out.data.cpu().numpy(), output_sizes.data.cpu().numpy()))
+            output_data.append((out.numpy(), output_sizes.numpy()))
             continue
 
         decoded_output, _ = decoder.decode(out.data, output_sizes.data)

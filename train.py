@@ -1,5 +1,4 @@
 import argparse
-import errno
 import json
 import os
 import time
@@ -10,7 +9,6 @@ from tqdm import tqdm
 from warpctc_pytorch import CTCLoss
 
 from data.data_loader import AudioDataLoader, SpectrogramDataset, BucketingSampler, DistributedBucketingSampler
-from data.distributed import DistributedDataParallel
 from decoder import GreedyDecoder
 from model import DeepSpeech, supported_rnns
 
@@ -125,32 +123,11 @@ if __name__ == '__main__':
         viz_window = None
         epochs = torch.arange(1, args.epochs + 1)
     if args.tensorboard and main_proc:
-        try:
-            os.makedirs(args.log_dir)
-        except OSError as e:
-            if e.errno == errno.EEXIST:
-                print('Tensorboard log directory already exists.')
-                for file in os.listdir(args.log_dir):
-                    file_path = os.path.join(args.log_dir, file)
-                    try:
-                        if os.path.isfile(file_path):
-                            os.unlink(file_path)
-                    except Exception:
-                        raise
-            else:
-                raise
+        os.makedirs(args.log_dir, exist_ok=True)
         from tensorboardX import SummaryWriter
 
         tensorboard_writer = SummaryWriter(args.log_dir)
-
-    try:
-        os.makedirs(save_folder)
-    except OSError as e:
-        if e.errno == errno.EEXIST:
-            print('Model Save directory already exists.')
-        else:
-            raise
-    criterion = CTCLoss()
+    os.makedirs(save_folder, exist_ok=True)
 
     avg_loss, start_epoch, start_iter = 0, 0, 0
     if args.continue_from:  # Starting from previous model
@@ -164,15 +141,6 @@ if __name__ == '__main__':
                                     momentum=args.momentum, nesterov=True)
         if not args.finetune:  # Don't want to restart training
             optimizer.load_state_dict(package['optim_dict'])
-
-            # Temporary fix for pytorch #2830 & #1442 while pull request #3658 in not incorporated in a release
-            # TODO : remove when a new release of pytorch include pull request #3658
-            if args.cuda:
-                for state in optimizer.state.values():
-                    for k, v in state.items():
-                        if torch.is_tensor(v):
-                            state[k] = v.cuda()
-
             start_epoch = int(package.get('epoch', 1)) - 1  # Index start at 0 for training
             start_iter = package.get('iteration', None)
             if start_iter is None:
@@ -228,7 +196,7 @@ if __name__ == '__main__':
         parameters = model.parameters()
         optimizer = torch.optim.SGD(parameters, lr=args.lr,
                                     momentum=args.momentum, nesterov=True)
-
+    criterion = CTCLoss()
     decoder = GreedyDecoder(labels)
     train_dataset = SpectrogramDataset(audio_conf=audio_conf, manifest_filepath=args.train_manifest, labels=labels,
                                        normalize=True, augment=args.augment)
@@ -248,12 +216,11 @@ if __name__ == '__main__':
         print("Shuffling batches for the following epochs")
         train_sampler.shuffle(start_epoch)
 
-    if args.cuda and not args.distributed:
-        model = torch.nn.DataParallel(model, device_ids=args.device_ids).cuda()
-    elif args.cuda and args.distributed:
+    if args.cuda:
         model.cuda()
-        model = torch.nn.parallel.DistributedDataParallel(model,
-                                                          device_ids=(int(args.gpu_rank),) if args.rank else None)
+        if args.distributed:
+            model = torch.nn.parallel.DistributedDataParallel(model,
+                                                              device_ids=(int(args.gpu_rank),) if args.rank else None)
 
     print(model)
     print("Number of parameters: %d" % DeepSpeech.get_param_size(model))
