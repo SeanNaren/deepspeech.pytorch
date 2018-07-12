@@ -238,14 +238,6 @@ class DeepSpeech(nn.Module):
         model = cls(rnn_hidden_size=package['hidden_size'], nb_layers=package['hidden_layers'],
                     labels=package['labels'], audio_conf=package['audio_conf'],
                     rnn_type=supported_rnns[package['rnn_type']], bidirectional=package.get('bidirectional', True))
-        # the blacklist parameters are params that were previous erroneously saved by the model
-        # care should be taken in future versions that if batch_norm on the first rnn is required
-        # that it be named something else
-        blacklist = ['rnns.0.batch_norm.module.weight', 'rnns.0.batch_norm.module.bias',
-                     'rnns.0.batch_norm.module.running_mean', 'rnns.0.batch_norm.module.running_var']
-        for x in blacklist:
-            if x in package['state_dict']:
-                del package['state_dict'][x]
         model.load_state_dict(package['state_dict'])
         for x in model.rnns:
             x.flatten_parameters()
