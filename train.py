@@ -9,6 +9,7 @@ from tqdm import tqdm
 from warpctc_pytorch import CTCLoss
 
 from data.data_loader import AudioDataLoader, SpectrogramDataset, BucketingSampler, DistributedBucketingSampler
+from data.utils import reduce_tensor
 from decoder import GreedyDecoder
 from model import DeepSpeech, supported_rnns
 
@@ -248,13 +249,14 @@ if __name__ == '__main__':
             loss = criterion(out, targets, output_sizes, target_sizes)
             loss = loss / inputs.size(0)  # average the loss by minibatch
 
-            loss_sum = loss.data.sum()
             inf = float("inf")
-            if loss_sum == inf or loss_sum == -inf:
-                print("WARNING: received an inf loss, setting loss value to 0")
-                loss_value = 0
+            if args.distributed:
+                loss_value = reduce_tensor(loss, args.world_size)[0]
             else:
                 loss_value = loss.item()
+            if loss_value == inf or loss_value == -inf:
+                print("WARNING: received an inf loss, setting loss value to 0")
+                loss_value = 0
 
             avg_loss += loss_value
             losses.update(loss_value, inputs.size(0))
