@@ -191,6 +191,12 @@ multiproc will open a log for all processes other than the main process.
 
 We suggest using the gloo backend which defaults to TCP if Infiniband isn't available. Using NCCL2 is also possible as a backend. More information [here](http://pytorch.org/docs/master/distributed.html#distributed-basics).
 
+You can also specify specific GPU IDs rather than allowing the script to use all available GPUs:
+
+```
+python -m multiproc train.py --visdom --cuda --device-ids 0,1,2,3 # Add your parameters as normal, will only run on 4 GPUs
+```
+
 ### Noise Augmentation/Injection
 
 There is support for two different types of noise; noise augmentation and noise injection.
