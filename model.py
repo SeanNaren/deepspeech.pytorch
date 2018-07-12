@@ -58,7 +58,9 @@ class MaskConv(nn.Module):
         """
         for module in self.seq_module:
             x = module(x)
-            mask = torch.ByteTensor(x.size()).fill_(0).cuda()  # TODO don't hard-code cuda
+            mask = torch.ByteTensor(x.size()).fill_(0)
+            if x.is_cuda:
+                mask = mask.cuda()
             for i, length in enumerate(lengths):
                 length = length.item()
                 if (mask[i].size(2) - length) > 0:
