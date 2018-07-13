@@ -240,7 +240,7 @@ run.
 To continue from a checkpointed model that has been saved:
 
 ```
-python train.py --continue-from models/deepspeech_checkpoint_epoch_N_iter_N.pth.tar
+python train.py --continue-from models/deepspeech_checkpoint_epoch_N_iter_N.pth
 ```
 
 This continues from the same training state as well as recreates the visdom graph to continue from if enabled.
@@ -264,7 +264,7 @@ Use the flag `--help` to see other parameters that can be used with the script.
 Saved models contain the metadata of their training process. To see the metadata run the below command:
 
 ```
-python model.py --model-path models/deepspeech.pth.tar
+python model.py --model-path models/deepspeech.pth
 ```
 
 To also note, there is no final softmax layer on the model as when trained, warp-ctc does this softmax internally. This will have to also be implemented in complex decoders if anything is built on top of the model, so take this into consideration!
@@ -281,6 +281,16 @@ An example script to output a transcription has been provided:
 
 ```
 python transcribe.py --model-path models/deepspeech.pth --audio-path /path/to/audio.wav
+```
+
+## Server
+
+Included is a basic server script that will allow post request to be sent to the server to transcribe files.
+
+```
+python server.py --host 0.0.0.0 --port 8000 # Run on one window
+
+curl ...
 ```
 
 ### Alternate Decoders
