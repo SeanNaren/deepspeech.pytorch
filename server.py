@@ -48,6 +48,7 @@ def main():
     parser = add_inference_args(parser)
     parser = add_decoder_args(parser)
     args = parser.parse_args()
+    logging.getLogger().setLevel(logging.DEBUG)
 
     logging.info('Setting up server...')
     torch.set_grad_enabled(False)
