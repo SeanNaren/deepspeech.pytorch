@@ -279,7 +279,7 @@ if __name__ == '__main__':
                       'Loss {loss.val:.4f} ({loss.avg:.4f})\t'.format(
                     (epoch + 1), (i + 1), len(train_sampler), batch_time=batch_time, data_time=data_time, loss=losses))
             if args.checkpoint_per_batch > 0 and i > 0 and (i + 1) % args.checkpoint_per_batch == 0 and main_proc:
-                file_path = '%s/deepspeech_checkpoint_epoch_%d_iter_%d.pth.tar' % (save_folder, epoch + 1, i + 1)
+                file_path = '%s/deepspeech_checkpoint_epoch_%d_iter_%d.pth' % (save_folder, epoch + 1, i + 1)
                 print("Saving checkpoint model to %s" % file_path)
                 torch.save(DeepSpeech.serialize(model, optimizer=optimizer, epoch=epoch, iteration=i,
                                                 loss_results=loss_results,
@@ -365,7 +365,7 @@ if __name__ == '__main__':
                         tensorboard_writer.add_histogram(tag, to_np(value), epoch + 1)
                         tensorboard_writer.add_histogram(tag + '/grad', to_np(value.grad), epoch + 1)
             if args.checkpoint and main_proc:
-                file_path = '%s/deepspeech_%d.pth.tar' % (save_folder, epoch + 1)
+                file_path = '%s/deepspeech_%d.pth' % (save_folder, epoch + 1)
                 torch.save(DeepSpeech.serialize(model, optimizer=optimizer, epoch=epoch, loss_results=loss_results,
                                                 wer_results=wer_results, cer_results=cer_results),
                            file_path)
