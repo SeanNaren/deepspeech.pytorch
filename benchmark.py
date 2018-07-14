@@ -61,11 +61,9 @@ print("Number of parameters: %d" % DeepSpeech.get_param_size(model))
 parameters = model.parameters()
 optimizer = torch.optim.SGD(parameters, lr=3e-4,
                             momentum=0.9, nesterov=True)
+model.cuda()
 if args.distributed:
-    model.cuda()
     model = torch.nn.parallel.DistributedDataParallel(model)
-else:
-    model = torch.nn.DataParallel(model).cuda()
 
 criterion = CTCLoss()
 
@@ -78,13 +76,12 @@ def iteration(inputs):
     targets = torch.ones(int(batch_size * ((seconds * 100) / 2)))
     target_sizes = torch.empty(batch_size, dtype=torch.int).fill_(int((seconds * 100) / 2))
     input_percentages = torch.ones(batch_size).fill_(1)
+    input_sizes = input_percentages.mul_(int(inputs.size(3))).int()
 
-    out = model(inputs)
+    out, output_sizes = model(inputs, input_sizes)
     out = out.transpose(0, 1)  # TxNxH
 
-    seq_length = out.size(0)
-    sizes = input_percentages.mul_(int(seq_length)).int()
-    loss = criterion(out, targets, sizes, target_sizes)
+    loss = criterion(out, targets, output_sizes, target_sizes)
     loss = loss / inputs.size(0)  # average the loss by minibatch
     # compute gradient
     optimizer.zero_grad()
