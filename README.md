@@ -290,7 +290,7 @@ Included is a basic server script that will allow post request to be sent to the
 ```
 python server.py --host 0.0.0.0 --port 8000 # Run on one window
 
-curl ...
+curl -X POST http://0.0.0.0:8000/transcribe -H "Content-type: multipart/form-data" -F "file=@/path/to/input.wav"
 ```
 
 ### Alternate Decoders
