@@ -139,6 +139,8 @@ if __name__ == '__main__':
         optimizer = torch.optim.SGD(parameters, lr=args.lr,
                                     momentum=args.momentum, nesterov=True)
         if not args.finetune:  # Don't want to restart training
+            if args.cuda:
+                model.cuda()
             optimizer.load_state_dict(package['optim_dict'])
             start_epoch = int(package.get('epoch', 1)) - 1  # Index start at 0 for training
             start_iter = package.get('iteration', None)
