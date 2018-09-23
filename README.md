@@ -76,7 +76,7 @@ Currently supports AN4, TEDLIUM, Voxforge and LibriSpeech. Scripts will setup th
 
 ### HTS (for training Vietnamese corpus)
 
-To download the hts dataset: download from https://drive.google.com/file/d/1WNU-8vJMQKDAuzB2zTSk9bYOdqAejmm7/view?usp=sharing and extract it into data folder
+To download the hts dataset: download from https://drive.google.com/file/d/1WNU-8vJMQKDAuzB2zTSk9bYOdqAejmm7/view?usp=sharing and extract it into `data` folder
 
 To setup the hts dataset: run below command in the root folder of the repo:
 
