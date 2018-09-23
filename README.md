@@ -74,6 +74,16 @@ nvidia-docker run -ti -v `pwd`/data:/workspace/data --entrypoint=/bin/bash deeps
 
 Currently supports AN4, TEDLIUM, Voxforge and LibriSpeech. Scripts will setup the dataset and create manifest files used in dataloading.
 
+### HTS (for training Vietnamese corpus)
+
+To download the hts dataset: download from https://drive.google.com/file/d/1WNU-8vJMQKDAuzB2zTSk9bYOdqAejmm7/view?usp=sharing and extract it into data folder
+
+To setup the hts dataset: run below command in the root folder of the repo:
+
+```
+cd data; python hts.py
+```
+
 ### AN4
 
 To download and setup the an4 dataset run below command in the root folder of the repo:
