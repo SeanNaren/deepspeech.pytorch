@@ -223,6 +223,7 @@ if __name__ == '__main__':
             model = torch.nn.parallel.DistributedDataParallel(model,
                                                               device_ids=(int(args.gpu_rank),) if args.rank else None)
 
+    print('\nparsed options:\n{}\n'.format(vars(args)))
     print(model)
     print("Number of parameters: %d" % DeepSpeech.get_param_size(model))
 
