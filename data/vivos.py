@@ -18,9 +18,11 @@ args = parser.parse_args()
 def main():
     train_path = args.target_dir + '/train/'
     test_path = args.target_dir + '/test/'
+    test2_path = args.target_dir + '/test2/'
     print ('\n', 'Creating manifests...')
     create_manifest(train_path, 'vivos_train_manifest.csv', args.min_duration, args.max_duration)
     create_manifest(test_path, 'vivos_test_manifest.csv')
+    create_manifest(test2_path, 'vivos_test2_manifest.csv')
 
 
 if __name__ == '__main__':
