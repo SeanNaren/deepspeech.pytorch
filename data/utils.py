@@ -42,3 +42,18 @@ def reduce_tensor(tensor, world_size):
     rt /= world_size
     return rt
 
+def create_manifest_for_bk_dataset(data_path, output_path, min_duration=None, max_duration=None):
+    file_paths = [os.path.join(dirpath, f)
+                  for dirpath, dirnames, files in os.walk(data_path)
+                  for f in fnmatch.filter(files, '*.wav')]
+    file_paths = order_and_prune_files(file_paths, min_duration, max_duration)
+    with io.FileIO(output_path, "w") as file:
+        for wav_path in tqdm(file_paths, total=len(file_paths)):
+            start = wav_path.find('wav/')
+            end = wav_path.find('/s')
+            transcript_path = wav_path[:start + 4] + wav_path[end + 1:]
+            transcript_path = transcript_path.replace('/wav/', '/txt/').replace('.wav', '.txt')
+            sample = os.path.abspath(wav_path) + ',' + os.path.abspath(transcript_path) + '\n'
+            file.write(sample.encode('utf-8'))
+    print('\n')
+

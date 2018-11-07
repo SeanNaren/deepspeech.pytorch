@@ -19,8 +19,8 @@ windows = {'hamming': scipy.signal.hamming, 'hann': scipy.signal.hann, 'blackman
            'bartlett': scipy.signal.bartlett}
 
 
-def load_audio(path):
-    sound, _ = torchaudio.load(path, normalization=True)
+def load_audio_by_torchaudio(path):
+    sound, sample_rate = torchaudio.load(path, normalization=True)
     sound = sound.numpy()
     if len(sound.shape) > 1:
         if sound.shape[1] == 1:
@@ -29,6 +29,12 @@ def load_audio(path):
             sound = sound.mean(axis=1)  # multiple channels, average
     return sound
 
+def load_audio_by_librosa(path):
+    sound, _ = librosa.load(filename, sr=16000)
+    return sound
+
+def load_audio(path):
+    return load_audio_by_torchaudio(path)
 
 class AudioParser(object):
     def parse_transcript(self, transcript_path):
