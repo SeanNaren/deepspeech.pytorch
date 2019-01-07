@@ -1,4 +1,4 @@
-FROM nvidia/cuda:9.1-cudnn7-devel-ubuntu16.04
+FROM nvidia/cuda:10.0-cudnn7-devel-ubuntu16.04
 
 WORKDIR /workspace/
 
@@ -28,7 +28,7 @@ ENV PATH=$CONDA_PREFIX/bin:$PATH
 ENV CONDA_AUTO_UPDATE_CONDA=false
 RUN conda install -y "conda>=4.4.11" && conda clean -ya
 
-RUN conda install pytorch torchvision cuda91 -c pytorch && conda clean -ya
+RUN conda install pytorch torchvision cuda100 -c pytorch && conda clean -ya
 
 # Install HDF5 Python bindings
 RUN conda install -y \
