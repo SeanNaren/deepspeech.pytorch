@@ -103,6 +103,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     args.distributed = args.world_size > 1
     main_proc = True
+    device = torch.device("cuda" if args.cuda else "cpu")
     if args.distributed:
         if args.gpu_rank:
             torch.cuda.set_device(int(args.gpu_rank))
@@ -139,8 +140,7 @@ if __name__ == '__main__':
         optimizer = torch.optim.SGD(parameters, lr=args.lr,
                                     momentum=args.momentum, nesterov=True)
         if not args.finetune:  # Don't want to restart training
-            if args.cuda:
-                model.cuda()
+            model = model.to(device)
             optimizer.load_state_dict(package['optim_dict'])
             start_epoch = int(package.get('epoch', 1)) - 1  # Index start at 0 for training
             start_iter = package.get('iteration', None)
@@ -217,11 +217,10 @@ if __name__ == '__main__':
         print("Shuffling batches for the following epochs")
         train_sampler.shuffle(start_epoch)
 
-    if args.cuda:
-        model.cuda()
-        if args.distributed:
-            model = torch.nn.parallel.DistributedDataParallel(model,
-                                                              device_ids=(int(args.gpu_rank),) if args.rank else None)
+    model = model.to(device)
+    if args.distributed:
+        model = torch.nn.parallel.DistributedDataParallel(model,
+                                                          device_ids=(int(args.gpu_rank),) if args.rank else None)
 
     print(model)
     print("Number of parameters: %d" % DeepSpeech.get_param_size(model))
@@ -242,18 +241,17 @@ if __name__ == '__main__':
             # measure data loading time
             data_time.update(time.time() - end)
 
-            if args.cuda:
-                inputs = inputs.cuda()
+            inputs = inputs.to(device)
 
             out, output_sizes = model(inputs, input_sizes)
             out = out.transpose(0, 1)  # TxNxH
 
-            loss = criterion(out, targets, output_sizes, target_sizes)
+            loss = criterion(out, targets, output_sizes, target_sizes).to(device)
             loss = loss / inputs.size(0)  # average the loss by minibatch
 
             inf = float("inf")
             if args.distributed:
-                loss_value = reduce_tensor(loss, args.world_size)[0]
+                loss_value = reduce_tensor(loss, args.world_size).item()
             else:
                 loss_value = loss.item()
             if loss_value == inf or loss_value == -inf:
@@ -311,12 +309,11 @@ if __name__ == '__main__':
                     split_targets.append(targets[offset:offset + size])
                     offset += size
 
-                if args.cuda:
-                    inputs = inputs.cuda()
+                inputs = inputs.to(device)
 
                 out, output_sizes = model(inputs, input_sizes)
 
-                decoded_output, _ = decoder.decode(out.data, output_sizes)
+                decoded_output, _ = decoder.decode(out, output_sizes)
                 target_strings = decoder.convert_to_strings(split_targets)
                 wer, cer = 0, 0
                 for x in range(len(target_strings)):

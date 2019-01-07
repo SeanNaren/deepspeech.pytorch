@@ -52,11 +52,10 @@ def decode_results(model, decoded_output, decoded_offsets):
     return results
 
 
-def transcribe(audio_path, parser, model, decoder, cuda=False):
+def transcribe(audio_path, parser, model, decoder, device):
     spect = parser.parse_audio(audio_path).contiguous()
     spect = spect.view(1, 1, spect.size(0), spect.size(1))
-    if cuda:
-        spect = spect.cuda()
+    spect.to(device)
     input_sizes = torch.IntTensor([spect.size(3)]).int()
     out, output_sizes = model(spect, input_sizes)
     decoded_output, decoded_offsets = decoder.decode(out, output_sizes)
@@ -66,8 +65,8 @@ def transcribe(audio_path, parser, model, decoder, cuda=False):
 if __name__ == '__main__':
     torch.set_grad_enabled(False)
     model = DeepSpeech.load_model(args.model_path)
-    if args.cuda:
-        model.cuda()
+    device = torch.device("cuda" if args.cuda else "cpu")
+    model.to(device)
     model.eval()
 
     labels = DeepSpeech.get_labels(model)
@@ -84,5 +83,5 @@ if __name__ == '__main__':
 
     parser = SpectrogramParser(audio_conf, normalize=True)
 
-    decoded_output, decoded_offsets = transcribe(args.audio_path, parser, model, decoder, args.cuda)
+    decoded_output, decoded_offsets = transcribe(args.audio_path, parser, model, decoder, device)
     print(json.dumps(decode_results(model, decoded_output, decoded_offsets)))

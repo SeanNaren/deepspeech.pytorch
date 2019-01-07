@@ -25,8 +25,8 @@ args = parser.parse_args()
 if __name__ == '__main__':
     torch.set_grad_enabled(False)
     model = DeepSpeech.load_model(args.model_path)
-    if args.cuda:
-        model.cuda()
+    device = torch.device("cuda" if args.cuda else "cpu")
+    model = model.to(device)
     model.eval()
 
     labels = DeepSpeech.get_labels(model)
@@ -60,9 +60,7 @@ if __name__ == '__main__':
             split_targets.append(targets[offset:offset + size])
             offset += size
 
-        if args.cuda:
-            inputs = inputs.cuda()
-
+        inputs = inputs.to(device)
         out, output_sizes = model(inputs, input_sizes)
 
         if decoder is None:
