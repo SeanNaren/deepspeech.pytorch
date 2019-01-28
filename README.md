@@ -1,51 +1,57 @@
 # deepspeech.pytorch
 
-Implementation of DeepSpeech2 using [Baidu Warp-CTC](https://github.com/baidu-research/warp-ctc).
-Creates a network based on the [DeepSpeech2](http://arxiv.org/pdf/1512.02595v1.pdf) architecture, trained with the CTC activation function.
+Implementation of DeepSpeech2 for PyTorch. Creates a network based on the [DeepSpeech2](http://arxiv.org/pdf/1512.02595v1.pdf) architecture, trained with the CTC activation function.
 
-## Features
+## Installation
 
-* Train DeepSpeech, configurable RNN types and architectures with multi-gpu support.
-* Language model support using kenlm (WIP right now, currently no instructions to build a LM yet).
-* Multiple dataset downloaders, support for AN4, TED, Voxforge and Librispeech. Datasets can be merged, support for custom datasets included.
-* Noise injection for online training to improve noise robustness.
-* Audio augmentation to improve noise robustness.
-* Easy start/stop capabilities in the event of crash or hard stop during training.
-* Visdom/Tensorboard support for visualizing training graphs.
+### Docker
 
-# Installation
+There is no official Dockerhub image, however a Dockerfile is provided to build on your own systems.
+
+```bash
+sudo nvidia-docker build -t  deepspeech2.docker .
+sudo nvidia-docker run -ti -v `pwd`/data:/workspace/data -p 8888:8888 --net=host --ipc=host deepspeech2.docker # Opens a Jupyter notebook, mounting the /data drive in the container
+```
+
+Optionally you can use the command line by changing the entrypoint:
+
+```bash
+sudo nvidia-docker run -ti -v `pwd`/data:/workspace/data --entrypoint=/bin/bash --net=host --ipc=host deepspeech2.docker
+
+```
+
+### From Source
 
 Several libraries are needed to be installed for training to work. I will assume that everything is being installed in
-an Anaconda installation on Ubuntu.
+an Anaconda installation on Ubuntu, with Pytorch 1.0.
 
 Install [PyTorch](https://github.com/pytorch/pytorch#installation) if you haven't already.
 
 Install this fork for Warp-CTC bindings:
 ```
 git clone https://github.com/SeanNaren/warp-ctc.git
-cd warp-ctc
-mkdir build; cd build
-cmake ..
-make
+cd warp-ctc; mkdir build; cd build; cmake ..; make
 export CUDA_HOME="/usr/local/cuda"
-cd ../pytorch_binding
-python setup.py install
+cd ../pytorch_binding && python setup.py install
 ```
 
 Install pytorch audio:
 ```
 sudo apt-get install sox libsox-dev libsox-fmt-all
 git clone https://github.com/pytorch/audio.git
-cd audio
-pip install cffi
-python setup.py install
+cd audio && python setup.py install
+```
+
+Install NVIDIA apex:
+```
+git clone --recursive https://github.com/NVIDIA/apex.git
+cd apex && pip install .
 ```
 
 If you want decoding to support beam search with an optional language model, install ctcdecode:
 ```
 git clone --recursive https://github.com/parlance/ctcdecode.git
-cd ctcdecode
-pip install .
+cd ctcdecode && pip install .
 ```
 
 Finally clone this repo and run this within the repo:
@@ -53,28 +59,13 @@ Finally clone this repo and run this within the repo:
 pip install -r requirements.txt
 ```
 
-## Docker
+## Usage
 
-There is no official Dockerhub image, however a Dockerfile is provided to build on your own systems.
-
-```
-sudo nvidia-docker build -t  deepspeech2.docker .
-sudo nvidia-docker run -ti -v `pwd`/data:/workspace/data -p 8888:8888 deepspeech2.docker # Opens a Jupyter notebook, mounting the /data drive in the container
-```
-
-If you'd prefer bash:
-
-```
-nvidia-docker run -ti -v `pwd`/data:/workspace/data --entrypoint=/bin/bash deepspeech2.docker # Opens a bash terminal, mounting the /data drive in the container
-
-```
-# Usage
-
-## Dataset
+### Datasets
 
 Currently supports AN4, TEDLIUM, Voxforge and LibriSpeech. Scripts will setup the dataset and create manifest files used in dataloading.
 
-### AN4
+#### AN4
 
 To download and setup the an4 dataset run below command in the root folder of the repo:
 
@@ -82,7 +73,7 @@ To download and setup the an4 dataset run below command in the root folder of th
 cd data; python an4.py
 ```
 
-### TEDLIUM
+#### TEDLIUM
 
 You have the option to download the raw dataset file manually or through the script (which will cache it).
 The file is found [here](http://www.openslr.org/resources/19/TEDLIUM_release2.tar.gz).
@@ -93,7 +84,7 @@ To download and setup the TEDLIUM_V2 dataset run below command in the root folde
 cd data; python ted.py # Optionally if you have downloaded the raw dataset file, pass --tar_path /path/to/TEDLIUM_release2.tar.gz
 
 ```
-### Voxforge
+#### Voxforge
 
 To download and setup the Voxforge dataset run the below command in the root folder of the repo:
 
@@ -103,7 +94,7 @@ cd data; python voxforge.py
 
 Note that this dataset does not come with a validation dataset or test dataset.
 
-### LibriSpeech
+#### LibriSpeech
 
 To download and setup the LibriSpeech dataset run the below command in the root folder of the repo:
 
@@ -132,7 +123,7 @@ cd data/
 python librispeech.py --files-to-use "train-clean-100.tar.gz, train-clean-360.tar.gz,train-other-500.tar.gz, dev-clean.tar.gz,dev-other.tar.gz, test-clean.tar.gz,test-other.tar.gz"
 ```
 
-### Custom Dataset
+#### Custom Dataset
 
 To create a custom dataset you must create a CSV file containing the locations of the training data. This has to be in the format of:
 
@@ -145,7 +136,7 @@ To create a custom dataset you must create a CSV file containing the locations o
 The first path is to the audio file, and the second path is to a text file containing the transcript on one line. This can then be used as stated below.
 
 
-### Merging multiple manifest files
+#### Merging multiple manifest files
 
 To create bigger manifest files (to train/test on multiple datasets at once) we can merge manifest files together like below from a directory
 containing all the manifests you want to merge. You can also prune short and long clips out of the new manifest.
@@ -189,7 +180,15 @@ python -m multiproc train.py --visdom --cuda # Add your parameters as normal, mu
 
 multiproc will open a log for all processes other than the main process.
 
-We suggest using the gloo backend which defaults to TCP if Infiniband isn't available. Using NCCL2 is also possible as a backend. More information [here](http://pytorch.org/docs/master/distributed.html#distributed-basics).
+We suggest using the NCCL backend which defaults to TCP if Infiniband isn't available.
+
+## Mixed Precision
+
+If you are using NVIDIA volta cards or above to train your model, it's highly suggested to turn on mixed precision for speed/memory benefits. More information can be found [here](https://docs.nvidia.com/deeplearning/sdk/mixed-precision-training/index.html). Also suggested is to turn on dyanmic loss scaling to handle small grad values:
+
+```
+python train.py --train-manifest data/train_manifest.csv --val-manifest data/val_manifest.csv --mixed-precision --dynamic-loss-scale
+```
 
 You can also specify specific GPU IDs rather than allowing the script to use all available GPUs:
 

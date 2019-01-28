@@ -76,14 +76,9 @@ if __name__ == '__main__':
         sys.exit(1)
 
     model = DeepSpeech.load_model(args.model_path)
-    if args.cuda:
-        model.cuda()
-    model.eval()
 
-    labels = DeepSpeech.get_labels(model)
-    audio_conf = DeepSpeech.get_audio_conf(model)
-    test_dataset = SpectrogramDataset(audio_conf=audio_conf, manifest_filepath=args.test_manifest, labels=labels,
-                                      normalize=True)
+    test_dataset = SpectrogramDataset(audio_conf=model.audio_conf, manifest_filepath=args.test_manifest,
+                                      labels=model.labels, normalize=True)
 
     logits = np.load(args.logits)
     batch_size = logits[0][0].shape[0]
@@ -107,7 +102,8 @@ if __name__ == '__main__':
     futures = []
     for index, (alpha, beta, x, y) in enumerate(params_grid):
         print("Scheduling decode for a={}, b={} ({},{}).".format(alpha, beta, x, y))
-        f = p.apply_async(decode_dataset, (logits, test_dataset, batch_size, alpha, beta, x, y, labels, index),
+        f = p.apply_async(decode_dataset,
+                          (logits, test_dataset, batch_size, alpha, beta, x, y, model.labels, index, device),
                           callback=result_callback)
         futures.append(f)
     for f in futures:

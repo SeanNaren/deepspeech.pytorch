@@ -2,6 +2,7 @@ import argparse
 import warnings
 
 from opts import add_decoder_args, add_inference_args
+from utils import load_model
 
 warnings.simplefilter('ignore')
 
@@ -13,14 +14,6 @@ from data.data_loader import SpectrogramParser
 from model import DeepSpeech
 import os.path
 import json
-
-parser = argparse.ArgumentParser(description='DeepSpeech transcription')
-parser = add_inference_args(parser)
-parser.add_argument('--audio-path', default='audio.wav',
-                    help='Audio file to predict on')
-parser.add_argument('--offsets', dest='offsets', action='store_true', help='Returns time offset information')
-parser = add_decoder_args(parser)
-args = parser.parse_args()
 
 
 def decode_results(model, decoded_output, decoded_offsets):
@@ -63,25 +56,26 @@ def transcribe(audio_path, parser, model, decoder, device):
 
 
 if __name__ == '__main__':
-    torch.set_grad_enabled(False)
-    model = DeepSpeech.load_model(args.model_path)
+    parser = argparse.ArgumentParser(description='DeepSpeech transcription')
+    parser = add_inference_args(parser)
+    parser.add_argument('--audio-path', default='audio.wav',
+                        help='Audio file to predict on')
+    parser.add_argument('--offsets', dest='offsets', action='store_true', help='Returns time offset information')
+    parser = add_decoder_args(parser)
+    args = parser.parse_args()
     device = torch.device("cuda" if args.cuda else "cpu")
-    model.to(device)
-    model.eval()
-
-    labels = DeepSpeech.get_labels(model)
-    audio_conf = DeepSpeech.get_audio_conf(model)
+    model = load_model(device, args.model_path, args.cuda)
 
     if args.decoder == "beam":
         from decoder import BeamCTCDecoder
 
-        decoder = BeamCTCDecoder(labels, lm_path=args.lm_path, alpha=args.alpha, beta=args.beta,
+        decoder = BeamCTCDecoder(model.labels, lm_path=args.lm_path, alpha=args.alpha, beta=args.beta,
                                  cutoff_top_n=args.cutoff_top_n, cutoff_prob=args.cutoff_prob,
                                  beam_width=args.beam_width, num_processes=args.lm_workers)
     else:
-        decoder = GreedyDecoder(labels, blank_index=labels.index('_'))
+        decoder = GreedyDecoder(model.labels, blank_index=model.labels.index('_'))
 
-    parser = SpectrogramParser(audio_conf, normalize=True)
+    parser = SpectrogramParser(model.audio_conf, normalize=True)
 
     decoded_output, decoded_offsets = transcribe(args.audio_path, parser, model, decoder, device)
     print(json.dumps(decode_results(model, decoded_output, decoded_offsets)))
