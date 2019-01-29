@@ -1,17 +1,22 @@
 import argparse
 import json
 import os
+import random
 import time
 
+import numpy as np
 import torch.distributed as dist
 import torch.utils.data.distributed
+from apex.fp16_utils import FP16_Optimizer
+from apex.parallel import DistributedDataParallel
 from tqdm import tqdm
 from warpctc_pytorch import CTCLoss
 
 from data.data_loader import AudioDataLoader, SpectrogramDataset, BucketingSampler, DistributedBucketingSampler
-from data.utils import reduce_tensor
 from decoder import GreedyDecoder
+from logger import VisdomLogger, TensorBoardLogger
 from model import DeepSpeech, supported_rnns
+from utils import convert_model_to_half, reduce_tensor, check_loss
 
 parser = argparse.ArgumentParser(description='DeepSpeech training')
 parser.add_argument('--train-manifest', metavar='DIR',
@@ -64,20 +69,29 @@ parser.add_argument('--no-bidirectional', dest='bidirectional', action='store_fa
                     help='Turn off bi-directional RNNs, introduces lookahead convolution')
 parser.add_argument('--dist-url', default='tcp://127.0.0.1:1550', type=str,
                     help='url used to set up distributed training')
-parser.add_argument('--dist-backend', default='gloo', type=str, help='distributed backend')
+parser.add_argument('--dist-backend', default='nccl', type=str, help='distributed backend')
 parser.add_argument('--world-size', default=1, type=int,
                     help='number of distributed processes')
 parser.add_argument('--rank', default=0, type=int,
                     help='The rank of this process')
 parser.add_argument('--gpu-rank', default=None,
                     help='If using distributed parallel for multi-gpu, sets the GPU for the process')
-
+parser.add_argument('--seed', default=123456, type=int, help='Seed to generators')
+parser.add_argument('--mixed-precision', action='store_true',
+                    help='Uses mixed precision to train a model (suggested with volta and above)')
+parser.add_argument('--static-loss-scale', type=float, default=1,
+                    help='Static loss scale for mixed precision, ' +
+                         'positive power of 2 values can improve FP16 convergence,' +
+                         'however dynamic loss scaling is preferred.')
+parser.add_argument('--dynamic-loss-scale', action='store_true',
+                    help='Use dynamic loss scaling for mixed precision. If supplied, this argument supersedes ' +
+                         '--static_loss_scale. Suggested to turn on for mixed precision')
 torch.manual_seed(123456)
 torch.cuda.manual_seed_all(123456)
 
 
 def to_np(x):
-    return x.data.cpu().numpy()
+    return x.cpu().numpy()
 
 
 class AverageMeter(object):
@@ -101,6 +115,16 @@ class AverageMeter(object):
 
 if __name__ == '__main__':
     args = parser.parse_args()
+
+    # Set seeds for determinism
+    torch.manual_seed(args.seed)
+    torch.cuda.manual_seed_all(args.seed)
+    np.random.seed(args.seed)
+    random.seed(args.seed)
+
+    device = torch.device("cuda" if args.cuda else "cpu")
+    if args.mixed_precision and not args.cuda:
+        raise ValueError('If using mixed precision training, CUDA must be enabled!')
     args.distributed = args.world_size > 1
     main_proc = True
     device = torch.device("cuda" if args.cuda else "cpu")
@@ -111,37 +135,25 @@ if __name__ == '__main__':
                                 world_size=args.world_size, rank=args.rank)
         main_proc = args.rank == 0  # Only the first proc should save models
     save_folder = args.save_folder
+    os.makedirs(save_folder, exist_ok=True)  # Ensure save folder exists
 
     loss_results, cer_results, wer_results = torch.Tensor(args.epochs), torch.Tensor(args.epochs), torch.Tensor(
         args.epochs)
     best_wer = None
-    if args.visdom and main_proc:
-        from visdom import Visdom
+    if main_proc and args.visdom:
+        visdom_logger = VisdomLogger(args.id, args.epochs)
+    if main_proc and args.tensorboard:
+        tensorboard_logger = TensorBoardLogger(args.id, args.log_dir, args.log_params)
 
-        viz = Visdom()
-        opts = dict(title=args.id, ylabel='', xlabel='Epoch', legend=['Loss', 'WER', 'CER'])
-        viz_window = None
-        epochs = torch.arange(1, args.epochs + 1)
-    if args.tensorboard and main_proc:
-        os.makedirs(args.log_dir, exist_ok=True)
-        from tensorboardX import SummaryWriter
-
-        tensorboard_writer = SummaryWriter(args.log_dir)
-    os.makedirs(save_folder, exist_ok=True)
-
-    avg_loss, start_epoch, start_iter = 0, 0, 0
+    avg_loss, start_epoch, start_iter, optim_state = 0, 0, 0, None
     if args.continue_from:  # Starting from previous model
         print("Loading checkpoint model %s" % args.continue_from)
         package = torch.load(args.continue_from, map_location=lambda storage, loc: storage)
         model = DeepSpeech.load_model_package(package)
         labels = DeepSpeech.get_labels(model)
         audio_conf = DeepSpeech.get_audio_conf(model)
-        parameters = model.parameters()
-        optimizer = torch.optim.SGD(parameters, lr=args.lr,
-                                    momentum=args.momentum, nesterov=True)
         if not args.finetune:  # Don't want to restart training
-            model = model.to(device)
-            optimizer.load_state_dict(package['optim_dict'])
+            optim_state = package['optim_dict']
             start_epoch = int(package.get('epoch', 1)) - 1  # Index start at 0 for training
             start_iter = package.get('iteration', None)
             if start_iter is None:
@@ -150,30 +162,12 @@ if __name__ == '__main__':
             else:
                 start_iter += 1
             avg_loss = int(package.get('avg_loss', 0))
-            loss_results, cer_results, wer_results = package['loss_results'], package[
-                'cer_results'], package['wer_results']
-            if main_proc and args.visdom and \
-                            package[
-                                'loss_results'] is not None and start_epoch > 0:  # Add previous scores to visdom graph
-                x_axis = epochs[0:start_epoch]
-                y_axis = torch.stack(
-                    (loss_results[0:start_epoch], wer_results[0:start_epoch], cer_results[0:start_epoch]),
-                    dim=1)
-                viz_window = viz.line(
-                    X=x_axis,
-                    Y=y_axis,
-                    opts=opts,
-                )
-            if main_proc and args.tensorboard and \
-                            package[
-                                'loss_results'] is not None and start_epoch > 0:  # Previous scores to tensorboard logs
-                for i in range(start_epoch):
-                    values = {
-                        'Avg Train Loss': loss_results[i],
-                        'Avg WER': wer_results[i],
-                        'Avg CER': cer_results[i]
-                    }
-                    tensorboard_writer.add_scalars(args.id, values, i + 1)
+            loss_results, cer_results, wer_results = package['loss_results'], package['cer_results'], \
+                                                     package['wer_results']
+            if main_proc and args.visdom:  # Add previous scores to visdom graph
+                visdom_logger.load_previous_values(start_epoch, package)
+            if main_proc and args.tensorboard:  # Previous scores to tensorboard logs
+                tensorboard_logger.load_previous_values(start_epoch, package)
     else:
         with open(args.labels_path) as label_file:
             labels = str(''.join(json.load(label_file)))
@@ -193,11 +187,9 @@ if __name__ == '__main__':
                            labels=labels,
                            rnn_type=supported_rnns[rnn_type],
                            audio_conf=audio_conf,
-                           bidirectional=args.bidirectional)
-        parameters = model.parameters()
-        optimizer = torch.optim.SGD(parameters, lr=args.lr,
-                                    momentum=args.momentum, nesterov=True)
-    criterion = CTCLoss()
+                           bidirectional=args.bidirectional,
+                           mixed_precision=args.mixed_precision)
+
     decoder = GreedyDecoder(labels)
     train_dataset = SpectrogramDataset(audio_conf=audio_conf, manifest_filepath=args.train_manifest, labels=labels,
                                        normalize=True, augment=args.augment)
@@ -218,13 +210,23 @@ if __name__ == '__main__':
         train_sampler.shuffle(start_epoch)
 
     model = model.to(device)
+    if args.mixed_precision:
+        model = convert_model_to_half(model)
+    parameters = model.parameters()
+    optimizer = torch.optim.SGD(parameters, lr=args.lr,
+                                momentum=args.momentum, nesterov=True, weight_decay=1e-5)
     if args.distributed:
-        model = torch.nn.parallel.DistributedDataParallel(model,
-                                                          device_ids=(int(args.gpu_rank),) if args.rank else None)
-
+        model = DistributedDataParallel(model)
+    if args.mixed_precision:
+        optimizer = FP16_Optimizer(optimizer,
+                                   static_loss_scale=args.static_loss_scale,
+                                   dynamic_loss_scale=args.dynamic_loss_scale)
+    if optim_state is not None:
+        optimizer.load_state_dict(optim_state)
     print(model)
     print("Number of parameters: %d" % DeepSpeech.get_param_size(model))
 
+    criterion = CTCLoss()
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
@@ -240,34 +242,41 @@ if __name__ == '__main__':
             input_sizes = input_percentages.mul_(int(inputs.size(3))).int()
             # measure data loading time
             data_time.update(time.time() - end)
-
             inputs = inputs.to(device)
 
             out, output_sizes = model(inputs, input_sizes)
             out = out.transpose(0, 1)  # TxNxH
 
-            loss = criterion(out, targets, output_sizes, target_sizes).to(device)
+            float_out = out.float()  # ensure float32 for loss
+            loss = criterion(float_out, targets, output_sizes, target_sizes).to(device)
             loss = loss / inputs.size(0)  # average the loss by minibatch
 
-            inf = float("inf")
             if args.distributed:
+                loss = loss.to(device)
                 loss_value = reduce_tensor(loss, args.world_size).item()
+                data_time = reduce_tensor(data_time, args.world_size, reduce_op_max=True)
             else:
                 loss_value = loss.item()
-            if loss_value == inf or loss_value == -inf:
-                print("WARNING: received an inf loss, setting loss value to 0")
+
+            # Check to ensure valid loss was calculated
+            valid_loss, error = check_loss(loss, loss_value)
+            if valid_loss:
+                optimizer.zero_grad()
+                # compute gradient
+                if args.mixed_precision:
+                    optimizer.backward(loss)
+                    optimizer.clip_master_grads(args.max_norm)
+                else:
+                    loss.backward()
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_norm)
+                optimizer.step()
+            else:
+                print(error)
+                print('Skipping grad update')
                 loss_value = 0
 
             avg_loss += loss_value
             losses.update(loss_value, inputs.size(0))
-
-            # compute gradient
-            optimizer.zero_grad()
-            loss.backward()
-
-            torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_norm)
-            # SGD step
-            optimizer.step()
 
             # measure elapsed time
             batch_time.update(time.time() - end)
@@ -285,8 +294,8 @@ if __name__ == '__main__':
                                                 loss_results=loss_results,
                                                 wer_results=wer_results, cer_results=cer_results, avg_loss=avg_loss),
                            file_path)
-            del loss
-            del out
+            del loss, out, float_out
+
         avg_loss /= len(train_sampler)
 
         epoch_time = time.time() - start_epoch_time
@@ -301,6 +310,7 @@ if __name__ == '__main__':
             for i, (data) in tqdm(enumerate(test_loader), total=len(test_loader)):
                 inputs, targets, input_percentages, target_sizes = data
                 input_sizes = input_percentages.mul_(int(inputs.size(3))).int()
+                inputs = inputs.to(device)
 
                 # unflatten targets
                 split_targets = []
@@ -308,8 +318,6 @@ if __name__ == '__main__':
                 for size in target_sizes:
                     split_targets.append(targets[offset:offset + size])
                     offset += size
-
-                inputs = inputs.to(device)
 
                 out, output_sizes = model(inputs, input_sizes)
 
@@ -332,55 +340,43 @@ if __name__ == '__main__':
             cer_results[epoch] = cer
             print('Validation Summary Epoch: [{0}]\t'
                   'Average WER {wer:.3f}\t'
-                  'Average CER {cer:.3f}\t'.format(epoch + 1, wer=wer, cer=cer))
+                  'Average CER {cer:.3f}\t'.format(
+                epoch + 1, wer=wer, cer=cer))
 
-            if args.visdom and main_proc:
-                x_axis = epochs[0:epoch + 1]
-                y_axis = torch.stack(
-                    (loss_results[0:epoch + 1], wer_results[0:epoch + 1], cer_results[0:epoch + 1]), dim=1)
-                if viz_window is None:
-                    viz_window = viz.line(
-                        X=x_axis,
-                        Y=y_axis,
-                        opts=opts,
-                    )
-                else:
-                    viz.line(
-                        X=x_axis.unsqueeze(0).expand(y_axis.size(1), x_axis.size(0)).transpose(0, 1),  # Visdom fix
-                        Y=y_axis,
-                        win=viz_window,
-                        update='replace',
-                    )
-            if args.tensorboard and main_proc:
-                values = {
-                    'Avg Train Loss': avg_loss,
-                    'Avg WER': wer,
-                    'Avg CER': cer
-                }
-                tensorboard_writer.add_scalars(args.id, values, epoch + 1)
-                if args.log_params:
-                    for tag, value in model.named_parameters():
-                        tag = tag.replace('.', '/')
-                        tensorboard_writer.add_histogram(tag, to_np(value), epoch + 1)
-                        tensorboard_writer.add_histogram(tag + '/grad', to_np(value.grad), epoch + 1)
-            if args.checkpoint and main_proc:
-                file_path = '%s/deepspeech_%d.pth' % (save_folder, epoch + 1)
-                torch.save(DeepSpeech.serialize(model, optimizer=optimizer, epoch=epoch, loss_results=loss_results,
-                                                wer_results=wer_results, cer_results=cer_results),
-                           file_path)
-                # anneal lr
-                optim_state = optimizer.state_dict()
-                optim_state['param_groups'][0]['lr'] = optim_state['param_groups'][0]['lr'] / args.learning_anneal
-                optimizer.load_state_dict(optim_state)
-                print('Learning rate annealed to: {lr:.6f}'.format(lr=optim_state['param_groups'][0]['lr']))
+        values = {
+            'loss_results': loss_results,
+            'cer_results': cer_results,
+            'wer_results': wer_results
+        }
+        if args.visdom and main_proc:
+            visdom_logger.update(epoch, values)
+        if args.tensorboard and main_proc:
+            tensorboard_logger.update(epoch, values, model.named_parameters())
+            values = {
+                'Avg Train Loss': avg_loss,
+                'Avg WER': wer,
+                'Avg CER': cer
+            }
 
-            if (best_wer is None or best_wer > wer) and main_proc:
-                print("Found better validated model, saving to %s" % args.model_path)
-                torch.save(DeepSpeech.serialize(model, optimizer=optimizer, epoch=epoch, loss_results=loss_results,
-                                                wer_results=wer_results, cer_results=cer_results), args.model_path)
-                best_wer = wer
+        if main_proc and args.checkpoint:
+            file_path = '%s/deepspeech_%d.pth.tar' % (save_folder, epoch + 1)
+            torch.save(DeepSpeech.serialize(model, optimizer=optimizer, epoch=epoch, loss_results=loss_results,
+                                            wer_results=wer_results, cer_results=cer_results),
+                       file_path)
+        # anneal lr
+        param_groups = optimizer.optimizer.param_groups if args.mixed_precision else optimizer.param_groups
+        for g in param_groups:
+            g['lr'] = g['lr'] / args.learning_anneal
+        print('Learning rate annealed to: {lr:.6f}'.format(lr=g['lr']))
 
-                avg_loss = 0
+        if main_proc and (best_wer is None or best_wer > wer):
+            print("Found better validated model, saving to %s" % args.model_path)
+            torch.save(DeepSpeech.serialize(model, optimizer=optimizer, epoch=epoch, loss_results=loss_results,
+                                            wer_results=wer_results, cer_results=cer_results)
+                       , args.model_path)
+            best_wer = wer
+
+            avg_loss = 0
             if not args.no_shuffle:
                 print("Shuffling batches...")
                 train_sampler.shuffle(epoch)

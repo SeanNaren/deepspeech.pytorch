@@ -20,6 +20,7 @@ parser.add_argument('--files-to-process', default="cv-valid-dev.csv,cv-valid-tes
 args = parser.parse_args()
 COMMON_VOICE_URL = "https://common-voice-data-download.s3.amazonaws.com/cv_corpus_v1.tar.gz"
 
+
 def convert_to_wav(csv_file, target_dir):
     """ Read *.csv file description, convert mp3 to wav, process text.
         Save results to target_dir.
@@ -53,6 +54,7 @@ def convert_to_wav(csv_file, target_dir):
         with ThreadPool(10) as pool:
             pool.map(process, data)
 
+
 def main():
     target_dir = args.target_dir
     os.makedirs(target_dir, exist_ok=True)
@@ -83,6 +85,7 @@ def main():
                         os.path.splitext(csv_file)[0] + '_manifest.csv',
                         args.min_duration,
                         args.max_duration)
+
 
 if __name__ == "__main__":
     main()

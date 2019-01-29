@@ -41,3 +41,6 @@ for i in range(world_size):
 
 for p in workers:
     p.wait()
+    if p.returncode != 0:
+        raise subprocess.CalledProcessError(returncode=p.returncode,
+                                            cmd=p.args)
