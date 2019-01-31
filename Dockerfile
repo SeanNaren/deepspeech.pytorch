@@ -7,7 +7,7 @@ RUN apt-get update -y
 RUN apt-get install -y git curl ca-certificates bzip2 cmake tree htop bmon iotop sox libsox-dev libsox-fmt-all
 
 # install python deps
-RUN pip install cython visdom cffi tensorboardX
+RUN pip install cython visdom cffi tensorboardX wget
 
 # install warp-CTC
 ENV CUDA_HOME=/usr/local/cuda
