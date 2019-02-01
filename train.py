@@ -254,7 +254,6 @@ if __name__ == '__main__':
             if args.distributed:
                 loss = loss.to(device)
                 loss_value = reduce_tensor(loss, args.world_size).item()
-                data_time = reduce_tensor(data_time, args.world_size, reduce_op_max=True)
             else:
                 loss_value = loss.item()
 
