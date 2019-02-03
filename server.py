@@ -32,7 +32,7 @@ def transcribe_file():
         with NamedTemporaryFile(suffix=file_extension) as tmp_saved_audio_file:
             file.save(tmp_saved_audio_file.name)
             logging.info('Transcribing file...')
-            transcription, _ = transcribe(tmp_saved_audio_file.name, spect_parser, model, decoder, args.cuda)
+            transcription, _ = transcribe(tmp_saved_audio_file.name, spect_parser, model, decoder, device)
             logging.info('File transcribed')
             res['status'] = "OK"
             res['transcription'] = transcription
@@ -41,7 +41,7 @@ def transcribe_file():
 
 def main():
     import argparse
-    global model, spect_parser, decoder, args
+    global model, spect_parser, decoder, args, device
     parser = argparse.ArgumentParser(description='DeepSpeech transcription server')
     parser.add_argument('--host', type=str, default='0.0.0.0', help='Host to be used by the server')
     parser.add_argument('--port', type=int, default=8888, help='Port to be used by the server')
