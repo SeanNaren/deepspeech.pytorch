@@ -150,8 +150,8 @@ if __name__ == '__main__':
         print("Loading checkpoint model %s" % args.continue_from)
         package = torch.load(args.continue_from, map_location=lambda storage, loc: storage)
         model = DeepSpeech.load_model_package(package)
-        labels = DeepSpeech.get_labels(model)
-        audio_conf = DeepSpeech.get_audio_conf(model)
+        labels = model.labels 
+        audio_conf = model.audio_conf
         if not args.finetune:  # Don't want to restart training
             optim_state = package['optim_dict']
             start_epoch = int(package.get('epoch', 1)) - 1  # Index start at 0 for training
