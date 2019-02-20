@@ -13,7 +13,7 @@ parser = argparse.ArgumentParser(description='DeepSpeech transcription')
 parser = add_inference_args(parser)
 parser.add_argument('--test-manifest', metavar='DIR',
                     help='path to validation manifest csv', default='data/test_manifest.csv')
-parser.add_argument('--batch-size', default=20, type=int, help='Batch size for training')
+parser.add_argument('--batch-size', default=20, type=int, help='Batch size for testing')
 parser.add_argument('--num-workers', default=4, type=int, help='Number of workers used in dataloading')
 parser.add_argument('--verbose', action="store_true", help="print out decoded output and error of each sample")
 parser.add_argument('--output-path', default=None, type=str, help="Where to save raw acoustic output")
