@@ -1,0 +1,47 @@
+import os
+task = 'test'
+
+os.chdir(task)
+audio_path = os.getcwd()
+audio = os.listdir()
+os.chdir('..')
+
+#audio_path = sys.argv[0]
+#audio = os.listdir(audio_path)
+
+text_path = audio_path.split('/')[-1] + '_text'
+os.system('rm -rf '+text_path)
+os.makedirs(text_path)
+os.chdir(text_path)
+texts = list()
+#for tts audio
+for x in audio:
+    text = x.split('_')[0]
+    #print(text) 
+    with open(text+'.txt', 'w') as file:
+        file.write(text)
+    texts.append(os.getcwd() + '/'  + text + '.txt')
+
+aud = [audio_path + '/' + x for x in audio]
+
+#print(audio)
+mapping = dict(zip(aud,texts))
+
+s = ''
+for k,v in mapping.items():
+#    print( k +  '=>' + v)
+    s = s + k + ',' + v + '\n' 
+
+print(s)
+print('text files generated successfully...')
+print('----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------')
+os.chdir('..')
+with open(task + '_' +'manifest.csv','w') as f:
+    f.write(s)
+print('manifest.csv file created successfully...')
+#for human audio
+#...
+
+
+
+
