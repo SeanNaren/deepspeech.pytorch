@@ -8,7 +8,8 @@ import wget
 from utils import create_manifest
 
 parser = argparse.ArgumentParser(description='Processes and downloads an4.')
-parser.add_argument('--target-dir', default='an4_dataset/', help='Path to save dataset')
+parser.add_argument('--target-dir', default='an4_dataset/',
+                    help='Path to save dataset')
 parser.add_argument('--min-duration', default=1, type=int,
                     help='Prunes training samples shorter than the min duration (given in seconds, default 1)')
 parser.add_argument('--max-duration', default=15, type=int,
@@ -30,7 +31,8 @@ def _format_data(root_path, data_tag, name, wav_folder):
     train_path = wav_path + wav_folder
 
     _convert_audio_to_wav(train_path)
-    _format_files(file_ids, new_transcript_path, new_wav_path, transcripts, wav_path)
+    _format_files(file_ids, new_transcript_path,
+                  new_wav_path, transcripts, wav_path)
 
 
 def _convert_audio_to_wav(train_path):
@@ -54,21 +56,24 @@ def _format_files(file_ids, new_transcript_path, new_wav_path, transcripts, wav_
                 extracted_transcript = _process_transcript(transcripts, x)
                 current_path = os.path.abspath(path)
                 new_path = new_wav_path + filename
-                text_path = new_transcript_path + filename.replace('.wav', '.txt')
+                text_path = new_transcript_path + \
+                    filename.replace('.wav', '.txt')
                 with io.FileIO(text_path, "w") as file:
                     file.write(extracted_transcript.encode('utf-8'))
                 os.rename(current_path, new_path)
 
 
 def _process_transcript(transcripts, x):
-    extracted_transcript = transcripts[x].split('(')[0].strip("<s>").split('<')[0].strip().upper()
+    extracted_transcript = transcripts[x].split(
+        '(')[0].strip("<s>").split('<')[0].strip().upper()
     return extracted_transcript
 
 
 def main():
     root_path = 'an4/'
     name = 'an4'
-    wget.download('http://www.speech.cs.cmu.edu/databases/an4/an4_raw.bigendian.tar.gz')
+    wget.download(
+        'http://www.speech.cs.cmu.edu/databases/an4/an4_raw.bigendian.tar.gz')
     tar = tarfile.open('an4_raw.bigendian.tar.gz')
     tar.extractall()
     os.makedirs(args.target_dir)
@@ -79,7 +84,8 @@ def main():
     train_path = args.target_dir + '/train/'
     test_path = args.target_dir + '/test/'
     print ('\n', 'Creating manifests...')
-    create_manifest(train_path, 'an4_train_manifest.csv', args.min_duration, args.max_duration)
+    create_manifest(train_path, 'an4_train_manifest.csv',
+                    args.min_duration, args.max_duration)
     create_manifest(test_path, 'an4_val_manifest.csv')
 
 

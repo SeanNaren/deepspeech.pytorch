@@ -36,7 +36,8 @@ class Decoder(object):
         self.labels = labels
         self.int_to_char = dict([(i, c) for (i, c) in enumerate(labels)])
         self.blank_index = blank_index
-        space_index = len(labels)  # To prevent errors in decode, we add an out of bounds index for the space
+        # To prevent errors in decode, we add an out of bounds index for the space
+        space_index = len(labels)
         if ' ' in labels:
             space_index = labels.index(' ')
         self.space_index = space_index
@@ -105,7 +106,8 @@ class BeamCTCDecoder(Decoder):
             for p, utt in enumerate(batch):
                 size = seq_len[b][p]
                 if size > 0:
-                    transcript = ''.join(map(lambda x: self.int_to_char[x.item()], utt[0:size]))
+                    transcript = ''.join(
+                        map(lambda x: self.int_to_char[x.item()], utt[0:size]))
                 else:
                     transcript = ''
                 utterances.append(transcript)
@@ -153,7 +155,8 @@ class GreedyDecoder(Decoder):
         offsets = [] if return_offsets else None
         for x in xrange(len(sequences)):
             seq_len = sizes[x] if sizes is not None else len(sequences[x])
-            string, string_offsets = self.process_string(sequences[x], seq_len, remove_repetitions)
+            string, string_offsets = self.process_string(
+                sequences[x], seq_len, remove_repetitions)
             strings.append([string])  # We only return one path
             if return_offsets:
                 offsets.append([string_offsets])

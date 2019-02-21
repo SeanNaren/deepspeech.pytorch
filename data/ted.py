@@ -8,10 +8,14 @@ import io
 from utils import create_manifest
 from tqdm import tqdm
 
-parser = argparse.ArgumentParser(description='Processes and downloads TED-LIUMv2 dataset.')
-parser.add_argument("--target-dir", default='TEDLIUM_dataset/', type=str, help="Directory to store the dataset.")
-parser.add_argument("--tar-path", type=str, help="Path to the TEDLIUM_release tar if downloaded (Optional).")
-parser.add_argument('--sample-rate', default=16000, type=int, help='Sample rate')
+parser = argparse.ArgumentParser(
+    description='Processes and downloads TED-LIUMv2 dataset.')
+parser.add_argument("--target-dir", default='TEDLIUM_dataset/',
+                    type=str, help="Directory to store the dataset.")
+parser.add_argument("--tar-path", type=str,
+                    help="Path to the TEDLIUM_release tar if downloaded (Optional).")
+parser.add_argument('--sample-rate', default=16000,
+                    type=int, help='Sample rate')
 parser.add_argument('--min-duration', default=1, type=int,
                     help='Prunes training samples shorter than the min duration (given in seconds, default 1)')
 parser.add_argument('--max-duration', default=15, type=int,
@@ -74,19 +78,23 @@ def prepare_dir(ted_dir):
         speaker_name = sph_file.split('.sph')[0]
 
         sph_file_full = os.path.join(ted_dir, "sph", sph_file)
-        stm_file_full = os.path.join(ted_dir, "stm", "{}.stm".format(speaker_name))
+        stm_file_full = os.path.join(
+            ted_dir, "stm", "{}.stm".format(speaker_name))
 
         assert os.path.exists(sph_file_full) and os.path.exists(stm_file_full)
         all_utterances = get_utterances_from_stm(stm_file_full)
 
         all_utterances = filter(filter_short_utterances, all_utterances)
         for utterance_id, utterance in enumerate(all_utterances):
-            target_wav_file = os.path.join(wav_dir, "{}_{}.wav".format(utterance["filename"], str(utterance_id)))
-            target_txt_file = os.path.join(txt_dir, "{}_{}.txt".format(utterance["filename"], str(utterance_id)))
+            target_wav_file = os.path.join(wav_dir, "{}_{}.wav".format(
+                utterance["filename"], str(utterance_id)))
+            target_txt_file = os.path.join(txt_dir, "{}_{}.txt".format(
+                utterance["filename"], str(utterance_id)))
             cut_utterance(sph_file_full, target_wav_file, utterance["start_time"], utterance["end_time"],
                           sample_rate=args.sample_rate)
             with io.FileIO(target_txt_file, "w") as f:
-                f.write(_preprocess_transcript(utterance["transcript"]).encode('utf-8'))
+                f.write(_preprocess_transcript(
+                    utterance["transcript"]).encode('utf-8'))
         counter += 1
 
 
@@ -120,7 +128,8 @@ def main():
     prepare_dir(test_ted_dir)
     print('Creating manifests...')
 
-    create_manifest(train_ted_dir, 'ted_train_manifest.csv', args.min_duration, args.max_duration)
+    create_manifest(train_ted_dir, 'ted_train_manifest.csv',
+                    args.min_duration, args.max_duration)
     create_manifest(val_ted_dir, 'ted_val_manifest.csv')
     create_manifest(test_ted_dir, 'ted_test_manifest.csv')
 

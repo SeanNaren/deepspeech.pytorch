@@ -63,7 +63,8 @@ class MaskConv(nn.Module):
             for i, length in enumerate(lengths):
                 length = length.item()
                 if (mask[i].size(2) - length) > 0:
-                    mask[i].narrow(2, length, mask[i].size(2) - length).fill_(1)
+                    mask[i].narrow(
+                        2, length, mask[i].size(2) - length).fill_(1)
             x = x.masked_fill(mask, 0)
         return x, lengths
 
@@ -82,7 +83,8 @@ class BatchRNN(nn.Module):
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.bidirectional = bidirectional
-        self.batch_norm = SequenceWise(nn.BatchNorm1d(input_size)) if batch_norm else None
+        self.batch_norm = SequenceWise(
+            nn.BatchNorm1d(input_size)) if batch_norm else None
         self.rnn = rnn_type(input_size=input_size, hidden_size=hidden_size,
                             bidirectional=bidirectional, bias=True)
         self.num_directions = 2 if bidirectional else 1
@@ -97,7 +99,9 @@ class BatchRNN(nn.Module):
         x, h = self.rnn(x)
         x, _ = nn.utils.rnn.pad_packed_sequence(x)
         if self.bidirectional:
-            x = x.view(x.size(0), x.size(1), 2, -1).sum(2).view(x.size(0), x.size(1), -1)  # (TxNxH*2) -> (TxNxH) by sum
+            # (TxNxH*2) -> (TxNxH) by sum
+            x = x.view(x.size(0), x.size(1), 2, -
+                       1).sum(2).view(x.size(0), x.size(1), -1)
         return x
 
 
@@ -128,17 +132,19 @@ class Lookahead(nn.Module):
 
         # add lookahead windows (with context+1 width) as a fourth dimension
         # for each seq-batch-feature combination
-        x = [x[i:i + self.context + 1] for i in range(seq_len)]  # TxLxNxH - sequence, context, batch, feature
+        # TxLxNxH - sequence, context, batch, feature
+        x = [x[i:i + self.context + 1] for i in range(seq_len)]
         x = torch.stack(x)
-        x = x.permute(0, 2, 3, 1)  # TxNxHxL - sequence, batch, feature, context
+        # TxNxHxL - sequence, batch, feature, context
+        x = x.permute(0, 2, 3, 1)
 
         x = torch.mul(x, self.weight).sum(dim=3)
         return x
 
     def __repr__(self):
         return self.__class__.__name__ + '(' \
-               + 'n_features=' + str(self.n_features) \
-               + ', context=' + str(self.context) + ')'
+            + 'n_features=' + str(self.n_features) \
+            + ', context=' + str(self.context) + ')'
 
 
 class DeepSpeech(nn.Module):
@@ -163,10 +169,12 @@ class DeepSpeech(nn.Module):
         num_classes = len(self.labels)
 
         self.conv = MaskConv(nn.Sequential(
-            nn.Conv2d(1, 32, kernel_size=(41, 11), stride=(2, 2), padding=(20, 5)),
+            nn.Conv2d(1, 32, kernel_size=(41, 11),
+                      stride=(2, 2), padding=(20, 5)),
             nn.BatchNorm2d(32),
             nn.Hardtanh(0, 20, inplace=True),
-            nn.Conv2d(32, 32, kernel_size=(21, 11), stride=(2, 1), padding=(10, 5)),
+            nn.Conv2d(32, 32, kernel_size=(21, 11),
+                      stride=(2, 1), padding=(10, 5)),
             nn.BatchNorm2d(32),
             nn.Hardtanh(0, 20, inplace=True)
         ))
@@ -208,7 +216,8 @@ class DeepSpeech(nn.Module):
         x, _ = self.conv(x, output_lengths)
 
         sizes = x.size()
-        x = x.view(sizes[0], sizes[1] * sizes[2], sizes[3])  # Collapse feature dimension
+        # Collapse feature dimension
+        x = x.view(sizes[0], sizes[1] * sizes[2], sizes[3])
         x = x.transpose(1, 2).transpose(0, 1).contiguous()  # TxNxH
 
         for rnn in self.rnns:
@@ -233,7 +242,8 @@ class DeepSpeech(nn.Module):
         seq_len = input_length
         for m in self.conv.modules():
             if type(m) == nn.modules.conv.Conv2d:
-                seq_len = ((seq_len + 2 * m.padding[1] - m.dilation[1] * (m.kernel_size[1] - 1) - 1) / m.stride[1] + 1)
+                seq_len = (
+                    (seq_len + 2 * m.padding[1] - m.dilation[1] * (m.kernel_size[1] - 1) - 1) / m.stride[1] + 1)
         return seq_len.int()
 
     @classmethod
@@ -299,11 +309,13 @@ if __name__ == '__main__':
     import os.path
     import argparse
 
-    parser = argparse.ArgumentParser(description='DeepSpeech model information')
+    parser = argparse.ArgumentParser(
+        description='DeepSpeech model information')
     parser.add_argument('--model-path', default='models/deepspeech_final.pth',
                         help='Path to model file created by training')
     args = parser.parse_args()
-    package = torch.load(args.model_path, map_location=lambda storage, loc: storage)
+    package = torch.load(
+        args.model_path, map_location=lambda storage, loc: storage)
     model = DeepSpeech.load_model(args.model_path)
 
     print("Model name:         ", os.path.basename(args.model_path))
@@ -327,6 +339,9 @@ if __name__ == '__main__':
         print("Training Information")
         epochs = package['epoch']
         print("  Epochs:           ", epochs)
-        print("  Current Loss:      {0:.3f}".format(package['loss_results'][epochs - 1]))
-        print("  Current CER:       {0:.3f}".format(package['cer_results'][epochs - 1]))
-        print("  Current WER:       {0:.3f}".format(package['wer_results'][epochs - 1]))
+        print("  Current Loss:      {0:.3f}".format(
+            package['loss_results'][epochs - 1]))
+        print("  Current CER:       {0:.3f}".format(
+            package['cer_results'][epochs - 1]))
+        print("  Current WER:       {0:.3f}".format(
+            package['wer_results'][epochs - 1]))

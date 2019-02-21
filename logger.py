@@ -11,7 +11,8 @@ class VisdomLogger(object):
     def __init__(self, id, num_epochs):
         from visdom import Visdom
         self.viz = Visdom()
-        self.opts = dict(title=id, ylabel='', xlabel='Epoch', legend=['Loss', 'WER', 'CER'])
+        self.opts = dict(title=id, ylabel='', xlabel='Epoch',
+                         legend=['Loss', 'WER', 'CER'])
         self.viz_window = None
         self.epochs = torch.arange(1, num_epochs + 1)
         self.visdom_plotter = True
@@ -31,7 +32,8 @@ class VisdomLogger(object):
         )
 
     def load_previous_values(self, start_epoch, package):
-        self.update(start_epoch - 1, package)  # Add all values except the iteration we're starting from
+        # Add all values except the iteration we're starting from
+        self.update(start_epoch - 1, package)
 
 
 class TensorBoardLogger(object):
@@ -44,7 +46,7 @@ class TensorBoardLogger(object):
 
     def update(self, epoch, values, parameters=None):
         loss, wer, cer = values["loss_results"][epoch + 1], values["wer_results"][epoch + 1], \
-                         values["cer_results"][epoch + 1]
+            values["cer_results"][epoch + 1]
         values = {
             'Avg Train Loss': loss,
             'Avg WER': wer,
@@ -54,8 +56,10 @@ class TensorBoardLogger(object):
         if self.log_params:
             for tag, value in parameters():
                 tag = tag.replace('.', '/')
-                self.tensorboard_writer.add_histogram(tag, to_np(value), epoch + 1)
-                self.tensorboard_writer.add_histogram(tag + '/grad', to_np(value.grad), epoch + 1)
+                self.tensorboard_writer.add_histogram(
+                    tag, to_np(value), epoch + 1)
+                self.tensorboard_writer.add_histogram(
+                    tag + '/grad', to_np(value.grad), epoch + 1)
 
     def load_previous_values(self, start_epoch, values):
         loss_results = values["loss_results"][:start_epoch]

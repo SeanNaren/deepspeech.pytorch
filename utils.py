@@ -17,7 +17,9 @@ def convert_model_to_half(model):
 
 def reduce_tensor(tensor, world_size, reduce_op_max=False):
     rt = tensor.clone()
-    dist.all_reduce(rt, op=dist.reduce_op.MAX if reduce_op_max is True else dist.reduce_op.SUM)  # Default to sum
+    # Default to sum
+    dist.all_reduce(
+        rt, op=dist.reduce_op.MAX if reduce_op_max is True else dist.reduce_op.SUM)
     if not reduce_op_max:
         rt /= world_size
     return rt

@@ -19,21 +19,34 @@ parser.add_argument('--batch-size', type=int, default=32, help='Size of input')
 parser.add_argument('--seconds', type=int, default=15,
                     help='The size of the fake input in seconds using default stride of 0.01, '
                          '15s is usually the maximum duration')
-parser.add_argument('--dry-runs', type=int, default=2, help='Dry runs before measuring performance')
-parser.add_argument('--runs', type=int, default=5, help='How many benchmark runs to measure performance')
-parser.add_argument('--labels-path', default='labels.json', help='Path to the labels to infer over in the model')
-parser.add_argument('--hidden-size', default=800, type=int, help='Hidden size of RNNs')
-parser.add_argument('--hidden-layers', default=5, type=int, help='Number of RNN layers')
-parser.add_argument('--rnn-type', default='gru', help='Type of the RNN. rnn|gru|lstm are supported')
-parser.add_argument('--sample-rate', default=16000, type=int, help='Sample rate')
-parser.add_argument('--window-size', default=.02, type=float, help='Window size for spectrogram in seconds')
-parser.add_argument('--num-samples', default=1024, type=int, help='Number of samples to go through')
-parser.add_argument('--mixed-precision', action='store_true', help='Use Mixed Precision to train the model')
+parser.add_argument('--dry-runs', type=int, default=2,
+                    help='Dry runs before measuring performance')
+parser.add_argument('--runs', type=int, default=5,
+                    help='How many benchmark runs to measure performance')
+parser.add_argument('--labels-path', default='labels.json',
+                    help='Path to the labels to infer over in the model')
+parser.add_argument('--hidden-size', default=800,
+                    type=int, help='Hidden size of RNNs')
+parser.add_argument('--hidden-layers', default=5,
+                    type=int, help='Number of RNN layers')
+parser.add_argument('--rnn-type', default='gru',
+                    help='Type of the RNN. rnn|gru|lstm are supported')
+parser.add_argument('--sample-rate', default=16000,
+                    type=int, help='Sample rate')
+parser.add_argument('--window-size', default=.02, type=float,
+                    help='Window size for spectrogram in seconds')
+parser.add_argument('--num-samples', default=1024, type=int,
+                    help='Number of samples to go through')
+parser.add_argument('--mixed-precision', action='store_true',
+                    help='Use Mixed Precision to train the model')
 parser.add_argument('--dist-url', default='tcp://127.0.0.1:1550', type=str,
                     help='url used to set up distributed training')
-parser.add_argument('--dist_backend', default='nccl', type=str, help='distributed backend')
-parser.add_argument('--world-size', default=1, type=int, help='number of distributed processes')
-parser.add_argument('--rank', default=0, type=int, help='The rank of this process')
+parser.add_argument('--dist_backend', default='nccl',
+                    type=str, help='distributed backend')
+parser.add_argument('--world-size', default=1, type=int,
+                    help='number of distributed processes')
+parser.add_argument('--rank', default=0, type=int,
+                    help='The rank of this process')
 parser.add_argument('--static-loss-scale', type=float, default=1,
                     help='Static loss scale for mixed precision, ' +
                          'positive power of 2 values can improve FP16 convergence,' +
@@ -50,7 +63,8 @@ if args.distributed:
                             world_size=args.world_size, rank=args.rank)
 
 if args.distributed:
-    input_data = torch.randn(int(args.num_samples / args.world_size), 1, 161, args.seconds * 100)
+    input_data = torch.randn(
+        int(args.num_samples / args.world_size), 1, 161, args.seconds * 100)
 else:
     input_data = torch.randn(args.num_samples, 1, 161, args.seconds * 100)
 input_data = input_data.to(device)
@@ -77,7 +91,8 @@ if args.mixed_precision:
 print("Number of parameters: %d" % DeepSpeech.get_param_size(model))
 
 parameters = model.parameters()
-optimizer = torch.optim.SGD(parameters, lr=3e-4, momentum=0.9, nesterov=True, weight_decay=1e-5)
+optimizer = torch.optim.SGD(
+    parameters, lr=3e-4, momentum=0.9, nesterov=True, weight_decay=1e-5)
 if args.distributed:
     model = DistributedDataParallel(model)
 if args.mixed_precision:
@@ -94,7 +109,8 @@ batch_size = int(args.batch_size)
 def iteration(inputs):
     # targets, align half of the audio
     targets = torch.ones(int(batch_size * ((seconds * 100) / 2)))
-    target_sizes = torch.empty(batch_size, dtype=torch.int).fill_(int((seconds * 100) / 2))
+    target_sizes = torch.empty(batch_size, dtype=torch.int).fill_(
+        int((seconds * 100) / 2))
     input_percentages = torch.ones(batch_size).fill_(1)
     input_sizes = input_percentages.mul_(int(inputs.size(3))).int()
 

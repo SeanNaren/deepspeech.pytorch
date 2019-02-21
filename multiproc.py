@@ -6,7 +6,8 @@ argslist = list(sys.argv)[1:]
 world_size = torch.cuda.device_count()
 device_ids = None
 if '--device-ids' in argslist:  # Manually specified GPU IDs
-    device_ids = argslist[argslist.index('--device-ids') + 1].strip().split(',')
+    device_ids = argslist[argslist.index(
+        '--device-ids') + 1].strip().split(',')
     world_size = len(device_ids)
     # Remove GPU IDs since these are not for the training script
     argslist.pop(argslist.index('--device-ids') + 1)
@@ -36,7 +37,8 @@ for i in range(world_size):
         argslist.append(str(i))
     stdout = None if i == 0 else open("GPU_" + str(i) + ".log", "w")
     print(argslist)
-    p = subprocess.Popen([str(sys.executable)] + argslist, stdout=stdout, stderr=stdout)
+    p = subprocess.Popen([str(sys.executable)] + argslist,
+                         stdout=stdout, stderr=stdout)
     workers.append(p)
 
 for p in workers:

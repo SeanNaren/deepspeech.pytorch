@@ -13,12 +13,17 @@ parser = argparse.ArgumentParser(description='DeepSpeech transcription')
 parser = add_inference_args(parser)
 parser.add_argument('--test-manifest', metavar='DIR',
                     help='path to validation manifest csv', default='data/test_manifest.csv')
-parser.add_argument('--batch-size', default=20, type=int, help='Batch size for training')
-parser.add_argument('--num-workers', default=4, type=int, help='Number of workers used in dataloading')
-parser.add_argument('--verbose', action="store_true", help="print out decoded output and error of each sample")
-parser.add_argument('--output-path', default=None, type=str, help="Where to save raw acoustic output")
+parser.add_argument('--batch-size', default=20, type=int,
+                    help='Batch size for training')
+parser.add_argument('--num-workers', default=4, type=int,
+                    help='Number of workers used in dataloading')
+parser.add_argument('--verbose', action="store_true",
+                    help="print out decoded output and error of each sample")
+parser.add_argument('--output-path', default=None, type=str,
+                    help="Where to save raw acoustic output")
 parser = add_decoder_args(parser)
-parser.add_argument('--save-output', action="store_true", help="Saves output of model from test")
+parser.add_argument('--save-output', action="store_true",
+                    help="Saves output of model from test")
 args = parser.parse_args()
 
 if __name__ == '__main__':
@@ -33,10 +38,12 @@ if __name__ == '__main__':
                                  cutoff_top_n=args.cutoff_top_n, cutoff_prob=args.cutoff_prob,
                                  beam_width=args.beam_width, num_processes=args.lm_workers)
     elif args.decoder == "greedy":
-        decoder = GreedyDecoder(model.labels, blank_index=model.labels.index('_'))
+        decoder = GreedyDecoder(
+            model.labels, blank_index=model.labels.index('_'))
     else:
         decoder = None
-    target_decoder = GreedyDecoder(model.labels, blank_index=model.labels.index('_'))
+    target_decoder = GreedyDecoder(
+        model.labels, blank_index=model.labels.index('_'))
     test_dataset = SpectrogramDataset(audio_conf=model.audio_conf, manifest_filepath=args.test_manifest,
                                       labels=model.labels, normalize=True)
     test_loader = AudioDataLoader(test_dataset, batch_size=args.batch_size,
@@ -73,7 +80,8 @@ if __name__ == '__main__':
             if args.verbose:
                 print("Ref:", reference.lower())
                 print("Hyp:", transcript.lower())
-                print("WER:", float(wer_inst) / len(reference.split()), "CER:", float(cer_inst) / len(reference), "\n")
+                print("WER:", float(wer_inst) / len(reference.split()),
+                      "CER:", float(cer_inst) / len(reference), "\n")
 
     wer = float(total_wer) / num_tokens
     cer = float(total_cer) / num_chars

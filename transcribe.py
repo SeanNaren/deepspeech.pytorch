@@ -60,7 +60,8 @@ if __name__ == '__main__':
     parser = add_inference_args(parser)
     parser.add_argument('--audio-path', default='audio.wav',
                         help='Audio file to predict on')
-    parser.add_argument('--offsets', dest='offsets', action='store_true', help='Returns time offset information')
+    parser.add_argument('--offsets', dest='offsets',
+                        action='store_true', help='Returns time offset information')
     parser = add_decoder_args(parser)
     args = parser.parse_args()
     device = torch.device("cuda" if args.cuda else "cpu")
@@ -73,9 +74,11 @@ if __name__ == '__main__':
                                  cutoff_top_n=args.cutoff_top_n, cutoff_prob=args.cutoff_prob,
                                  beam_width=args.beam_width, num_processes=args.lm_workers)
     else:
-        decoder = GreedyDecoder(model.labels, blank_index=model.labels.index('_'))
+        decoder = GreedyDecoder(
+            model.labels, blank_index=model.labels.index('_'))
 
     parser = SpectrogramParser(model.audio_conf, normalize=True)
 
-    decoded_output, decoded_offsets = transcribe(args.audio_path, parser, model, decoder, device)
+    decoded_output, decoded_offsets = transcribe(
+        args.audio_path, parser, model, decoder, device)
     print(json.dumps(decode_results(model, decoded_output, decoded_offsets)))

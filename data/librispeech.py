@@ -7,9 +7,12 @@ from utils import create_manifest
 from tqdm import tqdm
 import shutil
 
-parser = argparse.ArgumentParser(description='Processes and downloads LibriSpeech dataset.')
-parser.add_argument("--target-dir", default='LibriSpeech_dataset/', type=str, help="Directory to store the dataset.")
-parser.add_argument('--sample-rate', default=16000, type=int, help='Sample rate')
+parser = argparse.ArgumentParser(
+    description='Processes and downloads LibriSpeech dataset.')
+parser.add_argument("--target-dir", default='LibriSpeech_dataset/',
+                    type=str, help="Directory to store the dataset.")
+parser.add_argument('--sample-rate', default=16000,
+                    type=int, help='Sample rate')
 parser.add_argument('--files-to-use', default="train-clean-100.tar.gz,"
                                               "train-clean-360.tar.gz,train-other-500.tar.gz,"
                                               "dev-clean.tar.gz,dev-other.tar.gz,"
@@ -41,18 +44,24 @@ def _preprocess_transcript(phrase):
 def _process_file(wav_dir, txt_dir, base_filename, root_dir):
     full_recording_path = os.path.join(root_dir, base_filename)
     assert os.path.exists(full_recording_path) and os.path.exists(root_dir)
-    wav_recording_path = os.path.join(wav_dir, base_filename.replace(".flac", ".wav"))
+    wav_recording_path = os.path.join(
+        wav_dir, base_filename.replace(".flac", ".wav"))
     subprocess.call(["sox {}  -r {} -b 16 -c 1 {}".format(full_recording_path, str(args.sample_rate),
                                                           wav_recording_path)], shell=True)
     # process transcript
-    txt_transcript_path = os.path.join(txt_dir, base_filename.replace(".flac", ".txt"))
-    transcript_file = os.path.join(root_dir, "-".join(base_filename.split('-')[:-1]) + ".trans.txt")
-    assert os.path.exists(transcript_file), "Transcript file {} does not exist.".format(transcript_file)
+    txt_transcript_path = os.path.join(
+        txt_dir, base_filename.replace(".flac", ".txt"))
+    transcript_file = os.path.join(
+        root_dir, "-".join(base_filename.split('-')[:-1]) + ".trans.txt")
+    assert os.path.exists(
+        transcript_file), "Transcript file {} does not exist.".format(transcript_file)
     transcriptions = open(transcript_file).read().strip().split("\n")
-    transcriptions = {t.split()[0].split("-")[-1]: " ".join(t.split()[1:]) for t in transcriptions}
+    transcriptions = {t.split()[0].split(
+        "-")[-1]: " ".join(t.split()[1:]) for t in transcriptions}
     with open(txt_transcript_path, "w") as f:
         key = base_filename.replace(".flac", "").split("-")[-1]
-        assert key in transcriptions, "{} is not in the transcriptions".format(key)
+        assert key in transcriptions, "{} is not in the transcriptions".format(
+            key)
         f.write(_preprocess_transcript(transcriptions[key]))
         f.flush()
 
@@ -94,7 +103,8 @@ def main():
             tar.close()
             os.remove(target_filename)
             print("Converting flac files to wav and extracting transcripts...")
-            assert os.path.exists(extracted_dir), "Archive {} was not properly uncompressed.".format(filename)
+            assert os.path.exists(
+                extracted_dir), "Archive {} was not properly uncompressed.".format(filename)
             for root, subdirs, files in tqdm(os.walk(extracted_dir)):
                 for f in files:
                     if f.find(".flac") != -1:
@@ -104,7 +114,8 @@ def main():
             print("Finished {}".format(url))
             shutil.rmtree(extracted_dir)
         if split_type == 'train':  # Prune to min/max duration
-            create_manifest(split_dir, 'libri_' + split_type + '_manifest.csv', args.min_duration, args.max_duration)
+            create_manifest(split_dir, 'libri_' + split_type +
+                            '_manifest.csv', args.min_duration, args.max_duration)
         else:
             create_manifest(split_dir, 'libri_' + split_type + '_manifest.csv')
 

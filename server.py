@@ -27,12 +27,14 @@ def transcribe_file():
         _, file_extension = os.path.splitext(filename)
         if file_extension.lower() not in ALLOWED_EXTENSIONS:
             res['status'] = "error"
-            res['message'] = "{} is not supported format.".format(file_extension)
+            res['message'] = "{} is not supported format.".format(
+                file_extension)
             return jsonify(res)
         with NamedTemporaryFile(suffix=file_extension) as tmp_saved_audio_file:
             file.save(tmp_saved_audio_file.name)
             logging.info('Transcribing file...')
-            transcription, _ = transcribe(tmp_saved_audio_file.name, spect_parser, model, decoder, device)
+            transcription, _ = transcribe(
+                tmp_saved_audio_file.name, spect_parser, model, decoder, device)
             logging.info('File transcribed')
             res['status'] = "OK"
             res['transcription'] = transcription
@@ -42,9 +44,12 @@ def transcribe_file():
 def main():
     import argparse
     global model, spect_parser, decoder, args, device
-    parser = argparse.ArgumentParser(description='DeepSpeech transcription server')
-    parser.add_argument('--host', type=str, default='0.0.0.0', help='Host to be used by the server')
-    parser.add_argument('--port', type=int, default=8888, help='Port to be used by the server')
+    parser = argparse.ArgumentParser(
+        description='DeepSpeech transcription server')
+    parser.add_argument('--host', type=str, default='0.0.0.0',
+                        help='Host to be used by the server')
+    parser.add_argument('--port', type=int, default=8888,
+                        help='Port to be used by the server')
     parser = add_inference_args(parser)
     parser = add_decoder_args(parser)
     args = parser.parse_args()
@@ -62,7 +67,8 @@ def main():
                                  cutoff_top_n=args.cutoff_top_n, cutoff_prob=args.cutoff_prob,
                                  beam_width=args.beam_width, num_processes=args.lm_workers)
     else:
-        decoder = GreedyDecoder(model.labels, blank_index=model.labels.index('_'))
+        decoder = GreedyDecoder(
+            model.labels, blank_index=model.labels.index('_'))
 
     spect_parser = SpectrogramParser(model.audio_conf, normalize=True)
     logging.info('Server initialised')
