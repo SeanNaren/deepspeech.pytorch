@@ -34,7 +34,6 @@ def decode_results(model, decoded_output, decoded_offsets):
             }
         }
     }
-    results['_meta']['acoustic_model'].update(DeepSpeech.get_meta(model))
 
     for b in range(len(decoded_output)):
         for pi in range(min(args.top_paths, len(decoded_output[b]))):
