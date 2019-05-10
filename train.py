@@ -374,8 +374,8 @@ if __name__ == '__main__':
                                             wer_results=wer_results, cer_results=cer_results)
                        , args.model_path)
             best_wer = wer
-
             avg_loss = 0
-            if not args.no_shuffle:
-                print("Shuffling batches...")
-                train_sampler.shuffle(epoch)
+
+        if not args.no_shuffle:
+            print("Shuffling batches...")
+            train_sampler.shuffle(epoch)
