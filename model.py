@@ -239,9 +239,13 @@ class DeepSpeech(nn.Module):
     @classmethod
     def load_model(cls, path):
         package = torch.load(path, map_location=lambda storage, loc: storage)
-        model = cls(rnn_hidden_size=package['hidden_size'], nb_layers=package['hidden_layers'],
-                    labels=package['labels'], audio_conf=package['audio_conf'],
-                    rnn_type=supported_rnns[package['rnn_type']], bidirectional=package.get('bidirectional', True))
+        model = cls(rnn_hidden_size=package['hidden_size'],
+                    nb_layers=package['hidden_layers'],
+                    labels=package['labels'],
+                    audio_conf=package['audio_conf'],
+                    rnn_type=supported_rnns[package['rnn_type']],
+                    bidirectional=package.get('bidirectional', True),
+                    mixed_precision=package.get('mixed_precision', False))
         model.load_state_dict(package['state_dict'])
         for x in model.rnns:
             x.flatten_parameters()
@@ -249,9 +253,13 @@ class DeepSpeech(nn.Module):
 
     @classmethod
     def load_model_package(cls, package):
-        model = cls(rnn_hidden_size=package['hidden_size'], nb_layers=package['hidden_layers'],
-                    labels=package['labels'], audio_conf=package['audio_conf'],
-                    rnn_type=supported_rnns[package['rnn_type']], bidirectional=package.get('bidirectional', True))
+        model = cls(rnn_hidden_size=package['hidden_size'],
+                    nb_layers=package['hidden_layers'],
+                    labels=package['labels'],
+                    audio_conf=package['audio_conf'],
+                    rnn_type=supported_rnns[package['rnn_type']],
+                    bidirectional=package.get('bidirectional', True),
+                    mixed_precision=package.get('mixed_precision', False))
         model.load_state_dict(package['state_dict'])
         return model
 
@@ -266,7 +274,8 @@ class DeepSpeech(nn.Module):
             'audio_conf': model.audio_conf,
             'labels': model.labels,
             'state_dict': model.state_dict(),
-            'bidirectional': model.bidirectional
+            'bidirectional': model.bidirectional,
+            'mixed_precision': model.mixed_precision
         }
         if optimizer is not None:
             package['optim_dict'] = optimizer.state_dict()
