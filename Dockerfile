@@ -33,7 +33,6 @@ RUN cd apex; pip install .
 ADD . /workspace/deepspeech.pytorch
 RUN cd deepspeech.pytorch; pip install -r requirements.txt
 
-# launch jupiter
-RUN pip install jupyter
-RUN mkdir data; mkdir notebooks;
-CMD jupyter-notebook --ip="*" --no-browser --allow-root
+WORKDIR /root/deepspeech.pytorch
+
+ENTRYPOINT ["python", "train.py"]

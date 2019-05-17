@@ -1,0 +1,62 @@
+apiVersion: "kubeflow.org/v1beta1"
+kind: "PyTorchJob"
+metadata:
+  name: "deepspeech"
+spec:
+  pytorchReplicaSpecs:
+    Master:
+      replicas: 1
+      restartPolicy: OnFailure
+      template:
+        spec:
+          containers:
+            - name: pytorch
+              image: seannaren/deepspeech:latest
+              command: ["python", "-m", "multiproc", "train.py"]
+              args: ["--train-manifest", "/mnt/kubeflow-gcfs/librispeech/librispeech_train_manifest.csv", "--val-manifest", "/mnt/kubeflow-gcfs/librispeech/librispeech_val_manifest.csv", "--dynamic_loss_scale", "--num_workers", "8", "--mixed_precision"]
+              resources:
+                limits:
+                  nvidia.com/gpu: 8
+                  cpu: 31
+                  memory: "128Gi"
+              volumeMounts:
+              - mountPath: /mnt/kubeflow-gcfs
+                name: kubeflow-gcfs
+              - mountPath: /dev/shm
+                name: dshm
+          volumes:
+            - name: kubeflow-gcfs
+              persistentVolumeClaim:
+                claimName: kubeflow-gcfs
+                readOnly: false
+            - name: dshm
+              emptyDir:
+                medium: Memory
+    Worker:
+      replicas: 1 # Set this higher to use more than 2 GPUS (default 1 master, 1 worker)
+      restartPolicy: OnFailure
+      template:
+        spec:
+          containers:
+            - name: pytorch
+              image: seannaren/deepspeech:latest
+              command: ["python", "-m", "multiproc", "train.py"]
+              args: ["--train-manifest", "/mnt/kubeflow-gcfs/librispeech/librispeech_train_manifest.csv", "--val-manifest", "/mnt/kubeflow-gcfs/librispeech/librispeech_val_manifest.csv", "--dynamic_loss_scale", "--num_workers", "8", "--mixed_precision"]
+              resources:
+                limits:
+                  nvidia.com/gpu: 8
+                  cpu: 31
+                  memory: "128Gi"
+              volumeMounts:
+              - mountPath: /mnt/kubeflow-gcfs
+                name: kubeflow-gcfs
+              - mountPath: /dev/shm
+                name: dshm
+          volumes:
+            - name: kubeflow-gcfs
+              persistentVolumeClaim:
+                claimName: kubeflow-gcfs
+                readOnly: false
+            - name: dshm
+              emptyDir:
+                medium: Memory
