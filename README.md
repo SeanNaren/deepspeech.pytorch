@@ -39,6 +39,7 @@ Install pytorch audio:
 ```
 sudo apt-get install sox libsox-dev libsox-fmt-all
 git clone https://github.com/pytorch/audio.git
+git checkout d92de5b97fc6204db4b1e3ed20c03ac06f5d53f0
 cd audio && python setup.py install
 ```
 
