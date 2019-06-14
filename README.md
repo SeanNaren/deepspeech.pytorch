@@ -35,13 +35,6 @@ export CUDA_HOME="/usr/local/cuda"
 cd ../pytorch_binding && python setup.py install
 ```
 
-Install pytorch audio:
-```
-sudo apt-get install sox libsox-dev libsox-fmt-all
-git clone https://github.com/pytorch/audio.git
-cd audio && python setup.py install
-```
-
 Install NVIDIA apex:
 ```
 git clone --recursive https://github.com/NVIDIA/apex.git
@@ -180,21 +173,25 @@ python -m multiproc train.py --visdom --cuda # Add your parameters as normal, mu
 
 multiproc will open a log for all processes other than the main process.
 
-We suggest using the NCCL backend which defaults to TCP if Infiniband isn't available.
-
-## Mixed Precision
-
-If you are using NVIDIA volta cards or above to train your model, it's highly suggested to turn on mixed precision for speed/memory benefits. More information can be found [here](https://docs.nvidia.com/deeplearning/sdk/mixed-precision-training/index.html). Also suggested is to turn on dyanmic loss scaling to handle small grad values:
-
-```
-python train.py --train-manifest data/train_manifest.csv --val-manifest data/val_manifest.csv --mixed-precision --dynamic-loss-scale
-```
-
 You can also specify specific GPU IDs rather than allowing the script to use all available GPUs:
 
 ```
 python -m multiproc train.py --visdom --cuda --device-ids 0,1,2,3 # Add your parameters as normal, will only run on 4 GPUs
 ```
+
+We suggest using the NCCL backend which defaults to TCP if Infiniband isn't available.
+
+## Mixed Precision
+
+If you are using NVIDIA volta cards or above to train your model, it's highly suggested to turn on mixed precision for speed/memory benefits. More information can be found [here](https://docs.nvidia.com/deeplearning/sdk/mixed-precision-training/index.html).
+
+Different Optimization levels are available. More information on the Nvidia Apex API can be seen [here](https://nvidia.github.io/apex/amp.html#opt-levels).
+
+```
+python train.py --train-manifest data/train_manifest.csv --val-manifest data/val_manifest.csv --opt-level O1 --loss-scale 1.0
+```
+
+Training a model in mixed-precision means you can use 32 bit float or half precision at runtime. Float is default, to use half precision (Which on V100s come with a speedup and better memory use) use the `--half` flag when testing or transcribing.
 
 ### Noise Augmentation/Injection
 

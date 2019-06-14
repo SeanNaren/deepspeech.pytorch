@@ -11,12 +11,11 @@ from decoder import GreedyDecoder
 import torch
 
 from data.data_loader import SpectrogramParser
-from model import DeepSpeech
 import os.path
 import json
 
 
-def decode_results(model, decoded_output, decoded_offsets):
+def decode_results(decoded_output, decoded_offsets):
     results = {
         "output": [],
         "_meta": {
@@ -44,10 +43,12 @@ def decode_results(model, decoded_output, decoded_offsets):
     return results
 
 
-def transcribe(audio_path, parser, model, decoder, device):
-    spect = parser.parse_audio(audio_path).contiguous()
+def transcribe(audio_path, spect_parser, model, decoder, device, use_half):
+    spect = spect_parser.parse_audio(audio_path).contiguous()
     spect = spect.view(1, 1, spect.size(0), spect.size(1))
     spect = spect.to(device)
+    if use_half:
+        spect = spect.half()
     input_sizes = torch.IntTensor([spect.size(3)]).int()
     out, output_sizes = model(spect, input_sizes)
     decoded_output, decoded_offsets = decoder.decode(out, output_sizes)
@@ -55,15 +56,15 @@ def transcribe(audio_path, parser, model, decoder, device):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='DeepSpeech transcription')
-    parser = add_inference_args(parser)
-    parser.add_argument('--audio-path', default='audio.wav',
-                        help='Audio file to predict on')
-    parser.add_argument('--offsets', dest='offsets', action='store_true', help='Returns time offset information')
-    parser = add_decoder_args(parser)
-    args = parser.parse_args()
+    arg_parser = argparse.ArgumentParser(description='DeepSpeech transcription')
+    arg_parser = add_inference_args(arg_parser)
+    arg_parser.add_argument('--audio-path', default='audio.wav',
+                              help='Audio file to predict on')
+    arg_parser.add_argument('--offsets', dest='offsets', action='store_true', help='Returns time offset information')
+    arg_parser = add_decoder_args(arg_parser)
+    args = arg_parser.parse_args()
     device = torch.device("cuda" if args.cuda else "cpu")
-    model = load_model(device, args.model_path, args.cuda)
+    model = load_model(device, args.model_path, args.half)
 
     if args.decoder == "beam":
         from decoder import BeamCTCDecoder
@@ -74,7 +75,12 @@ if __name__ == '__main__':
     else:
         decoder = GreedyDecoder(model.labels, blank_index=model.labels.index('_'))
 
-    parser = SpectrogramParser(model.audio_conf, normalize=True)
+    spect_parser = SpectrogramParser(model.audio_conf, normalize=True)
 
-    decoded_output, decoded_offsets = transcribe(args.audio_path, parser, model, decoder, device)
-    print(json.dumps(decode_results(model, decoded_output, decoded_offsets)))
+    decoded_output, decoded_offsets = transcribe(audio_path=args.audio_path,
+                                                 spect_parser=spect_parser,
+                                                 model=model,
+                                                 decoder=decoder,
+                                                 device=device,
+                                                 use_half=args.half)
+    print(json.dumps(decode_results(decoded_output, decoded_offsets)))

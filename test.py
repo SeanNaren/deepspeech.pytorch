@@ -16,15 +16,14 @@ parser.add_argument('--test-manifest', metavar='DIR',
 parser.add_argument('--batch-size', default=20, type=int, help='Batch size for training')
 parser.add_argument('--num-workers', default=4, type=int, help='Number of workers used in dataloading')
 parser.add_argument('--verbose', action="store_true", help="print out decoded output and error of each sample")
-parser.add_argument('--output-path', default=None, type=str, help="Where to save raw acoustic output")
+parser.add_argument('--save-output', default=None, help="Saves output of model from test to this file_path")
 parser = add_decoder_args(parser)
-parser.add_argument('--save-output', action="store_true", help="Saves output of model from test")
 args = parser.parse_args()
 
 if __name__ == '__main__':
     torch.set_grad_enabled(False)
     device = torch.device("cuda" if args.cuda else "cpu")
-    model = load_model(device, args.model_path, args.cuda)
+    model = load_model(device, args.model_path, args.half)
 
     if args.decoder == "beam":
         from decoder import BeamCTCDecoder
@@ -47,6 +46,8 @@ if __name__ == '__main__':
         inputs, targets, input_percentages, target_sizes = data
         input_sizes = input_percentages.mul_(int(inputs.size(3))).int()
         inputs = inputs.to(device)
+        if args.half:
+            inputs = inputs.half()
         # unflatten targets
         split_targets = []
         offset = 0
@@ -56,12 +57,12 @@ if __name__ == '__main__':
 
         out, output_sizes = model(inputs, input_sizes)
 
-        if args.save_output:
-            # add output to data array, and continue
-            output_data.append((out.cpu().numpy(), output_sizes.numpy()))
-
         decoded_output, _ = decoder.decode(out, output_sizes)
         target_strings = target_decoder.convert_to_strings(split_targets)
+
+        if args.save_output is not None:
+            # add output to data array, and continue
+            output_data.append((out.cpu().numpy(), output_sizes.numpy(), target_strings))
         for x in range(len(target_strings)):
             transcript, reference = decoded_output[x][0], target_strings[x][0]
             wer_inst = decoder.wer(transcript, reference)
@@ -81,5 +82,5 @@ if __name__ == '__main__':
     print('Test Summary \t'
           'Average WER {wer:.3f}\t'
           'Average CER {cer:.3f}\t'.format(wer=wer * 100, cer=cer * 100))
-    if args.save_output:
-        np.save(args.output_path, output_data)
+    if args.save_output is not None:
+        np.save(args.save_output, output_data)

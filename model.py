@@ -143,7 +143,7 @@ class Lookahead(nn.Module):
 
 class DeepSpeech(nn.Module):
     def __init__(self, rnn_type=nn.LSTM, labels="abc", rnn_hidden_size=768, nb_layers=5, audio_conf=None,
-                 bidirectional=True, context=20, mixed_precision=False):
+                 bidirectional=True, context=20):
         super(DeepSpeech, self).__init__()
 
         # model metadata needed for serialization/deserialization
@@ -156,7 +156,6 @@ class DeepSpeech(nn.Module):
         self.audio_conf = audio_conf or {}
         self.labels = labels
         self.bidirectional = bidirectional
-        self.mixed_precision = mixed_precision
 
         sample_rate = self.audio_conf.get("sample_rate", 16000)
         window_size = self.audio_conf.get("window_size", 0.02)
@@ -201,8 +200,6 @@ class DeepSpeech(nn.Module):
         self.inference_softmax = InferenceBatchSoftmax()
 
     def forward(self, x, lengths):
-        if x.is_cuda and self.mixed_precision:
-            x = x.half()
         lengths = lengths.cpu().int()
         output_lengths = self.get_seq_lens(lengths)
         x, _ = self.conv(x, output_lengths)
@@ -244,8 +241,7 @@ class DeepSpeech(nn.Module):
                     labels=package['labels'],
                     audio_conf=package['audio_conf'],
                     rnn_type=supported_rnns[package['rnn_type']],
-                    bidirectional=package.get('bidirectional', True),
-                    mixed_precision=package.get('mixed_precision', False))
+                    bidirectional=package.get('bidirectional', True))
         model.load_state_dict(package['state_dict'])
         for x in model.rnns:
             x.flatten_parameters()
@@ -258,8 +254,7 @@ class DeepSpeech(nn.Module):
                     labels=package['labels'],
                     audio_conf=package['audio_conf'],
                     rnn_type=supported_rnns[package['rnn_type']],
-                    bidirectional=package.get('bidirectional', True),
-                    mixed_precision=package.get('mixed_precision', False))
+                    bidirectional=package.get('bidirectional', True))
         model.load_state_dict(package['state_dict'])
         return model
 
@@ -275,7 +270,6 @@ class DeepSpeech(nn.Module):
             'labels': model.labels,
             'state_dict': model.state_dict(),
             'bidirectional': model.bidirectional,
-            'mixed_precision': model.mixed_precision
         }
         if optimizer is not None:
             package['optim_dict'] = optimizer.state_dict()
