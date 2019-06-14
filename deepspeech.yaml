@@ -16,7 +16,7 @@ spec:
               args: ["--train-manifest", "/mnt/kubeflow-gcfs/librispeech/librispeech_train_manifest.csv", "--val-manifest", "/mnt/kubeflow-gcfs/librispeech/librispeech_val_manifest.csv", "--dynamic_loss_scale", "--num_workers", "8", "--mixed_precision"]
               resources:
                 limits:
-                  nvidia.com/gpu: 8
+                  nvidia.com/gpu: 1
                   cpu: 31
                   memory: "128Gi"
               volumeMounts:
@@ -44,7 +44,7 @@ spec:
               args: ["--train-manifest", "/mnt/kubeflow-gcfs/librispeech/librispeech_train_manifest.csv", "--val-manifest", "/mnt/kubeflow-gcfs/librispeech/librispeech_val_manifest.csv", "--dynamic_loss_scale", "--num_workers", "8", "--mixed_precision"]
               resources:
                 limits:
-                  nvidia.com/gpu: 8
+                  nvidia.com/gpu: 1
                   cpu: 31
                   memory: "128Gi"
               volumeMounts:

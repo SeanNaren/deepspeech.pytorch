@@ -1,14 +1,13 @@
 # DeepSpeech KubeFlow 
 
-This branch contains the code to run DeepSpeech on KubeFlow and Kubernetes as shown in our blog post [here](). We assume you have access to a GCP project with
-the appropriate GPU resources to use this. We use LibriSpeech 100 to measure our benchmarks. Modifications have been made internally, however the overall speedups should be available in this repo.
+This branch contains the scripts to run DeepSpeech on KubeFlow using GCP as shown in our blog post [here](https://medium.com/@seannaren/scaling-deepspeech-using-mixed-precision-and-kubeflow-b83965e79173). We assume you have access to a GCP project with
+the appropriate GPU resources to use this. Note that there is a charge which scales with the number of running GPUs. 
+
+We use LibriSpeech 100 to measure our benchmarks. Modifications have been made internally, however the overall speedups should be comparable using deepspeech.pytorch.
 
 ## Installation
 
-Follow the instructions [here](https://www.kubeflow.org/docs/started/getting-started-gke/) 
-**till you set up the GCP auth data** then follow the below commands to setup kubeflow.
-
-We assume you're using an OSX based machine, however most of these commands can be ran on Linux as well.
+We assume you're using an OSX based machine, however most of these commands can be ran on Linux as well. We also assume you've set up [gcloud](https://cloud.google.com/sdk/install).
 
 ### Install additional dependencies
 ```bash
@@ -17,9 +16,11 @@ brew install jq
 pip install ys
 ```
 
-### Set up config for gcloud
+Follow the instructions [here](https://www.kubeflow.org/docs/gke/deploy/oauth-setup/).
 
-Make sure to set these zones 
+Once completed follow the instructions below.
+
+### Set up config for gcloud
 ```bash
 export ZONE=us-central1-a # Change this to the zone you prefer, ensure that there is GPU availability in that zone on GCP
 gcloud config set compute/zone ${ZONE}
@@ -30,7 +31,7 @@ gcloud config set compute/zone ${ZONE}
 # Set up env variables for cmds
 export CLIENT_ID=<CLIENT_ID from OAuth page>
 export CLIENT_SECRET=<CLIENT_SECRET from OAuth page>
-export KUBEFLOW_SRC=/Users/sean.narenthiran/kubeflow/ # Ensure absolute path
+export KUBEFLOW_SRC=~/kubeflow/ # Ensure path to a folder location which will contain kubeflow
 export KUBEFLOW_TAG=master
 export PROJECT=deepspeech # Ensure these are set to the values you've used when setting up kubeflow
 export KFAPP=deepspeech # Ensure these are set to the values you've used when setting up kubeflow
@@ -49,11 +50,11 @@ ${KUBEFLOW_SRC}/scripts/kfctl.sh apply k8s
 kubectl -n kubeflow get  all # Ensure you see nodes, will take a few minutes to spin everything up
 ```
 
-### Adding GPUs to be provisioned
+### Adding GPUs to be auto-provisioned
 
-To auto-scale GPUs we need to update the created nodes.
+To auto-scale GPUs we need to update the deployed nodes.
 
-Using the navigation menu select kubernetes engine. Then select clusters and click on the deepspeech cluster.
+Using the navigation menu select kubernetes engine in the GCP console. Then select clusters and click on the deepspeech cluster.
 
 Once you're in the cluster, press edit at the top to configure the node. Change the auto-provision settings to look like the below to use GPUs, and click save at the bottom.
 
@@ -103,10 +104,9 @@ mv ${KFAPP}/gcp_config/gcfs.yaml.new ${KFAPP}/gcp_config/gcfs.yaml
 # apply changes
 cd ${KFAPP}
 ${KUBEFLOW_SRC}/scripts/kfctl.sh apply platform
-
 ```
 
-This will make the drive, however we now need to mount it to kubeflow. We will need to define the storage capacity and IP address that our node is set on.
+This will make the drive, however we now need to mount it to our kubeflow cluster. We will need to define the storage capacity and IP address that our node is set on.
 To figure out the IP run the below command:
 
 ```bash
@@ -131,7 +131,7 @@ We now need to create a node to manage file transfer to and from the drive.
 
 In the GCP UI, go to compute engine and select VM instances. Select Create Instance. Change the name to nfs-server, change instance location to the same as defined above (us-central1-a for us) and change the Boot Instance type to Ubuntu 16 LTS, and click Create.
 
-It will take a few minutes to create the instance, but once it is up you should be able to SSH to it via the  (click the button next to the instance name). Once you are on the node follow the below commands:
+It will take a few minutes to create the instance, but once it is up you should be able to SSH to it via clicking the button next to the instance name. Once you are on the node follow the below commands:
 
 ```bash
 # From the GCP SSH terminal to the NFS server
@@ -166,7 +166,7 @@ kubectl create -f deepspeech.yaml
 We can see the status of pipelines using the UI. Check under workloads to see your jobs. They will remain unschedulable until the GPUs have been provisioned and ready to run, so this may take a few minutes to do.
 To check the progress of the GPUS, under clusters select deepspeech, and then select nodes. You should see two new GPU nodes, select them and check the running pods to see if a nvidia-gpu-driver pod is starting up.
 
-After a while the pipeline will run, and results can be seen via the logs by selecting the workload job.
+After a while the pipeline will run, and results can be seen via the logs by selecting the workload job in the GCP UI.
  
 You can also see the status of the node via the terminal:
 
@@ -174,13 +174,26 @@ You can also see the status of the node via the terminal:
 kubectl get pods
 ```
 
+To stop the pipeline run:
+
+```bash
+kubectl delete -f deepspeech.yaml
+```
+
+### Editing the pipeline
+
+To edit the pipeline, modify the deepspeech.yaml file. Here you can see two sets of configs, one for the master node, and one for worker nodes. Currently the script is set up to provision one of each, but this can be changed easily by modifying the `replicas` config.
+
+By modifying `nvidia.com/gpu: 1` you can vary the number of GPUs mounted to a single node.
+
 ### Nuking Everything
 
 To get rid of everything we suggest follow the below steps:
 
-First go to the Deployment Manager page in the GCP UI, and delete the deployment. This will remove any running nodes etc.
-Go to the Compute page, and make sure all nodes have been terminated. Finally go to the Disks page, and delete any stray disks.
-Finally run the below command:
+* First go to the Deployment Manager page in the GCP UI, and delete the deployment. This will remove any running nodes etc.
+* Go to the Compute page, and make sure all nodes have been terminated. 
+* Go to the Disks page, and delete any stray disks.
+* Finally run the below command:
 
 ```
 cd ${KFAPP}
