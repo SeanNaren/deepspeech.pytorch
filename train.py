@@ -9,13 +9,13 @@ import torch.distributed as dist
 import torch.utils.data.distributed
 from apex.fp16_utils import FP16_Optimizer
 from apex.parallel import DistributedDataParallel
-from tqdm import tqdm
 from warpctc_pytorch import CTCLoss
 
 from data.data_loader import AudioDataLoader, SpectrogramDataset, BucketingSampler, DistributedBucketingSampler
 from decoder import GreedyDecoder
 from logger import VisdomLogger, TensorBoardLogger
 from model import DeepSpeech, supported_rnns
+from test import evaluate
 from utils import convert_model_to_half, reduce_tensor, check_loss
 
 parser = argparse.ArgumentParser(description='DeepSpeech training')
@@ -150,7 +150,7 @@ if __name__ == '__main__':
         print("Loading checkpoint model %s" % args.continue_from)
         package = torch.load(args.continue_from, map_location=lambda storage, loc: storage)
         model = DeepSpeech.load_model_package(package)
-        labels = model.labels 
+        labels = model.labels
         audio_conf = model.audio_conf
         if not args.finetune:  # Don't want to restart training
             optim_state = package['optim_dict']
@@ -304,44 +304,19 @@ if __name__ == '__main__':
               'Average Loss {loss:.3f}\t'.format(epoch + 1, epoch_time=epoch_time, loss=avg_loss))
 
         start_iter = 0  # Reset start iteration for next epoch
-        total_cer, total_wer = 0, 0
-        model.eval()
         with torch.no_grad():
-            for i, (data) in tqdm(enumerate(test_loader), total=len(test_loader)):
-                inputs, targets, input_percentages, target_sizes = data
-                input_sizes = input_percentages.mul_(int(inputs.size(3))).int()
-                inputs = inputs.to(device)
-
-                # unflatten targets
-                split_targets = []
-                offset = 0
-                for size in target_sizes:
-                    split_targets.append(targets[offset:offset + size])
-                    offset += size
-
-                out, output_sizes = model(inputs, input_sizes)
-
-                decoded_output, _ = decoder.decode(out, output_sizes)
-                target_strings = decoder.convert_to_strings(split_targets)
-                wer, cer = 0, 0
-                for x in range(len(target_strings)):
-                    transcript, reference = decoded_output[x][0], target_strings[x][0]
-                    wer += decoder.wer(transcript, reference) / float(len(reference.split()))
-                    cer += decoder.cer(transcript, reference) / float(len(reference))
-                total_cer += cer
-                total_wer += wer
-                del out
-            wer = total_wer / len(test_loader.dataset)
-            cer = total_cer / len(test_loader.dataset)
-            wer *= 100
-            cer *= 100
-            loss_results[epoch] = avg_loss
-            wer_results[epoch] = wer
-            cer_results[epoch] = cer
-            print('Validation Summary Epoch: [{0}]\t'
-                  'Average WER {wer:.3f}\t'
-                  'Average CER {cer:.3f}\t'.format(
-                epoch + 1, wer=wer, cer=cer))
+            wer, cer, output_data = evaluate(test_loader=test_loader,
+                                             device=device,
+                                             model=model,
+                                             decoder=decoder,
+                                             target_decoder=decoder)
+        loss_results[epoch] = avg_loss
+        wer_results[epoch] = wer
+        cer_results[epoch] = cer
+        print('Validation Summary Epoch: [{0}]\t'
+              'Average WER {wer:.3f}\t'
+              'Average CER {cer:.3f}\t'.format(
+            epoch + 1, wer=wer, cer=cer))
 
         values = {
             'loss_results': loss_results,
