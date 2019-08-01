@@ -11,7 +11,7 @@ from decoder import BeamCTCDecoder
 from model import DeepSpeech
 from opts import add_decoder_args
 
-parser = argparse.ArgumentParser(description='DeepSpeech transcription')
+parser = argparse.ArgumentParser(description='Tune an ARPA LM based on a pre-trained acoustic model output')
 parser.add_argument('--model-path', default='models/deepspeech_final.pth',
                     help='Path to model file created by training')
 parser.add_argument('--saved-output', default="", type=str, help='Path to output from test.py')
