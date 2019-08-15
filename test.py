@@ -20,7 +20,7 @@ parser.add_argument('--save-output', default=None, help="Saves output of model f
 parser = add_decoder_args(parser)
 
 
-def evaluate(test_loader, device, model, decoder, target_decoder, save_output=False, verbose=False):
+def evaluate(test_loader, device, model, decoder, target_decoder, save_output=False, verbose=False, half=False):
     model.eval()
     total_cer, total_wer, num_tokens, num_chars = 0, 0, 0, 0
     output_data = []
@@ -28,7 +28,7 @@ def evaluate(test_loader, device, model, decoder, target_decoder, save_output=Fa
         inputs, targets, input_percentages, target_sizes = data
         input_sizes = input_percentages.mul_(int(inputs.size(3))).int()
         inputs = inputs.to(device)
-        if args.half:
+        if half:
             inputs = inputs.half()
         # unflatten targets
         split_targets = []
@@ -71,7 +71,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     torch.set_grad_enabled(False)
     device = torch.device("cuda" if args.cuda else "cpu")
-    model = load_model(device, args.model_path, args.cuda)
+    model = load_model(device, args.model_path, args.half)
 
     if args.decoder == "beam":
         from decoder import BeamCTCDecoder
@@ -94,7 +94,8 @@ if __name__ == '__main__':
                                      decoder=decoder,
                                      target_decoder=target_decoder,
                                      save_output=args.save_output,
-                                     verbose=args.verbose)
+                                     verbose=args.verbose,
+                                     half=args.half)
 
     print('Test Summary \t'
           'Average WER {wer:.3f}\t'
