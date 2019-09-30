@@ -240,7 +240,7 @@ We support using kenlm based LMs. Below are instructions on how to take the Libr
 ### Tuning the LibriSpeech LMs
 
 First ensure you've set up the librispeech datasets from the data/ folder.
-In addition download the latest pre-trained librispeech model from the releases page, as well as the ARPA model you want to tune from [here](http://www.openslr.org/11/). For the below we use the 4gram ARPA model.
+In addition download the latest pre-trained librispeech model from the releases page, as well as the ARPA model you want to tune from [here](http://www.openslr.org/11/). For the below we use the 3-gram ARPA model (3e-7 prune).
 
 First we need to generate the acoustic output to be used to evaluate the model on LibriSpeech val.
 ```
@@ -250,7 +250,7 @@ python test.py --test-manifest data/librispeech_val_manifest.csv --model-path li
 We use a beam width of 128 which gives reasonable results. We suggest using a CPU intensive node to carry out the grid search.
 
 ```
-python search_lm_params.py --num-workers 16 --saved-output librispeech_val_output.npy --output-path libri_tune_output.json --lm-alpha-from 0 --lm-alpha-to 5 --lm-beta-from 0 --lm-beta-to 3 --lm-path 4-gram.arpa  --model-path librispeech_pretrained_v2.pth --beam-width 128 --lm-workers 16
+python search_lm_params.py --num-workers 16 --saved-output librispeech_val_output.npy --output-path libri_tune_output.json --lm-alpha-from 0 --lm-alpha-to 5 --lm-beta-from 0 --lm-beta-to 3 --lm-path 3-gram.pruned.3e-7.arpa  --model-path librispeech_pretrained_v2.pth --beam-width 128 --lm-workers 16
 ```
 
 This will run a grid search across the alpha/beta parameters using a beam width of 128. Use the below script to find the best alpha/beta params:
