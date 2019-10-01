@@ -32,7 +32,12 @@ def transcribe_file():
         with NamedTemporaryFile(suffix=file_extension) as tmp_saved_audio_file:
             file.save(tmp_saved_audio_file.name)
             logging.info('Transcribing file...')
-            transcription, _ = transcribe(tmp_saved_audio_file.name, spect_parser, model, decoder, device)
+            transcription, _ = transcribe(audio_path=tmp_saved_audio_file,
+                                          spect_parser=spect_parser,
+                                          model=model,
+                                          decoder=decoder,
+                                          device=device,
+                                          use_half=args.half)
             logging.info('File transcribed')
             res['status'] = "OK"
             res['transcription'] = transcription
@@ -53,7 +58,7 @@ def main():
     logging.info('Setting up server...')
     torch.set_grad_enabled(False)
     device = torch.device("cuda" if args.cuda else "cpu")
-    model = load_model(device, args.model_path, args.cuda)
+    model = load_model(device, args.model_path, args.half)
 
     if args.decoder == "beam":
         from decoder import BeamCTCDecoder

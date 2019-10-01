@@ -1,7 +1,7 @@
 import argparse
 
 import torch
-import torchaudio
+from scipy.io.wavfile import write
 
 from data.data_loader import load_audio, NoiseInjection
 
@@ -18,5 +18,7 @@ noise_injector = NoiseInjection()
 data = load_audio(args.input_path)
 mixed_data = noise_injector.inject_noise_sample(data, args.noise_path, args.noise_level)
 mixed_data = torch.tensor(mixed_data, dtype=torch.float).unsqueeze(1)  # Add channels dim
-torchaudio.save(args.output_path, mixed_data, args.sample_rate)
+write(filename=args.output_path,
+      data=mixed_data.numpy(),
+      rate=args.sample_rate)
 print('Saved mixed file to %s' % args.output_path)

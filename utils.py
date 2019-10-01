@@ -1,18 +1,7 @@
 import torch
-from apex.fp16_utils import BN_convert_float
 import torch.distributed as dist
 
 from model import DeepSpeech
-
-
-def convert_model_to_half(model):
-    """
-    Converts model to half but keeps the batch norm layers in 32 bit for precision purposes
-    """
-    old_model = model
-    new_model = BN_convert_float(model.half())
-    del old_model  # Delete previous non-half model
-    return new_model
 
 
 def reduce_tensor(tensor, world_size, reduce_op_max=False):
@@ -42,10 +31,10 @@ def check_loss(loss, loss_value):
     return loss_valid, error
 
 
-def load_model(device, model_path, is_cuda):
+def load_model(device, model_path, use_half):
     model = DeepSpeech.load_model(model_path)
     model.eval()
     model = model.to(device)
-    if is_cuda and model.mixed_precision:
-        model = convert_model_to_half(model)
+    if use_half:
+        model = model.half()
     return model

@@ -35,13 +35,6 @@ export CUDA_HOME="/usr/local/cuda"
 cd ../pytorch_binding && python setup.py install
 ```
 
-Install pytorch audio:
-```
-sudo apt-get install sox libsox-dev libsox-fmt-all
-git clone https://github.com/pytorch/audio.git
-cd audio && python setup.py install
-```
-
 Install NVIDIA apex:
 ```
 git clone --recursive https://github.com/NVIDIA/apex.git
@@ -59,69 +52,11 @@ Finally clone this repo and run this within the repo:
 pip install -r requirements.txt
 ```
 
-## Usage
+## Training
 
 ### Datasets
 
-Currently supports AN4, TEDLIUM, Voxforge and LibriSpeech. Scripts will setup the dataset and create manifest files used in dataloading.
-
-#### AN4
-
-To download and setup the an4 dataset run below command in the root folder of the repo:
-
-```
-cd data; python an4.py
-```
-
-#### TEDLIUM
-
-You have the option to download the raw dataset file manually or through the script (which will cache it).
-The file is found [here](http://www.openslr.org/resources/19/TEDLIUM_release2.tar.gz).
-
-To download and setup the TEDLIUM_V2 dataset run below command in the root folder of the repo:
-
-```
-cd data; python ted.py # Optionally if you have downloaded the raw dataset file, pass --tar_path /path/to/TEDLIUM_release2.tar.gz
-
-```
-#### Voxforge
-
-To download and setup the Voxforge dataset run the below command in the root folder of the repo:
-
-```
-cd data; python voxforge.py
-```
-
-Note that this dataset does not come with a validation dataset or test dataset.
-
-#### LibriSpeech
-
-To download and setup the LibriSpeech dataset run the below command in the root folder of the repo:
-
-```
-cd data; python librispeech.py
-```
-
-You have the option to download the raw dataset files manually or through the script (which will cache them as well).
-In order to do this you must create the following folder structure and put the corresponding tar files that you download from [here](http://www.openslr.org/12/).
-
-```
-cd data/
-mkdir LibriSpeech/ # This can be anything as long as you specify the directory path as --target-dir when running the librispeech.py script
-mkdir LibriSpeech/val/
-mkdir LibriSpeech/test/
-mkdir LibriSpeech/train/
-```
-
-Now put the `tar.gz` files in the correct folders. They will now be used in the data pre-processing for librispeech and be removed after
-formatting the dataset.
-
-Optionally you can specify the exact librispeech files you want if you don't want to add all of them. This can be done like below:
-
-```
-cd data/
-python librispeech.py --files-to-use "train-clean-100.tar.gz, train-clean-360.tar.gz,train-other-500.tar.gz, dev-clean.tar.gz,dev-other.tar.gz, test-clean.tar.gz,test-other.tar.gz"
-```
+Currently supports AN4, TEDLIUM, Voxforge, Common Voice and LibriSpeech. Scripts will setup the dataset and create manifest files used in data-loading. The scripts can be found in the data/ folder. Many of the scripts allow you to download the raw datasets separately if you choose so.
 
 #### Custom Dataset
 
@@ -146,7 +81,7 @@ cd data/
 python merge_manifests.py --output-path merged_manifest.csv --merge-dir all-manifests/ --min-duration 1 --max-duration 15 # durations in seconds
 ```
 
-## Training
+### Training a Model
 
 ```
 python train.py --train-manifest data/train_manifest.csv --val-manifest data/val_manifest.csv
@@ -168,7 +103,7 @@ python train.py --tensorboard --logdir log_dir/ # Make sure the Tensorboard inst
 
 For both visualisation tools, you can add your own name to the run by changing the `--id` parameter when training.
 
-## Multi-GPU Training
+### Multi-GPU Training
 
 We support multi-GPU training via the distributed parallel wrapper (see [here](https://github.com/NVIDIA/sentiment-discovery/blob/master/analysis/scale.md) and [here](https://github.com/SeanNaren/deepspeech.pytorch/issues/211) to see why we don't use DataParallel).
 
@@ -180,21 +115,25 @@ python -m multiproc train.py --visdom --cuda # Add your parameters as normal, mu
 
 multiproc will open a log for all processes other than the main process.
 
-We suggest using the NCCL backend which defaults to TCP if Infiniband isn't available.
-
-## Mixed Precision
-
-If you are using NVIDIA volta cards or above to train your model, it's highly suggested to turn on mixed precision for speed/memory benefits. More information can be found [here](https://docs.nvidia.com/deeplearning/sdk/mixed-precision-training/index.html). Also suggested is to turn on dyanmic loss scaling to handle small grad values:
-
-```
-python train.py --train-manifest data/train_manifest.csv --val-manifest data/val_manifest.csv --mixed-precision --dynamic-loss-scale
-```
-
 You can also specify specific GPU IDs rather than allowing the script to use all available GPUs:
 
 ```
 python -m multiproc train.py --visdom --cuda --device-ids 0,1,2,3 # Add your parameters as normal, will only run on 4 GPUs
 ```
+
+We suggest using the NCCL backend which defaults to TCP if Infiniband isn't available.
+
+### Mixed Precision
+
+If you are using NVIDIA volta cards or above to train your model, it's highly suggested to turn on mixed precision for speed/memory benefits. More information can be found [here](https://docs.nvidia.com/deeplearning/sdk/mixed-precision-training/index.html).
+
+Different Optimization levels are available. More information on the Nvidia Apex API can be seen [here](https://nvidia.github.io/apex/amp.html#opt-levels).
+
+```
+python train.py --train-manifest data/train_manifest.csv --val-manifest data/val_manifest.csv --opt-level O1 --loss-scale 1.0
+```
+
+Training a model in mixed-precision means you can use 32 bit float or half precision at runtime. Float is default, to use half precision (Which on V100s come with a speedup and better memory use) use the `--half` flag when testing or transcribing.
 
 ### Noise Augmentation/Injection
 
@@ -282,7 +221,9 @@ An example script to output a transcription has been provided:
 python transcribe.py --model-path models/deepspeech.pth --audio-path /path/to/audio.wav
 ```
 
-## Server
+If you used mixed-precision or half precision when training the model, you can use the `--half` flag for a speed/memory benefit.
+
+## Inference Server
 
 Included is a basic server script that will allow post request to be sent to the server to transcribe files.
 
@@ -291,6 +232,38 @@ python server.py --host 0.0.0.0 --port 8000 # Run on one window
 
 curl -X POST http://0.0.0.0:8000/transcribe -H "Content-type: multipart/form-data" -F "file=@/path/to/input.wav"
 ```
+
+## Using an ARPA LM
+
+We support using kenlm based LMs. Below are instructions on how to take the LibriSpeech LMs found [here](http://www.openslr.org/11/) and tune the model to give you the best parameters when decoding, based on LibriSpeech.
+
+### Tuning the LibriSpeech LMs
+
+First ensure you've set up the librispeech datasets from the data/ folder.
+In addition download the latest pre-trained librispeech model from the releases page, as well as the ARPA model you want to tune from [here](http://www.openslr.org/11/). For the below we use the 3-gram ARPA model (3e-7 prune).
+
+First we need to generate the acoustic output to be used to evaluate the model on LibriSpeech val.
+```
+python test.py --test-manifest data/librispeech_val_manifest.csv --model-path librispeech_pretrained_v2.pth --cuda --half --save-output librispeech_val_output.npy
+```
+
+We use a beam width of 128 which gives reasonable results. We suggest using a CPU intensive node to carry out the grid search.
+
+```
+python search_lm_params.py --num-workers 16 --saved-output librispeech_val_output.npy --output-path libri_tune_output.json --lm-alpha-from 0 --lm-alpha-to 5 --lm-beta-from 0 --lm-beta-to 3 --lm-path 3-gram.pruned.3e-7.arpa  --model-path librispeech_pretrained_v2.pth --beam-width 128 --lm-workers 16
+```
+
+This will run a grid search across the alpha/beta parameters using a beam width of 128. Use the below script to find the best alpha/beta params:
+
+```
+python select_lm_params.py --input-path libri_tune_output.json
+```
+
+Use the alpha/beta parameters when using the beam decoder.
+
+### Building your own LM
+
+To build your own LM you need to use the KenLM repo found [here](https://github.com/kpu/kenlm). Have a read of the documentation to get a sense of how to train your own LM. The above steps once trained can be used to find the appropriate parameters.
 
 ### Alternate Decoders
 By default, `test.py` and `transcribe.py` use a `GreedyDecoder` which picks the highest-likelihood output label at each timestep. Repeated and blank symbols are then filtered to give the final output.
