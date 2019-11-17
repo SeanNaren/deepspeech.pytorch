@@ -120,7 +120,6 @@ if __name__ == '__main__':
     device = torch.device("cuda" if args.cuda else "cpu")
     args.distributed = args.world_size > 1
     main_proc = True
-    device = torch.device("cuda" if args.cuda else "cpu")
     if args.distributed:
         if args.gpu_rank:
             torch.cuda.set_device(int(args.gpu_rank))
@@ -209,10 +208,11 @@ if __name__ == '__main__':
     if optim_state is not None:
         optimizer.load_state_dict(optim_state)
 
-    model, optimizer = amp.initialize(model, optimizer,
-                                      opt_level=args.opt_level,
-                                      keep_batchnorm_fp32=args.keep_batchnorm_fp32,
-                                      loss_scale=args.loss_scale)
+    if device.type == 'cuda':
+        model, optimizer = amp.initialize(model, optimizer,
+                                        opt_level=args.opt_level,
+                                        keep_batchnorm_fp32=args.keep_batchnorm_fp32,
+                                        loss_scale=args.loss_scale)
     if args.distributed:
         model = DistributedDataParallel(model)
     print(model)
@@ -231,6 +231,7 @@ if __name__ == '__main__':
             if i == len(train_sampler):
                 break
             inputs, targets, input_percentages, target_sizes = data
+            print('inputs size: {}, target_size: {}'.format(inputs.shape, target_sizes))
             input_sizes = input_percentages.mul_(int(inputs.size(3))).int()
             # measure data loading time
             data_time.update(time.time() - end)
@@ -254,9 +255,11 @@ if __name__ == '__main__':
             if valid_loss:
                 optimizer.zero_grad()
                 # compute gradient
-
-                with amp.scale_loss(loss, optimizer) as scaled_loss:
-                    scaled_loss.backward()
+                if device.type == 'cuda':
+                    with amp.scale_loss(loss, optimizer) as scaled_loss:
+                        scaled_loss.backward()
+                else:
+                    loss.backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_norm)
                 optimizer.step()
             else:
