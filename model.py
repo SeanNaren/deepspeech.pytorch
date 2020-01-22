@@ -245,7 +245,7 @@ class DeepSpeech(nn.Module):
         return model
 
     @staticmethod
-    def serialize(model, optimizer=None, epoch=None, iteration=None, loss_results=None,
+    def serialize(model, optimizer=None, amp=None, epoch=None, iteration=None, loss_results=None,
                   cer_results=None, wer_results=None, avg_loss=None, meta=None):
         package = {
             'version': model.version,
@@ -259,6 +259,8 @@ class DeepSpeech(nn.Module):
         }
         if optimizer is not None:
             package['optim_dict'] = optimizer.state_dict()
+        if amp is not None:
+            package['amp'] = amp.state_dict()
         if avg_loss is not None:
             package['avg_loss'] = avg_loss
         if epoch is not None:
