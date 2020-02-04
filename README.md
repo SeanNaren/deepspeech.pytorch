@@ -135,13 +135,15 @@ python train.py --train-manifest data/train_manifest.csv --val-manifest data/val
 
 Training a model in mixed-precision means you can use 32 bit float or half precision at runtime. Float is default, to use half precision (Which on V100s come with a speedup and better memory use) use the `--half` flag when testing or transcribing.
 
-### Noise Augmentation/Injection
+### Augmentation
 
-There is support for two different types of noise; noise augmentation and noise injection.
+There is support for three different types of augmentations: SpecAugment, noise injection and random tempo/gain perturbations.
 
-#### Noise Augmentation
+#### SpecAugment
 
-Applies small changes to the tempo and gain when loading audio to increase robustness. To use, use the `--augment` flag when training.
+Applies simple Spectral Augmentation techniques directly on Mel spectogram features to make the model more robust to variations in input data. To enable SpecAugment, use the `--spec-augment` flag when training.
+
+SpecAugment implementation was adapted from [this](https://github.com/DemisEom/SpecAugment) project.
 
 #### Noise Injection
 
@@ -156,6 +158,10 @@ Included is a script to inject noise into an audio file to hear what different n
 ```
 python noise_inject.py --input-path /path/to/input.wav --noise-path /path/to/noise.wav --output-path /path/to/input_injected.wav --noise-level 0.5 # higher levels means more noise
 ```
+
+#### Tempo/Gain Perturbation
+
+Applies small changes to the tempo and gain when loading audio to increase robustness. To use, use the `--speed-volume-perturb` flag when training.
 
 ### Checkpoints
 
