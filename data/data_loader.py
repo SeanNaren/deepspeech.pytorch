@@ -14,6 +14,7 @@ from scipy.io.wavfile import read
 import math
 from torch.utils.data import DataLoader
 from torch.utils.data import Dataset
+from .spec_augment import spec_augment
 
 windows = {'hamming': scipy.signal.hamming, 'hann': scipy.signal.hann, 'blackman': scipy.signal.blackman,
            'bartlett': scipy.signal.bartlett}
@@ -81,12 +82,13 @@ class NoiseInjection(object):
 
 
 class SpectrogramParser(AudioParser):
-    def __init__(self, audio_conf, normalize=False, augment=False):
+    def __init__(self, audio_conf, normalize=False, speed_volume_perturb=False, spec_augment=False):
         """
         Parses audio file into spectrogram with optional normalization and various augmentations
         :param audio_conf: Dictionary containing the sample rate, window and the window length/stride in seconds
         :param normalize(default False):  Apply standard mean and deviation normalization to audio tensor
-        :param augment(default False):  Apply random tempo and gain perturbations
+        :param speed_volume_perturb(default False): Apply random tempo and gain perturbations
+        :param spec_augment(default False): Apply simple spectral augmentation to mel spectograms
         """
         super(SpectrogramParser, self).__init__()
         self.window_stride = audio_conf['window_stride']
@@ -94,14 +96,15 @@ class SpectrogramParser(AudioParser):
         self.sample_rate = audio_conf['sample_rate']
         self.window = windows.get(audio_conf['window'], windows['hamming'])
         self.normalize = normalize
-        self.augment = augment
+        self.speed_volume_perturb = speed_volume_perturb
+        self.spec_augment = spec_augment
         self.noiseInjector = NoiseInjection(audio_conf['noise_dir'], self.sample_rate,
                                             audio_conf['noise_levels']) if audio_conf.get(
             'noise_dir') is not None else None
         self.noise_prob = audio_conf.get('noise_prob')
 
     def parse_audio(self, audio_path):
-        if self.augment:
+        if self.speed_volume_perturb:
             y = load_randomly_augmented_audio(audio_path, self.sample_rate)
         else:
             y = load_audio(audio_path)
@@ -125,6 +128,9 @@ class SpectrogramParser(AudioParser):
             spect.add_(-mean)
             spect.div_(std)
 
+        if self.spec_augment:
+            spect = spec_augment(spect)
+
         return spect
 
     def parse_transcript(self, transcript_path):
@@ -132,7 +138,7 @@ class SpectrogramParser(AudioParser):
 
 
 class SpectrogramDataset(Dataset, SpectrogramParser):
-    def __init__(self, audio_conf, manifest_filepath, labels, normalize=False, augment=False):
+    def __init__(self, audio_conf, manifest_filepath, labels, normalize=False, speed_volume_perturb=False, spec_augment=False):
         """
         Dataset that loads tensors via a csv containing file paths to audio files and transcripts separated by
         a comma. Each new line is a different sample. Example below:
@@ -144,7 +150,8 @@ class SpectrogramDataset(Dataset, SpectrogramParser):
         :param manifest_filepath: Path to manifest csv as describe above
         :param labels: String containing all the possible characters to map to
         :param normalize: Apply standard mean and deviation normalization to audio tensor
-        :param augment(default False):  Apply random tempo and gain perturbations
+        :param speed_volume_perturb(default False): Apply random tempo and gain perturbations
+        :param spec_augment(default False): Apply simple spectral augmentation to mel spectograms
         """
         with open(manifest_filepath) as f:
             ids = f.readlines()
@@ -152,7 +159,7 @@ class SpectrogramDataset(Dataset, SpectrogramParser):
         self.ids = ids
         self.size = len(ids)
         self.labels_map = dict([(labels[i], i) for i in range(len(labels))])
-        super(SpectrogramDataset, self).__init__(audio_conf, normalize, augment)
+        super(SpectrogramDataset, self).__init__(audio_conf, normalize, speed_volume_perturb, spec_augment)
 
     def __getitem__(self, index):
         sample = self.ids[index]
