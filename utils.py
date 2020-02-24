@@ -38,3 +38,12 @@ def load_model(device, model_path, use_half):
     if use_half:
         model = model.half()
     return model
+
+
+def remove_parallel_wrapper(model):
+    """
+    Return the model or extract the model out of the parallel wrapper
+    :param model: The training model
+    :return: The model without parallel wrapper
+    """
+    return model.module if isinstance(model, torch.nn.parallel.DistributedDataParallel) else model
