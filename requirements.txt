@@ -9,3 +9,4 @@ matplotlib
 flask
 sox
 sklearn
+soundfile

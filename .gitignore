@@ -104,3 +104,4 @@ ENV/
 models/
 data/*.csv
 data/*_dataset/
+.vscode/

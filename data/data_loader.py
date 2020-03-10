@@ -7,6 +7,7 @@ import numpy as np
 import scipy.signal
 import sox
 import torch
+import soundfile as sf
 from scipy.io.wavfile import read
 from torch.utils.data import Dataset, Sampler, DistributedSampler, DataLoader
 
@@ -21,8 +22,7 @@ windows = {
 
 
 def load_audio(path):
-    sample_rate, sound = read(path)
-    sound = sound.astype('float32') / 32767  # normalize audio
+    sound, sample_rate = sf.read(path)
     if len(sound.shape) > 1:
         if sound.shape[1] == 1:
             sound = sound.squeeze()
