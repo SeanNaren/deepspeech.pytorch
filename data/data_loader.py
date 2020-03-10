@@ -5,10 +5,9 @@ from tempfile import NamedTemporaryFile
 import librosa
 import numpy as np
 import scipy.signal
+import soundfile as sf
 import sox
 import torch
-import soundfile as sf
-from scipy.io.wavfile import read
 from torch.utils.data import Dataset, Sampler, DistributedSampler, DataLoader
 
 from .spec_augment import spec_augment
