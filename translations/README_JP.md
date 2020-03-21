@@ -304,7 +304,7 @@ parameters:
 
 Pre-trainedは[こちら](https://github.com/SeanNaren/deepspeech.pytorch/releases)からダウンロード可能です。
 
-## ## 謝辞
+## 謝辞
 
 [Egor](https://github.com/EgorLakomkin)と[Ryan](https://github.com/ryanleary)、そして多くのコントリビュータに感謝します。
 
