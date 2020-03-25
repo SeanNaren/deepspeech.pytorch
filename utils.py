@@ -46,4 +46,6 @@ def remove_parallel_wrapper(model):
     :param model: The training model
     :return: The model without parallel wrapper
     """
-    return model.module if isinstance(model, torch.nn.parallel.DistributedDataParallel) else model
+    # Take care of distributed/data-parallel wrapper
+    model_no_wrapper = model.module if hasattr(model, "module") else model
+    return model_no_wrapper
