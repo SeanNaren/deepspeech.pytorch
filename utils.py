@@ -38,3 +38,14 @@ def load_model(device, model_path, use_half):
     if use_half:
         model = model.half()
     return model
+
+
+def remove_parallel_wrapper(model):
+    """
+    Return the model or extract the model out of the parallel wrapper
+    :param model: The training model
+    :return: The model without parallel wrapper
+    """
+    # Take care of distributed/data-parallel wrapper
+    model_no_wrapper = model.module if hasattr(model, "module") else model
+    return model_no_wrapper
