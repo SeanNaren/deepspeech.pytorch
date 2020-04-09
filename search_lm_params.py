@@ -34,7 +34,7 @@ if args.lm_path is None:
 
 model = DeepSpeech.load_model(args.model_path)
 
-saved_output = np.load(args.saved_output)
+saved_output = torch.load(args.saved_output)
 
 
 def init(beam_width, blank_index, lm_path):
@@ -50,8 +50,6 @@ def decode_dataset(params):
 
     total_cer, total_wer, num_tokens, num_chars = 0, 0, 0, 0
     for out, sizes, target_strings in saved_output:
-        out = torch.Tensor(out).float()
-        sizes = torch.Tensor(sizes).int()
         decoded_output, _, = decoder.decode(out, sizes)
         for x in range(len(target_strings)):
             transcript, reference = decoded_output[x][0], target_strings[x][0]
