@@ -44,7 +44,7 @@ def evaluate(test_loader, device, model, decoder, target_decoder, save_output=Fa
 
         if save_output is not None:
             # add output to data array, and continue
-            output_data.append((out.cpu().numpy(), output_sizes.numpy(), target_strings))
+            output_data.append((out.cpu(), output_sizes, target_strings))
         for x in range(len(target_strings)):
             transcript, reference = decoded_output[x][0], target_strings[x][0]
             wer_inst = decoder.wer(transcript, reference)
@@ -97,4 +97,4 @@ if __name__ == '__main__':
           'Average WER {wer:.3f}\t'
           'Average CER {cer:.3f}\t'.format(wer=wer, cer=cer))
     if args.save_output is not None:
-        np.save(args.save_output, output_data)
+        torch.save(output_data, args.save_output)
