@@ -1,4 +1,5 @@
-FROM pytorch/pytorch:1.0-cuda10.0-cudnn7-devel
+FROM pytorch/pytorch:1.4-cuda10.1-cudnn7-devel
+ENV LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
 
 WORKDIR /workspace/
 
@@ -7,7 +8,7 @@ RUN apt-get update -y
 RUN apt-get install -y git curl ca-certificates bzip2 cmake tree htop bmon iotop sox libsox-dev libsox-fmt-all vim
 
 # install python deps
-RUN pip install cython visdom cffi tensorboardX wget
+RUN pip install cython visdom cffi tensorboardX wget jupyter
 
 # install warp-CTC
 ENV CUDA_HOME=/usr/local/cuda
@@ -33,6 +34,6 @@ RUN cd apex; pip install .
 ADD . /workspace/deepspeech.pytorch
 RUN cd deepspeech.pytorch; pip install -r requirements.txt
 
-WORKDIR /root/deepspeech.pytorch
-
-ENTRYPOINT ["python", "train.py"]
+# launch jupyter
+RUN mkdir data; mkdir notebooks;
+CMD jupyter-notebook --ip="*" --no-browser --allow-root

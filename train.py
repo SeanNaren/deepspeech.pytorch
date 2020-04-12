@@ -7,16 +7,16 @@ import time
 import numpy as np
 import torch.distributed as dist
 import torch.utils.data.distributed
-from apex.fp16_utils import FP16_Optimizer
+from apex import amp
 from apex.parallel import DistributedDataParallel
-from tqdm import tqdm
 from warpctc_pytorch import CTCLoss
 
 from data.data_loader import AudioDataLoader, SpectrogramDataset, BucketingSampler, DistributedBucketingSampler
 from decoder import GreedyDecoder
 from logger import VisdomLogger, TensorBoardLogger
 from model import DeepSpeech, supported_rnns
-from utils import convert_model_to_half, reduce_tensor, check_loss
+from test import evaluate
+from utils import reduce_tensor, check_loss, remove_parallel_wrapper
 
 parser = argparse.ArgumentParser(description='DeepSpeech training')
 parser.add_argument('--train-manifest', metavar='DIR',
@@ -53,7 +53,10 @@ parser.add_argument('--model-path', default='models/deepspeech_final.pth',
 parser.add_argument('--continue-from', default='', help='Continue from checkpoint model')
 parser.add_argument('--finetune', dest='finetune', action='store_true',
                     help='Finetune the model from checkpoint "continue_from"')
-parser.add_argument('--augment', dest='augment', action='store_true', help='Use random tempo and gain perturbations.')
+parser.add_argument('--speed-volume-perturb', dest='speed_volume_perturb', action='store_true',
+                    help='Use random tempo and gain perturbations.')
+parser.add_argument('--spec-augment', dest='spec_augment', action='store_true',
+                    help='Use simple spectral augmentation on mel spectograms.')
 parser.add_argument('--noise-dir', default=None,
                     help='Directory to inject noise into audio. If default, noise Inject not added')
 parser.add_argument('--noise-prob', default=0.4, help='Probability of noise being added per sample')
@@ -77,15 +80,11 @@ parser.add_argument('--rank', default=0, type=int,
 parser.add_argument('--gpu-rank', default=None,
                     help='If using distributed parallel for multi-gpu, sets the GPU for the process')
 parser.add_argument('--seed', default=123456, type=int, help='Seed to generators')
-parser.add_argument('--mixed-precision', action='store_true',
-                    help='Uses mixed precision to train a model (suggested with volta and above)')
-parser.add_argument('--static-loss-scale', type=float, default=1,
-                    help='Static loss scale for mixed precision, ' +
-                         'positive power of 2 values can improve FP16 convergence,' +
-                         'however dynamic loss scaling is preferred.')
-parser.add_argument('--dynamic-loss-scale', action='store_true',
-                    help='Use dynamic loss scaling for mixed precision. If supplied, this argument supersedes ' +
-                         '--static_loss_scale. Suggested to turn on for mixed precision')
+parser.add_argument('--opt-level', type=str)
+parser.add_argument('--keep-batchnorm-fp32', type=str, default=None)
+parser.add_argument('--loss-scale', default=1,
+                    help='Loss scaling used by Apex. Default is 1 due to warp-ctc not supporting scaling of gradients')
+
 torch.manual_seed(123456)
 torch.cuda.manual_seed_all(123456)
 
@@ -123,8 +122,6 @@ if __name__ == '__main__':
     random.seed(args.seed)
 
     device = torch.device("cuda" if args.cuda else "cpu")
-    if args.mixed_precision and not args.cuda:
-        raise ValueError('If using mixed precision training, CUDA must be enabled!')
     args.distributed = args.world_size > 1
     main_proc = True
     device = torch.device("cuda" if args.cuda else "cpu")
@@ -145,15 +142,16 @@ if __name__ == '__main__':
     if main_proc and args.tensorboard:
         tensorboard_logger = TensorBoardLogger(args.id, args.log_dir, args.log_params)
 
-    avg_loss, start_epoch, start_iter, optim_state = 0, 0, 0, None
+    avg_loss, start_epoch, start_iter, optim_state, amp_state = 0, 0, 0, None, None
     if args.continue_from:  # Starting from previous model
         print("Loading checkpoint model %s" % args.continue_from)
         package = torch.load(args.continue_from, map_location=lambda storage, loc: storage)
         model = DeepSpeech.load_model_package(package)
-        labels = model.labels 
+        labels = model.labels
         audio_conf = model.audio_conf
         if not args.finetune:  # Don't want to restart training
             optim_state = package['optim_dict']
+            amp_state = package['amp']
             start_epoch = int(package.get('epoch', 1)) - 1  # Index start at 0 for training
             start_iter = package.get('iteration', None)
             if start_iter is None:
@@ -164,6 +162,7 @@ if __name__ == '__main__':
             avg_loss = int(package.get('avg_loss', 0))
             loss_results, cer_results, wer_results = package['loss_results'], package['cer_results'], \
                                                      package['wer_results']
+            best_wer = wer_results[start_epoch]
             if main_proc and args.visdom:  # Add previous scores to visdom graph
                 visdom_logger.load_previous_values(start_epoch, package)
             if main_proc and args.tensorboard:  # Previous scores to tensorboard logs
@@ -187,14 +186,14 @@ if __name__ == '__main__':
                            labels=labels,
                            rnn_type=supported_rnns[rnn_type],
                            audio_conf=audio_conf,
-                           bidirectional=args.bidirectional,
-                           mixed_precision=args.mixed_precision)
+                           bidirectional=args.bidirectional)
 
     decoder = GreedyDecoder(labels)
     train_dataset = SpectrogramDataset(audio_conf=audio_conf, manifest_filepath=args.train_manifest, labels=labels,
-                                       normalize=True, augment=args.augment)
+                                       normalize=True, speed_volume_perturb=args.speed_volume_perturb,
+                                       spec_augment=args.spec_augment)
     test_dataset = SpectrogramDataset(audio_conf=audio_conf, manifest_filepath=args.val_manifest, labels=labels,
-                                      normalize=True, augment=False)
+                                      normalize=True, speed_volume_perturb=False, spec_augment=False)
     if not args.distributed:
         train_sampler = BucketingSampler(train_dataset, batch_size=args.batch_size)
     else:
@@ -210,19 +209,23 @@ if __name__ == '__main__':
         train_sampler.shuffle(start_epoch)
 
     model = model.to(device)
-    if args.mixed_precision:
-        model = convert_model_to_half(model)
     parameters = model.parameters()
     optimizer = torch.optim.SGD(parameters, lr=args.lr,
                                 momentum=args.momentum, nesterov=True, weight_decay=1e-5)
-    if args.distributed:
-        model = DistributedDataParallel(model)
-    if args.mixed_precision:
-        optimizer = FP16_Optimizer(optimizer,
-                                   static_loss_scale=args.static_loss_scale,
-                                   dynamic_loss_scale=args.dynamic_loss_scale)
+
+    model, optimizer = amp.initialize(model, optimizer,
+                                      opt_level=args.opt_level,
+                                      keep_batchnorm_fp32=args.keep_batchnorm_fp32,
+                                      loss_scale=args.loss_scale)
+
     if optim_state is not None:
         optimizer.load_state_dict(optim_state)
+
+    if amp_state is not None:
+        amp.load_state_dict(amp_state)
+
+    if args.distributed:
+        model = DistributedDataParallel(model)
     print(model)
     print("Number of parameters: %d" % DeepSpeech.get_param_size(model))
 
@@ -262,12 +265,10 @@ if __name__ == '__main__':
             if valid_loss:
                 optimizer.zero_grad()
                 # compute gradient
-                if args.mixed_precision:
-                    optimizer.backward(loss)
-                    optimizer.clip_master_grads(args.max_norm)
-                else:
-                    loss.backward()
-                    torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_norm)
+
+                with amp.scale_loss(loss, optimizer) as scaled_loss:
+                    scaled_loss.backward()
+                torch.nn.utils.clip_grad_norm_(amp.master_params(optimizer), args.max_norm)
                 optimizer.step()
             else:
                 print(error)
@@ -289,9 +290,15 @@ if __name__ == '__main__':
             if args.checkpoint_per_batch > 0 and i > 0 and (i + 1) % args.checkpoint_per_batch == 0 and main_proc:
                 file_path = '%s/deepspeech_checkpoint_epoch_%d_iter_%d.pth' % (save_folder, epoch + 1, i + 1)
                 print("Saving checkpoint model to %s" % file_path)
-                torch.save(DeepSpeech.serialize(model, optimizer=optimizer, epoch=epoch, iteration=i,
+                torch.save(DeepSpeech.serialize(remove_parallel_wrapper(model),
+                                                optimizer=optimizer,
+                                                amp=amp,
+                                                epoch=epoch,
+                                                iteration=i,
                                                 loss_results=loss_results,
-                                                wer_results=wer_results, cer_results=cer_results, avg_loss=avg_loss),
+                                                wer_results=wer_results,
+                                                cer_results=cer_results,
+                                                avg_loss=avg_loss),
                            file_path)
             del loss, out, float_out
 
@@ -303,44 +310,19 @@ if __name__ == '__main__':
               'Average Loss {loss:.3f}\t'.format(epoch + 1, epoch_time=epoch_time, loss=avg_loss))
 
         start_iter = 0  # Reset start iteration for next epoch
-        total_cer, total_wer = 0, 0
-        model.eval()
         with torch.no_grad():
-            for i, (data) in tqdm(enumerate(test_loader), total=len(test_loader)):
-                inputs, targets, input_percentages, target_sizes = data
-                input_sizes = input_percentages.mul_(int(inputs.size(3))).int()
-                inputs = inputs.to(device)
-
-                # unflatten targets
-                split_targets = []
-                offset = 0
-                for size in target_sizes:
-                    split_targets.append(targets[offset:offset + size])
-                    offset += size
-
-                out, output_sizes = model(inputs, input_sizes)
-
-                decoded_output, _ = decoder.decode(out, output_sizes)
-                target_strings = decoder.convert_to_strings(split_targets)
-                wer, cer = 0, 0
-                for x in range(len(target_strings)):
-                    transcript, reference = decoded_output[x][0], target_strings[x][0]
-                    wer += decoder.wer(transcript, reference) / float(len(reference.split()))
-                    cer += decoder.cer(transcript, reference) / float(len(reference))
-                total_cer += cer
-                total_wer += wer
-                del out
-            wer = total_wer / len(test_loader.dataset)
-            cer = total_cer / len(test_loader.dataset)
-            wer *= 100
-            cer *= 100
-            loss_results[epoch] = avg_loss
-            wer_results[epoch] = wer
-            cer_results[epoch] = cer
-            print('Validation Summary Epoch: [{0}]\t'
-                  'Average WER {wer:.3f}\t'
-                  'Average CER {cer:.3f}\t'.format(
-                epoch + 1, wer=wer, cer=cer))
+            wer, cer, output_data = evaluate(test_loader=test_loader,
+                                             device=device,
+                                             model=model,
+                                             decoder=decoder,
+                                             target_decoder=decoder)
+        loss_results[epoch] = avg_loss
+        wer_results[epoch] = wer
+        cer_results[epoch] = cer
+        print('Validation Summary Epoch: [{0}]\t'
+              'Average WER {wer:.3f}\t'
+              'Average CER {cer:.3f}\t'.format(
+            epoch + 1, wer=wer, cer=cer))
 
         values = {
             'loss_results': loss_results,
@@ -359,23 +341,31 @@ if __name__ == '__main__':
 
         if main_proc and args.checkpoint:
             file_path = '%s/deepspeech_%d.pth.tar' % (save_folder, epoch + 1)
-            torch.save(DeepSpeech.serialize(model, optimizer=optimizer, epoch=epoch, loss_results=loss_results,
-                                            wer_results=wer_results, cer_results=cer_results),
+            torch.save(DeepSpeech.serialize(remove_parallel_wrapper(model),
+                                            optimizer=optimizer,
+                                            amp=amp,
+                                            epoch=epoch,
+                                            loss_results=loss_results,
+                                            wer_results=wer_results,
+                                            cer_results=cer_results),
                        file_path)
         # anneal lr
-        param_groups = optimizer.optimizer.param_groups if args.mixed_precision else optimizer.param_groups
-        for g in param_groups:
+        for g in optimizer.param_groups:
             g['lr'] = g['lr'] / args.learning_anneal
         print('Learning rate annealed to: {lr:.6f}'.format(lr=g['lr']))
 
         if main_proc and (best_wer is None or best_wer > wer):
             print("Found better validated model, saving to %s" % args.model_path)
-            torch.save(DeepSpeech.serialize(model, optimizer=optimizer, epoch=epoch, loss_results=loss_results,
-                                            wer_results=wer_results, cer_results=cer_results)
+            torch.save(DeepSpeech.serialize(remove_parallel_wrapper(model),
+                                            optimizer=optimizer,
+                                            amp=amp, epoch=epoch,
+                                            loss_results=loss_results,
+                                            wer_results=wer_results,
+                                            cer_results=cer_results)
                        , args.model_path)
             best_wer = wer
-
             avg_loss = 0
-            if not args.no_shuffle:
-                print("Shuffling batches...")
-                train_sampler.shuffle(epoch)
+
+        if not args.no_shuffle:
+            print("Shuffling batches...")
+            train_sampler.shuffle(epoch)
