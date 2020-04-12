@@ -11,7 +11,7 @@ spec:
         spec:
           containers:
             - name: pytorch
-              image: seannaren/deepspeech:latest
+              image: seannaren/deepspeech.pytorch:latest
               command: ["python", "-m", "multiproc", "train.py"]
               args: ["--train-manifest", "/mnt/kubeflow-gcfs/librispeech/librispeech_train_manifest.csv", "--val-manifest", "/mnt/kubeflow-gcfs/librispeech/librispeech_val_manifest.csv", "--dynamic_loss_scale", "--num_workers", "8", "--mixed_precision"]
               resources:
@@ -39,7 +39,7 @@ spec:
         spec:
           containers:
             - name: pytorch
-              image: seannaren/deepspeech:latest
+              image: seannaren/deepspeech.pytorch:latest
               command: ["python", "-m", "multiproc", "train.py"]
               args: ["--train-manifest", "/mnt/kubeflow-gcfs/librispeech/librispeech_train_manifest.csv", "--val-manifest", "/mnt/kubeflow-gcfs/librispeech/librispeech_val_manifest.csv", "--dynamic_loss_scale", "--num_workers", "8", "--mixed_precision"]
               resources:
