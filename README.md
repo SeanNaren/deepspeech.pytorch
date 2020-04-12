@@ -1,29 +1,27 @@
 # deepspeech.pytorch
 
-Implementation of DeepSpeech2 for PyTorch. Creates a network based on the [DeepSpeech2](http://arxiv.org/pdf/1512.02595v1.pdf) architecture, trained with the CTC activation function.
+Implementation of DeepSpeech2 for PyTorch. The repo supports training/testing and inference using the [DeepSpeech2](http://arxiv.org/pdf/1512.02595v1.pdf) model. Optionally a [kenlm](https://github.com/kpu/kenlm) language model can be used at inference time.
 
 ## Installation
 
 ### Docker
 
-There is no official Dockerhub image, however a Dockerfile is provided to build on your own systems.
+To use the image with a GPU you'll need to have [nvidia-docker](https://github.com/NVIDIA/nvidia-docker) installed.
 
 ```bash
-sudo nvidia-docker build -t  deepspeech2.docker .
-sudo nvidia-docker run -ti -v `pwd`/data:/workspace/data -p 8888:8888 --net=host --ipc=host deepspeech2.docker # Opens a Jupyter notebook, mounting the /data drive in the container
+sudo docker run -ti --gpus all -v `pwd`/data:/workspace/data -p 8888:8888 --net=host --ipc=host seannaren/deepspeech.pytorch:latest # Opens a Jupyter notebook, mounting the /data drive in the container
 ```
 
 Optionally you can use the command line by changing the entrypoint:
 
 ```bash
-sudo nvidia-docker run -ti -v `pwd`/data:/workspace/data --entrypoint=/bin/bash --net=host --ipc=host deepspeech2.docker
-
+sudo docker run -ti --gpus all -v `pwd`/data:/workspace/data --entrypoint=/bin/bash --net=host --ipc=host seannaren/deepspeech.pytorch:latest
 ```
 
 ### From Source
 
 Several libraries are needed to be installed for training to work. I will assume that everything is being installed in
-an Anaconda installation on Ubuntu, with Pytorch 1.0.
+an Anaconda installation on Ubuntu, with PyTorch installed.
 
 Install [PyTorch](https://github.com/pytorch/pytorch#installation) if you haven't already.
 
