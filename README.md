@@ -96,7 +96,7 @@ python train.py --visdom
 There is also [Tensorboard](https://github.com/lanpa/tensorboard-pytorch) support to visualize training. Follow the instructions to set up. To use:
 
 ```
-python train.py --tensorboard --logdir log_dir/ # Make sure the Tensorboard instance is made pointing to this log directory
+python train.py --tensorboard --log-dir log_dir/ # Make sure the Tensorboard instance is made pointing to this log directory
 ```
 
 For both visualisation tools, you can add your own name to the run by changing the `--id` parameter when training.
