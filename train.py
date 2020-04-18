@@ -169,7 +169,7 @@ if __name__ == '__main__':
                 tensorboard_logger.load_previous_values(start_epoch, package)
     else:
         with open(args.labels_path) as label_file:
-            labels = str(''.join(json.load(label_file)))
+            labels = json.load(label_file)
 
         audio_conf = dict(sample_rate=args.sample_rate,
                           window_size=args.window_size,
