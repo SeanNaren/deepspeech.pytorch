@@ -16,7 +16,7 @@ from decoder import GreedyDecoder
 from logger import VisdomLogger, TensorBoardLogger
 from model import DeepSpeech, supported_rnns
 from test import evaluate
-from utils import reduce_tensor, check_loss
+from utils import reduce_tensor, check_loss, remove_parallel_wrapper
 
 parser = argparse.ArgumentParser(description='DeepSpeech training')
 parser.add_argument('--train-manifest', metavar='DIR',
@@ -53,8 +53,10 @@ parser.add_argument('--model-path', default='models/deepspeech_final.pth',
 parser.add_argument('--continue-from', default='', help='Continue from checkpoint model')
 parser.add_argument('--finetune', dest='finetune', action='store_true',
                     help='Finetune the model from checkpoint "continue_from"')
-parser.add_argument('--speed-volume-perturb', dest='speed_volume_perturb', action='store_true', help='Use random tempo and gain perturbations.')
-parser.add_argument('--spec-augment', dest='spec_augment', action='store_true', help='Use simple spectral augmentation on mel spectograms.')
+parser.add_argument('--speed-volume-perturb', dest='speed_volume_perturb', action='store_true',
+                    help='Use random tempo and gain perturbations.')
+parser.add_argument('--spec-augment', dest='spec_augment', action='store_true',
+                    help='Use simple spectral augmentation on mel spectograms.')
 parser.add_argument('--noise-dir', default=None,
                     help='Directory to inject noise into audio. If default, noise Inject not added')
 parser.add_argument('--noise-prob', default=0.4, help='Probability of noise being added per sample')
@@ -167,7 +169,7 @@ if __name__ == '__main__':
                 tensorboard_logger.load_previous_values(start_epoch, package)
     else:
         with open(args.labels_path) as label_file:
-            labels = str(''.join(json.load(label_file)))
+            labels = json.load(label_file)
 
         audio_conf = dict(sample_rate=args.sample_rate,
                           window_size=args.window_size,
@@ -188,7 +190,8 @@ if __name__ == '__main__':
 
     decoder = GreedyDecoder(labels)
     train_dataset = SpectrogramDataset(audio_conf=audio_conf, manifest_filepath=args.train_manifest, labels=labels,
-                                       normalize=True, speed_volume_perturb=args.speed_volume_perturb, spec_augment=args.spec_augment)
+                                       normalize=True, speed_volume_perturb=args.speed_volume_perturb,
+                                       spec_augment=args.spec_augment)
     test_dataset = SpectrogramDataset(audio_conf=audio_conf, manifest_filepath=args.val_manifest, labels=labels,
                                       normalize=True, speed_volume_perturb=False, spec_augment=False)
     if not args.distributed:
@@ -287,9 +290,15 @@ if __name__ == '__main__':
             if args.checkpoint_per_batch > 0 and i > 0 and (i + 1) % args.checkpoint_per_batch == 0 and main_proc:
                 file_path = '%s/deepspeech_checkpoint_epoch_%d_iter_%d.pth' % (save_folder, epoch + 1, i + 1)
                 print("Saving checkpoint model to %s" % file_path)
-                torch.save(DeepSpeech.serialize(model, optimizer=optimizer, amp=amp, epoch=epoch, iteration=i,
+                torch.save(DeepSpeech.serialize(remove_parallel_wrapper(model),
+                                                optimizer=optimizer,
+                                                amp=amp,
+                                                epoch=epoch,
+                                                iteration=i,
                                                 loss_results=loss_results,
-                                                wer_results=wer_results, cer_results=cer_results, avg_loss=avg_loss),
+                                                wer_results=wer_results,
+                                                cer_results=cer_results,
+                                                avg_loss=avg_loss),
                            file_path)
             del loss, out, float_out
 
@@ -332,8 +341,13 @@ if __name__ == '__main__':
 
         if main_proc and args.checkpoint:
             file_path = '%s/deepspeech_%d.pth.tar' % (save_folder, epoch + 1)
-            torch.save(DeepSpeech.serialize(model, optimizer=optimizer, amp=amp, epoch=epoch, loss_results=loss_results,
-                                            wer_results=wer_results, cer_results=cer_results),
+            torch.save(DeepSpeech.serialize(remove_parallel_wrapper(model),
+                                            optimizer=optimizer,
+                                            amp=amp,
+                                            epoch=epoch,
+                                            loss_results=loss_results,
+                                            wer_results=wer_results,
+                                            cer_results=cer_results),
                        file_path)
         # anneal lr
         for g in optimizer.param_groups:
@@ -342,8 +356,12 @@ if __name__ == '__main__':
 
         if main_proc and (best_wer is None or best_wer > wer):
             print("Found better validated model, saving to %s" % args.model_path)
-            torch.save(DeepSpeech.serialize(model, optimizer=optimizer, amp=amp, epoch=epoch, loss_results=loss_results,
-                                            wer_results=wer_results, cer_results=cer_results)
+            torch.save(DeepSpeech.serialize(remove_parallel_wrapper(model),
+                                            optimizer=optimizer,
+                                            amp=amp, epoch=epoch,
+                                            loss_results=loss_results,
+                                            wer_results=wer_results,
+                                            cer_results=cer_results)
                        , args.model_path)
             best_wer = wer
             avg_loss = 0

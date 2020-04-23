@@ -18,9 +18,9 @@ class VisdomLogger(object):
 
     def update(self, epoch, values):
         x_axis = self.epochs[0:epoch + 1]
-        y_axis = torch.stack((values["loss_results"][:epoch + 1],
-                              values["wer_results"][:epoch + 1],
-                              values["cer_results"][:epoch + 1]),
+        y_axis = torch.stack((values["loss_results"][:epoch],
+                              values["wer_results"][:epoch],
+                              values["cer_results"][:epoch]),
                              dim=1)
         self.viz_window = self.viz.line(
             X=x_axis,
@@ -43,8 +43,8 @@ class TensorBoardLogger(object):
         self.log_params = log_params
 
     def update(self, epoch, values, parameters=None):
-        loss, wer, cer = values["loss_results"][epoch + 1], values["wer_results"][epoch + 1], \
-                         values["cer_results"][epoch + 1]
+        loss, wer, cer = values["loss_results"][epoch], values["wer_results"][epoch], \
+                         values["cer_results"][epoch]
         values = {
             'Avg Train Loss': loss,
             'Avg WER': wer,
