@@ -1,10 +1,10 @@
 import argparse
 
 import numpy as np
-import torch
 from tqdm import tqdm
 
-from data.data_loader import SpectrogramDataset, AudioDataLoader
+import torch
+from data.data_loader import AudioDataLoader, SpectrogramDataset
 from decoder import GreedyDecoder
 from opts import add_decoder_args, add_inference_args
 from utils import load_model
@@ -20,7 +20,7 @@ parser.add_argument('--save-output', default=None, help="Saves output of model f
 parser = add_decoder_args(parser)
 
 
-def evaluate(test_loader, device, model, decoder, target_decoder, save_output=False, verbose=False, half=False):
+def evaluate(test_loader, device, model, decoder, target_decoder, save_output=None, verbose=False, half=False):
     model.eval()
     total_cer, total_wer, num_tokens, num_chars = 0, 0, 0, 0
     output_data = []
