@@ -4,3 +4,5 @@ visdom
 wget
 librosa
 tqdm
+matplotlib
+flask
