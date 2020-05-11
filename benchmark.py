@@ -1,20 +1,21 @@
 import argparse
 import json
+import os
 import time
 
 import torch
 import torch.distributed as dist
 import torch.utils.data.distributed
-from apex.fp16_utils import FP16_Optimizer
+from apex import amp
 from apex.parallel import DistributedDataParallel
 from tqdm import tqdm
 from tqdm import trange
 from warpctc_pytorch import CTCLoss
 
 from model import DeepSpeech, supported_rnns
-from utils import convert_model_to_half
 
-parser = argparse.ArgumentParser()
+parser = argparse.ArgumentParser(description="Benchmark script to check stability of training with CUDA. "
+                                             "Assumes a few hardcoded defaults which shouldn't make a large difference")
 parser.add_argument('--batch-size', type=int, default=32, help='Size of input')
 parser.add_argument('--seconds', type=int, default=15,
                     help='The size of the fake input in seconds using default stride of 0.01, '
@@ -22,35 +23,35 @@ parser.add_argument('--seconds', type=int, default=15,
 parser.add_argument('--dry-runs', type=int, default=2, help='Dry runs before measuring performance')
 parser.add_argument('--runs', type=int, default=5, help='How many benchmark runs to measure performance')
 parser.add_argument('--labels-path', default='labels.json', help='Path to the labels to infer over in the model')
-parser.add_argument('--hidden-size', default=800, type=int, help='Hidden size of RNNs')
+parser.add_argument('--hidden-size', default=1024, type=int, help='Hidden size of RNNs')
 parser.add_argument('--hidden-layers', default=5, type=int, help='Number of RNN layers')
-parser.add_argument('--rnn-type', default='gru', help='Type of the RNN. rnn|gru|lstm are supported')
+parser.add_argument('--rnn-type', default='lstm', help='Type of the RNN. rnn|gru|lstm are supported')
 parser.add_argument('--sample-rate', default=16000, type=int, help='Sample rate')
 parser.add_argument('--window-size', default=.02, type=float, help='Window size for spectrogram in seconds')
 parser.add_argument('--num-samples', default=1024, type=int, help='Number of samples to go through')
-parser.add_argument('--mixed-precision', action='store_true', help='Use Mixed Precision to train the model')
-parser.add_argument('--dist-url', default='tcp://127.0.0.1:1550', type=str,
-                    help='url used to set up distributed training')
-parser.add_argument('--dist_backend', default='nccl', type=str, help='distributed backend')
-parser.add_argument('--world-size', default=1, type=int, help='number of distributed processes')
-parser.add_argument('--rank', default=0, type=int, help='The rank of this process')
-parser.add_argument('--static-loss-scale', type=float, default=1,
-                    help='Static loss scale for mixed precision, ' +
-                         'positive power of 2 values can improve FP16 convergence,' +
-                         'however dynamic loss scaling is preferred.')
-parser.add_argument('--dynamic-loss-scale', action='store_true',
-                    help='Use dynamic loss scaling for mixed precision. If supplied, this argument supersedes ' +
-                         '--static_loss_scale. Suggested to turn on for mixed precision')
+parser.add_argument('--dist-backend', default='nccl', type=str, help='distributed backend')
+parser.add_argument('--opt-level', type=str,
+                    help='Apex optimization level,'
+                         'check https://nvidia.github.io/apex/amp.html for more information')
+parser.add_argument('--keep-batchnorm-fp32', type=str, default=None,
+                    help='Overrides Apex keep_batch_norm_fp32 flag')
+parser.add_argument('--loss-scale', default=1,
+                    help='Loss scaling used by Apex. Default is 1 due to warp-ctc not supporting scaling of gradients')
+parser.add_argument('--no-bidirectional', dest='bidirectional', action='store_false', default=True,
+                    help='Turn off bi-directional RNNs, introduces lookahead convolution')
 args = parser.parse_args()
 device = torch.device("cuda")
 
-args.distributed = args.world_size > 1
+args.distributed = os.environ.get("LOCAL_RANK")  # If local rank exists, distributed env
 if args.distributed:
-    dist.init_process_group(backend=args.dist_backend, init_method=args.dist_url,
-                            world_size=args.world_size, rank=args.rank)
+    device_id = int(os.environ["LOCAL_RANK"])
+    torch.cuda.set_device(device_id)
+    print(f"Setting CUDA Device to {device_id}")
+
+    dist.init_process_group(backend=args.dist_backend)
 
 if args.distributed:
-    input_data = torch.randn(int(args.num_samples / args.world_size), 1, 161, args.seconds * 100)
+    input_data = torch.randn(int(args.num_samples / dist.get_world_size()), 1, 161, args.seconds * 100)
 else:
     input_data = torch.randn(args.num_samples, 1, 161, args.seconds * 100)
 input_data = input_data.to(device)
@@ -70,20 +71,20 @@ model = DeepSpeech(rnn_hidden_size=args.hidden_size,
                    audio_conf=audio_conf,
                    labels=labels,
                    rnn_type=supported_rnns[rnn_type],
-                   mixed_precision=args.mixed_precision)
-model = model.to(device)
-if args.mixed_precision:
-    model = convert_model_to_half(model)
-print("Number of parameters: %d" % DeepSpeech.get_param_size(model))
+                   bidirectional=args.bidirectional)
 
+model = model.to(device)
 parameters = model.parameters()
 optimizer = torch.optim.SGD(parameters, lr=3e-4, momentum=0.9, nesterov=True, weight_decay=1e-5)
+
+model, optimizer = amp.initialize(model, optimizer,
+                                  opt_level=args.opt_level,
+                                  keep_batchnorm_fp32=args.keep_batchnorm_fp32,
+                                  loss_scale=args.loss_scale)
+print("Number of parameters: %d" % DeepSpeech.get_param_size(model))
+
 if args.distributed:
-    model = DistributedDataParallel(model)
-if args.mixed_precision:
-    optimizer = FP16_Optimizer(optimizer,
-                               static_loss_scale=args.static_loss_scale,
-                               dynamic_loss_scale=args.dynamic_loss_scale)
+    model = DistributedDataParallel(model, device_ids=[device_id])
 
 criterion = CTCLoss()
 
@@ -106,12 +107,12 @@ def iteration(inputs):
     loss = loss / inputs.size(0)  # average the loss by minibatch
     optimizer.zero_grad()
     # compute gradient
-    if args.mixed_precision:
-        optimizer.backward(loss)
-        optimizer.clip_master_grads(400)
-    else:
-        loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), 400)
+    optimizer.zero_grad()
+
+    # compute gradient
+    with amp.scale_loss(loss, optimizer) as scaled_loss:
+        scaled_loss.backward()
+    torch.nn.utils.clip_grad_norm_(amp.master_params(optimizer), 400)
     optimizer.step()
     del loss, out, float_out
 
