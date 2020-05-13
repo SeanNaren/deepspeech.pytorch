@@ -4,9 +4,9 @@ import sys
 from multiprocessing.pool import Pool
 
 import numpy as np
-import torch
 from tqdm import tqdm
 
+import torch
 from decoder import BeamCTCDecoder
 from model import DeepSpeech
 from opts import add_decoder_args
@@ -58,7 +58,7 @@ def decode_dataset(params):
             total_cer += cer_inst
             total_wer += wer_inst
             num_tokens += len(reference.split())
-            num_chars += len(reference)
+            num_chars += len(reference.replace(' ', ''))
 
     wer = float(total_wer) / num_tokens
     cer = float(total_cer) / num_chars
