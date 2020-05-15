@@ -39,7 +39,7 @@ import librosa.display
 import numpy as np
 import random
 import matplotlib
-matplotlib.use('TkAgg')
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from .sparse_image_warp import sparse_image_warp
 import torch
