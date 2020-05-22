@@ -39,7 +39,6 @@ parser.add_argument('--lr', '--learning-rate', default=3e-4, type=float, help='i
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
 parser.add_argument('--max-norm', default=400, type=int, help='Norm cutoff to prevent explosion of gradients')
 parser.add_argument('--learning-anneal', default=1.1, type=float, help='Annealing applied to learning rate every epoch')
-parser.add_argument('--silent', dest='silent', action='store_true', help='Turn off progress tracking per iteration')
 parser.add_argument('--checkpoint', dest='checkpoint', action='store_true', help='Enables checkpoint saving of model')
 parser.add_argument('--checkpoint-per-batch', default=0, type=int, help='Save checkpoint per batch. 0 means never save')
 parser.add_argument('--visdom', dest='visdom', action='store_true', help='Turn on visdom graphing')
@@ -80,8 +79,11 @@ parser.add_argument('--rank', default=0, type=int,
 parser.add_argument('--gpu-rank', default=None,
                     help='If using distributed parallel for multi-gpu, sets the GPU for the process')
 parser.add_argument('--seed', default=123456, type=int, help='Seed to generators')
-parser.add_argument('--opt-level', type=str)
-parser.add_argument('--keep-batchnorm-fp32', type=str, default=None)
+parser.add_argument('--opt-level', type=str,
+                    help='Apex optimization level,'
+                         'check https://nvidia.github.io/apex/amp.html for more information')
+parser.add_argument('--keep-batchnorm-fp32', type=str, default=None,
+                    help='Overrides Apex keep_batch_norm_fp32 flag')
 parser.add_argument('--loss-scale', default=1,
                     help='Loss scaling used by Apex. Default is 1 due to warp-ctc not supporting scaling of gradients')
 
@@ -149,7 +151,7 @@ if __name__ == '__main__':
         model = DeepSpeech.load_model_package(package)
         labels = model.labels
         audio_conf = model.audio_conf
-        if not args.finetune:  # Don't want to restart training
+        if not args.finetune:  # Don't restart training
             optim_state = package['optim_dict']
             amp_state = package['amp']
             start_epoch = int(package.get('epoch', 1)) - 1  # Index start at 0 for training
@@ -281,12 +283,11 @@ if __name__ == '__main__':
             # measure elapsed time
             batch_time.update(time.time() - end)
             end = time.time()
-            if not args.silent:
-                print('Epoch: [{0}][{1}/{2}]\t'
-                      'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
-                      'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
-                      'Loss {loss.val:.4f} ({loss.avg:.4f})\t'.format(
-                    (epoch + 1), (i + 1), len(train_sampler), batch_time=batch_time, data_time=data_time, loss=losses))
+            print('Epoch: [{0}][{1}/{2}]\t'
+                  'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
+                  'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
+                  'Loss {loss.val:.4f} ({loss.avg:.4f})\t'.format(
+                (epoch + 1), (i + 1), len(train_sampler), batch_time=batch_time, data_time=data_time, loss=losses))
             if args.checkpoint_per_batch > 0 and i > 0 and (i + 1) % args.checkpoint_per_batch == 0 and main_proc:
                 file_path = '%s/deepspeech_checkpoint_epoch_%d_iter_%d.pth' % (save_folder, epoch + 1, i + 1)
                 print("Saving checkpoint model to %s" % file_path)
