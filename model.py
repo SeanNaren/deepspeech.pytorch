@@ -4,7 +4,6 @@ from collections import OrderedDict
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.nn.parameter import Parameter
 
 supported_rnns = {
     'lstm': nn.LSTM,
@@ -128,23 +127,19 @@ class Lookahead(nn.Module):
 
 
 class DeepSpeech(nn.Module):
-    def __init__(self, rnn_type=nn.LSTM, labels="abc", rnn_hidden_size=768, nb_layers=5, audio_conf=None,
-                 bidirectional=True, context=20):
+    def __init__(self, rnn_type, labels, rnn_hidden_size, nb_layers, audio_conf,
+                 bidirectional, context=20):
         super(DeepSpeech, self).__init__()
 
-        # model metadata needed for serialization/deserialization
-        if audio_conf is None:
-            audio_conf = {}
-        self.version = '0.0.1'
         self.hidden_size = rnn_hidden_size
         self.hidden_layers = nb_layers
         self.rnn_type = rnn_type
-        self.audio_conf = audio_conf or {}
+        self.audio_conf = audio_conf
         self.labels = labels
         self.bidirectional = bidirectional
 
-        sample_rate = self.audio_conf.get("sample_rate", 16000)
-        window_size = self.audio_conf.get("window_size", 0.02)
+        sample_rate = self.audio_conf["sample_rate"]
+        window_size = self.audio_conf["window_size"]
         num_classes = len(self.labels)
 
         self.conv = MaskConv(nn.Sequential(
@@ -222,15 +217,7 @@ class DeepSpeech(nn.Module):
     @classmethod
     def load_model(cls, path):
         package = torch.load(path, map_location=lambda storage, loc: storage)
-        model = cls(rnn_hidden_size=package['hidden_size'],
-                    nb_layers=package['hidden_layers'],
-                    labels=package['labels'],
-                    audio_conf=package['audio_conf'],
-                    rnn_type=supported_rnns[package['rnn_type']],
-                    bidirectional=package.get('bidirectional', True))
-        model.load_state_dict(package['state_dict'])
-        for x in model.rnns:
-            x.flatten_parameters()
+        model = DeepSpeech.load_model_package(package)
         return model
 
     @classmethod
@@ -244,36 +231,16 @@ class DeepSpeech(nn.Module):
         model.load_state_dict(package['state_dict'])
         return model
 
-    @staticmethod
-    def serialize(model, optimizer=None, amp=None, epoch=None, iteration=None, loss_results=None,
-                  cer_results=None, wer_results=None, avg_loss=None, meta=None):
-        package = {
-            'version': model.version,
-            'hidden_size': model.hidden_size,
-            'hidden_layers': model.hidden_layers,
-            'rnn_type': supported_rnns_inv.get(model.rnn_type, model.rnn_type.__name__.lower()),
-            'audio_conf': model.audio_conf,
-            'labels': model.labels,
-            'state_dict': model.state_dict(),
-            'bidirectional': model.bidirectional,
+    def serialize_state(self):
+        return {
+            'hidden_size': self.hidden_size,
+            'hidden_layers': self.hidden_layers,
+            'rnn_type': supported_rnns_inv.get(self.rnn_type, self.rnn_type.__name__.lower()),
+            'audio_conf': self.audio_conf,
+            'labels': self.labels,
+            'state_dict': self.state_dict(),
+            'bidirectional': self.bidirectional,
         }
-        if optimizer is not None:
-            package['optim_dict'] = optimizer.state_dict()
-        if amp is not None:
-            package['amp'] = amp.state_dict()
-        if avg_loss is not None:
-            package['avg_loss'] = avg_loss
-        if epoch is not None:
-            package['epoch'] = epoch + 1  # increment for readability
-        if iteration is not None:
-            package['iteration'] = iteration
-        if loss_results is not None:
-            package['loss_results'] = loss_results
-            package['cer_results'] = cer_results
-            package['wer_results'] = wer_results
-        if meta is not None:
-            package['meta'] = meta
-        return package
 
     @staticmethod
     def get_param_size(model):
@@ -284,40 +251,3 @@ class DeepSpeech(nn.Module):
                 tmp *= x
             params += tmp
         return params
-
-
-if __name__ == '__main__':
-    import os.path
-    import argparse
-
-    parser = argparse.ArgumentParser(description='DeepSpeech model information')
-    parser.add_argument('--model-path', default='models/deepspeech_final.pth',
-                        help='Path to model file created by training')
-    args = parser.parse_args()
-    package = torch.load(args.model_path, map_location=lambda storage, loc: storage)
-    model = DeepSpeech.load_model(args.model_path)
-
-    print("Model name:         ", os.path.basename(args.model_path))
-    print("DeepSpeech version: ", model.version)
-    print("")
-    print("Recurrent Neural Network Properties")
-    print("  RNN Type:         ", model.rnn_type.__name__.lower())
-    print("  RNN Layers:       ", model.hidden_layers)
-    print("  RNN Size:         ", model.hidden_size)
-    print("  Classes:          ", len(model.labels))
-    print("")
-    print("Model Features")
-    print("  Labels:           ", model.labels)
-    print("  Sample Rate:      ", model.audio_conf.get("sample_rate", "n/a"))
-    print("  Window Type:      ", model.audio_conf.get("window", "n/a"))
-    print("  Window Size:      ", model.audio_conf.get("window_size", "n/a"))
-    print("  Window Stride:    ", model.audio_conf.get("window_stride", "n/a"))
-
-    if package.get('loss_results', None) is not None:
-        print("")
-        print("Training Information")
-        epochs = package['epoch']
-        print("  Epochs:           ", epochs)
-        print("  Current Loss:      {0:.3f}".format(package['loss_results'][epochs - 1]))
-        print("  Current CER:       {0:.3f}".format(package['cer_results'][epochs - 1]))
-        print("  Current WER:       {0:.3f}".format(package['wer_results'][epochs - 1]))

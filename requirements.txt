@@ -1,8 +1,10 @@
 python-levenshtein
 torch
+torchelastic
 visdom
 wget
 librosa
 tqdm
 matplotlib
 flask
+sox

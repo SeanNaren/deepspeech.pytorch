@@ -1,23 +1,23 @@
+import math
 import os
-import subprocess
 from tempfile import NamedTemporaryFile
-
-from torch.distributed import get_rank
-from torch.distributed import get_world_size
-from torch.utils.data.sampler import Sampler
 
 import librosa
 import numpy as np
 import scipy.signal
+import sox
 import torch
 from scipy.io.wavfile import read
-import math
-from torch.utils.data import DataLoader
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, Sampler, DistributedSampler, DataLoader
+
 from .spec_augment import spec_augment
 
-windows = {'hamming': scipy.signal.hamming, 'hann': scipy.signal.hann, 'blackman': scipy.signal.blackman,
-           'bartlett': scipy.signal.bartlett}
+windows = {
+    'hamming': scipy.signal.hamming,
+    'hann': scipy.signal.hann,
+    'blackman': scipy.signal.blackman,
+    'bartlett': scipy.signal.bartlett
+}
 
 
 def load_audio(path):
@@ -69,7 +69,7 @@ class NoiseInjection(object):
         return self.inject_noise_sample(data, noise_path, noise_level)
 
     def inject_noise_sample(self, data, noise_path, noise_level):
-        noise_len = get_audio_length(noise_path)
+        noise_len = sox.file_info.duration(noise_path)
         data_len = len(data) / self.sample_rate
         noise_start = np.random.rand() * (noise_len - data_len)
         noise_end = noise_start + data_len
@@ -138,7 +138,8 @@ class SpectrogramParser(AudioParser):
 
 
 class SpectrogramDataset(Dataset, SpectrogramParser):
-    def __init__(self, audio_conf, manifest_filepath, labels, normalize=False, speed_volume_perturb=False, spec_augment=False):
+    def __init__(self, audio_conf, manifest_filepath, labels, normalize=False, speed_volume_perturb=False,
+                 spec_augment=False):
         """
         Dataset that loads tensors via a csv containing file paths to audio files and transcripts separated by
         a comma. Each new line is a different sample. Example below:
@@ -213,69 +214,94 @@ class AudioDataLoader(DataLoader):
         self.collate_fn = _collate_fn
 
 
-class BucketingSampler(Sampler):
-    def __init__(self, data_source, batch_size=1):
-        """
-        Samples batches assuming they are in order of size to batch similarly sized samples together.
-        """
-        super(BucketingSampler, self).__init__(data_source)
-        self.data_source = data_source
-        ids = list(range(0, len(data_source)))
-        self.bins = [ids[i:i + batch_size] for i in range(0, len(ids), batch_size)]
+class DSRandomSampler(Sampler):
+    """
+    Implementation of a Random Sampler for sampling the dataset.
+    Added to ensure we reset the start index when an epoch is finished.
+    This is essential since we support saving/loading state during an epoch.
+    """
+
+    def __init__(self, dataset, batch_size=1, start_index=0):
+        super().__init__(data_source=dataset)
+
+        self.dataset = dataset
+        self.start_index = start_index
+        self.batch_size = batch_size
+        ids = list(range(len(self.dataset)))
+        self.bins = [ids[i:i + self.batch_size] for i in range(0, len(ids), self.batch_size)]
 
     def __iter__(self):
-        for ids in self.bins:
-            np.random.shuffle(ids)
-            yield ids
+        # deterministically shuffle based on epoch
+        g = torch.Generator()
+        g.manual_seed(self.epoch)
+        indices = (
+            torch.randperm(len(self.bins) - self.start_index, generator=g)
+                .add(self.start_index)
+                .tolist()
+        )
+        for x in indices:
+            batch_ids = self.bins[x]
+            np.random.shuffle(batch_ids)
+            yield batch_ids
 
     def __len__(self):
-        return len(self.bins)
+        return len(self.bins) - self.start_index
 
-    def shuffle(self, epoch):
-        np.random.shuffle(self.bins)
+    def set_epoch(self, epoch):
+        self.epoch = epoch
+
+    def reset_training_step(self, training_step):
+        self.start_index = training_step
 
 
-class DistributedBucketingSampler(Sampler):
-    def __init__(self, data_source, batch_size=1, num_replicas=None, rank=None):
-        """
-        Samples batches assuming they are in order of size to batch similarly sized samples together.
-        """
-        super(DistributedBucketingSampler, self).__init__(data_source)
-        if num_replicas is None:
-            num_replicas = get_world_size()
-        if rank is None:
-            rank = get_rank()
-        self.data_source = data_source
-        self.ids = list(range(0, len(data_source)))
+class DSElasticDistributedSampler(DistributedSampler):
+    """
+    Overrides the ElasticDistributedSampler to ensure we reset the start index when an epoch is finished.
+    This is essential since we support saving/loading state during an epoch.
+    """
+
+    def __init__(self, dataset, num_replicas=None, rank=None, start_index=0, batch_size=1):
+        super().__init__(dataset=dataset, num_replicas=num_replicas, rank=rank)
+        self.start_index = start_index
         self.batch_size = batch_size
-        self.bins = [self.ids[i:i + batch_size] for i in range(0, len(self.ids), batch_size)]
-        self.num_replicas = num_replicas
-        self.rank = rank
-        self.num_samples = int(math.ceil(len(self.bins) * 1.0 / self.num_replicas))
+        ids = list(range(len(dataset)))
+        self.bins = [ids[i:i + self.batch_size] for i in range(0, len(ids), self.batch_size)]
+        self.num_samples = int(
+            math.ceil(float(len(self.bins) - self.start_index) / self.num_replicas)
+        )
         self.total_size = self.num_samples * self.num_replicas
 
     def __iter__(self):
-        offset = self.rank
+        # deterministically shuffle based on epoch
+        g = torch.Generator()
+        g.manual_seed(self.epoch)
+        indices = (
+            torch.randperm(len(self.bins) - self.start_index, generator=g)
+                .add(self.start_index)
+                .tolist()
+        )
+
         # add extra samples to make it evenly divisible
-        bins = self.bins + self.bins[:(self.total_size - len(self.bins))]
-        assert len(bins) == self.total_size
-        samples = bins[offset::self.num_replicas]  # Get every Nth bin, starting from rank
-        return iter(samples)
+        indices += indices[: (self.total_size - len(indices))]
+        assert len(indices) == self.total_size
+
+        # subsample
+        indices = indices[self.rank: self.total_size: self.num_replicas]
+        assert len(indices) == self.num_samples
+        for x in indices:
+            batch_ids = self.bins[x]
+            np.random.shuffle(batch_ids)
+            yield batch_ids
 
     def __len__(self):
         return self.num_samples
 
-    def shuffle(self, epoch):
-        # deterministically shuffle based on epoch
-        g = torch.Generator()
-        g.manual_seed(epoch)
-        bin_ids = list(torch.randperm(len(self.bins), generator=g))
-        self.bins = [self.bins[i] for i in bin_ids]
-
-
-def get_audio_length(path):
-    output = subprocess.check_output(['soxi -D \"%s\"' % path.strip()], shell=True)
-    return float(output)
+    def reset_training_step(self, training_step):
+        self.start_index = training_step
+        self.num_samples = int(
+            math.ceil(float(len(self.bins) - self.start_index) / self.num_replicas)
+        )
+        self.total_size = self.num_samples * self.num_replicas
 
 
 def audio_with_sox(path, sample_rate, start_time, end_time):
