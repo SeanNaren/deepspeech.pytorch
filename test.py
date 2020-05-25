@@ -1,10 +1,9 @@
 import argparse
 
-import numpy as np
+import torch
 from tqdm import tqdm
 
-import torch
-from data.data_loader import AudioDataLoader, SpectrogramDataset
+from data.data_loader import SpectrogramDataset, AudioDataLoader
 from decoder import GreedyDecoder
 from opts import add_decoder_args, add_inference_args
 from utils import load_model
@@ -72,17 +71,25 @@ if __name__ == '__main__':
     if args.decoder == "beam":
         from decoder import BeamCTCDecoder
 
-        decoder = BeamCTCDecoder(model.labels, lm_path=args.lm_path, alpha=args.alpha, beta=args.beta,
-                                 cutoff_top_n=args.cutoff_top_n, cutoff_prob=args.cutoff_prob,
-                                 beam_width=args.beam_width, num_processes=args.lm_workers)
+        decoder = BeamCTCDecoder(model.labels,
+                                 lm_path=args.lm_path,
+                                 alpha=args.alpha,
+                                 beta=args.beta,
+                                 cutoff_top_n=args.cutoff_top_n,
+                                 cutoff_prob=args.cutoff_prob,
+                                 beam_width=args.beam_width,
+                                 num_processes=args.lm_workers)
     elif args.decoder == "greedy":
         decoder = GreedyDecoder(model.labels, blank_index=model.labels.index('_'))
     else:
         decoder = None
     target_decoder = GreedyDecoder(model.labels, blank_index=model.labels.index('_'))
-    test_dataset = SpectrogramDataset(audio_conf=model.audio_conf, manifest_filepath=args.test_manifest,
-                                      labels=model.labels, normalize=True)
-    test_loader = AudioDataLoader(test_dataset, batch_size=args.batch_size,
+    test_dataset = SpectrogramDataset(audio_conf=model.audio_conf,
+                                      manifest_filepath=args.test_manifest,
+                                      labels=model.labels,
+                                      normalize=True)
+    test_loader = AudioDataLoader(test_dataset,
+                                  batch_size=args.batch_size,
                                   num_workers=args.num_workers)
     wer, cer, output_data = evaluate(test_loader=test_loader,
                                      device=device,

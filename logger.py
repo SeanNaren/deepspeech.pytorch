@@ -18,9 +18,9 @@ class VisdomLogger(object):
 
     def update(self, epoch, values):
         x_axis = self.epochs[0:epoch + 1]
-        y_axis = torch.stack((values["loss_results"][:epoch],
-                              values["wer_results"][:epoch],
-                              values["cer_results"][:epoch]),
+        y_axis = torch.stack((values.loss_results[:epoch],
+                              values.wer_results[:epoch],
+                              values.cer_results[:epoch]),
                              dim=1)
         self.viz_window = self.viz.line(
             X=x_axis,
@@ -30,8 +30,8 @@ class VisdomLogger(object):
             update='replace' if self.viz_window else None
         )
 
-    def load_previous_values(self, start_epoch, package):
-        self.update(start_epoch - 1, package)  # Add all values except the iteration we're starting from
+    def load_previous_values(self, start_epoch, results_state):
+        self.update(start_epoch - 1, results_state)  # Add all values except the iteration we're starting from
 
 
 class TensorBoardLogger(object):
@@ -42,9 +42,10 @@ class TensorBoardLogger(object):
         self.tensorboard_writer = SummaryWriter(log_dir)
         self.log_params = log_params
 
-    def update(self, epoch, values, parameters=None):
-        loss, wer, cer = values["loss_results"][epoch], values["wer_results"][epoch], \
-                         values["cer_results"][epoch]
+    def update(self, epoch, results_state, parameters=None):
+        loss = results_state.loss_results[epoch]
+        wer = results_state.wer_results[epoch]
+        cer = results_state.cer_results[epoch]
         values = {
             'Avg Train Loss': loss,
             'Avg WER': wer,
@@ -57,10 +58,10 @@ class TensorBoardLogger(object):
                 self.tensorboard_writer.add_histogram(tag, to_np(value), epoch + 1)
                 self.tensorboard_writer.add_histogram(tag + '/grad', to_np(value.grad), epoch + 1)
 
-    def load_previous_values(self, start_epoch, values):
-        loss_results = values["loss_results"][:start_epoch]
-        wer_results = values["wer_results"][:start_epoch]
-        cer_results = values["cer_results"][:start_epoch]
+    def load_previous_values(self, start_epoch, result_state):
+        loss_results = result_state.loss_results[:start_epoch]
+        wer_results = result_state.wer_results[:start_epoch]
+        cer_results = result_state.cer_results[:start_epoch]
 
         for i in range(start_epoch):
             values = {

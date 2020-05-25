@@ -50,6 +50,11 @@ Finally clone this repo and run this within the repo:
 pip install -r requirements.txt
 ```
 
+If you plan to use Multi-GPU/Multi-node training, you'll need etcd. Below is the command to install on Ubuntu.
+```
+sudo apt-get install etcd
+```
+
 ## Training
 
 ### Datasets
@@ -103,23 +108,56 @@ For both visualisation tools, you can add your own name to the run by changing t
 
 ### Multi-GPU Training
 
-We support multi-GPU training via the distributed parallel wrapper (see [here](https://github.com/NVIDIA/sentiment-discovery/blob/master/analysis/scale.md) and [here](https://github.com/SeanNaren/deepspeech.pytorch/issues/211) to see why we don't use DataParallel).
+We support multi-GPU training via [TorchElastic](https://pytorch.org/elastic/0.2.0/index.html).
 
-To use multi-GPU:
-
-```
-python -m multiproc train.py --visdom --cuda # Add your parameters as normal, multiproc will scale to all GPUs automatically
-```
-
-multiproc will open a log for all processes other than the main process.
-
-You can also specify specific GPU IDs rather than allowing the script to use all available GPUs:
+Below is an example command when training on a machine with 4 local GPUs:
 
 ```
-python -m multiproc train.py --visdom --cuda --device-ids 0,1,2,3 # Add your parameters as normal, will only run on 4 GPUs
+python -m torchelastic.distributed.launch \
+        --standalone \
+        --nnodes=1 \
+        --nproc_per_node=4 \
+        train.py --train-manifest data/an4_train_manifest.csv \
+                 --val-manifest data/an4_val_manifest.csv  --opt-level O1 --num-workers 8 \
+                 --batch-size 8 --epochs 70 --checkpoint --save-n-recent-models 3
 ```
 
-We suggest using the NCCL backend which defaults to TCP if Infiniband isn't available.
+You'll see the output for all the processes running on each individual GPU.
+You can verify the model is being synchronized by the WER from all workers at validation time.
+
+### Multi-Node Training
+
+Also supported is multi-machine capabilities using TorchElastic. This requires a node to exist as an explicit etcd host (which could be one of the GPU nodes but isn't recommended), a shared mount across your cluster to load/save checkpoints and communication between the nodes.
+
+Below is an example where we've set one of our GPU nodes as our etcd host however if you're scaling up, it would be suggested to have a separate instance as your etcd instance to your GPU nodes as this will be a single point of failure.
+
+Assumed below is a shared drive called /share where we save our checkpoints and data to access.
+
+Run on the etcd host:
+```
+PUBLIC_HOST_NAME=127.0.0.1 # Change to public host name for all nodes to connect
+etcd --enable-v2 \
+     --listen-client-urls http://$PUBLIC_HOST_NAME:4377 \
+     --advertise-client-urls http://$PUBLIC_HOST_NAME:4377 \
+     --listen-peer-urls http://$PUBLIC_HOST_NAME:4379
+```
+
+Run on each GPU node:
+```
+python -m torchelastic.distributed.launch \
+        --nnodes=2 \
+        --nproc_per_node=4 \
+        --rdzv_id=123 \
+        --rdzv_backend=etcd \
+        --rdzv_endpoint=$PUBLIC_HOST_NAME:4377 \
+        train.py --train-manifest /share/data/an4_train_manifest.csv \
+                 --val-manifest /share/data/an4_val_manifest.csv  --opt-level O1 --num-workers 8 --save_folder /share/checkpoints/ \
+                 --batch-size 8 --epochs 70 --checkpoint --load_auto_checkpoint --save-n-recent-models 3
+```
+
+Using the `--load_auto_checkpoint` flag and the `--checkpoint_per_iteration` flag we can re-continue training from the latest saved checkpoint.
+
+Currently it is expected that there is an NFS drive/shared mount across all nodes within the cluster to load the latest checkpoint from.
 
 ### Mixed Precision
 
@@ -131,7 +169,7 @@ Different Optimization levels are available. More information on the Nvidia Apex
 python train.py --train-manifest data/train_manifest.csv --val-manifest data/val_manifest.csv --opt-level O1 --loss-scale 1.0
 ```
 
-Training a model in mixed-precision means you can use 32 bit float or half precision at runtime. Float is default, to use half precision (Which on V100s come with a speedup and better memory use) use the `--half` flag when testing or transcribing.
+Training a model in mixed-precision means you can use 32 bit float or half precision at runtime. Float32 is default, to use half precision (Which on V100s come with a speedup and better memory use) use the `--half` flag when testing or transcribing.
 
 ### Augmentation
 

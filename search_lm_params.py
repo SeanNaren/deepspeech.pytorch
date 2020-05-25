@@ -10,6 +10,7 @@ import torch
 from decoder import BeamCTCDecoder
 from model import DeepSpeech
 from opts import add_decoder_args
+from utils import load_model
 
 parser = argparse.ArgumentParser(description='Tune an ARPA LM based on a pre-trained acoustic model output')
 parser.add_argument('--model-path', default='models/deepspeech_final.pth',
@@ -32,7 +33,9 @@ if args.lm_path is None:
     print("error: LM must be provided for tuning")
     sys.exit(1)
 
-model = DeepSpeech.load_model(args.model_path)
+model = load_model(model_path=args.model_path,
+                   device='cpu',
+                   use_half=False)
 
 saved_output = torch.load(args.saved_output)
 
