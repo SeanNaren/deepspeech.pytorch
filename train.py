@@ -37,7 +37,11 @@ parser.add_argument('--rnn-type', default='lstm', help='Type of the RNN. rnn|gru
 parser.add_argument('--epochs', default=70, type=int, help='Number of training epochs')
 parser.add_argument('--no-cuda', dest='no_cuda', action='store_true', help='Enable CPU only training')
 parser.add_argument('--lr', '--learning-rate', default=3e-4, type=float, help='initial learning rate')
+parser.add_argument('--wd', '--weight_decay', default=1e-5, type=float, help='Initial weight decay')
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
+parser.add_argument('--adam', dest='adam', action='store_true', help='Replace SGD with Adam')
+parser.add_argument('--eps', default=1e-8, type=float, help='ADAM eps')
+parser.add_argument('--betas', default=(0.9, 0.999), nargs='+', help='ADAM betas')
 parser.add_argument('--max-norm', default=400, type=int, help='Norm cutoff to prevent explosion of gradients')
 parser.add_argument('--learning-anneal', default=1.1, type=float, help='Annealing applied to learning rate every epoch')
 parser.add_argument('--checkpoint', dest='checkpoint', action='store_true',
@@ -210,11 +214,18 @@ if __name__ == '__main__':
 
     model = model.to(device)
     parameters = model.parameters()
-    optimizer = torch.optim.SGD(parameters,
-                                lr=args.lr,
-                                momentum=args.momentum,
-                                nesterov=True,
-                                weight_decay=1e-5)
+    if args.adam:
+        optimizer = torch.optim.AdamW(parameters,
+                                      lr=args.lr,
+                                      betas=args.betas,
+                                      eps=args.eps,
+                                      weight_decay=args.wd)
+    else:
+        optimizer = torch.optim.SGD(parameters,
+                                    lr=args.lr,
+                                    momentum=args.momentum,
+                                    nesterov=True,
+                                    weight_decay=args.wd)
 
     model, optimizer = amp.initialize(model, optimizer,
                                       opt_level=args.opt_level,
