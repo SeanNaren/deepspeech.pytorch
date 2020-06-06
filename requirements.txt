@@ -8,3 +8,4 @@ tqdm
 matplotlib
 flask
 sox
+sklearn
