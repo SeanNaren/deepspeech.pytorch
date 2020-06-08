@@ -37,7 +37,7 @@ class VisdomLogger(object):
 class TensorBoardLogger(object):
     def __init__(self, id, log_dir, log_params):
         os.makedirs(log_dir, exist_ok=True)
-        from tensorboardX import SummaryWriter
+        from torch.utils.tensorboard import SummaryWriter
         self.id = id
         self.tensorboard_writer = SummaryWriter(log_dir)
         self.log_params = log_params
