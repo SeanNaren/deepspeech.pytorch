@@ -1,3 +1,6 @@
+scipy
+numpy
+soundfile
 python-levenshtein
 torch
 torchelastic
@@ -9,3 +12,4 @@ matplotlib
 flask
 sox
 sklearn
+soundfile

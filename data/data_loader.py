@@ -5,9 +5,9 @@ from tempfile import NamedTemporaryFile
 import librosa
 import numpy as np
 import scipy.signal
+import soundfile as sf
 import sox
 import torch
-from scipy.io.wavfile import read
 from torch.utils.data import Dataset, Sampler, DistributedSampler, DataLoader
 
 from .spec_augment import spec_augment
@@ -21,7 +21,9 @@ windows = {
 
 
 def load_audio(path):
-    sample_rate, sound = read(path)
+    sound, sample_rate = sf.read(path, dtype='int16')
+    # TODO this should be 32768.0 to get twos-complement range.
+    # TODO the difference is negligible but should be fixed for new models.
     sound = sound.astype('float32') / 32767  # normalize audio
     if len(sound.shape) > 1:
         if sound.shape[1] == 1:
