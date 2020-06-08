@@ -21,7 +21,10 @@ windows = {
 
 
 def load_audio(path):
-    sound, sample_rate = sf.read(path)
+    sound, sample_rate = sf.read(path, dtype='int16')
+    # TODO this should be 32768.0 to get twos-complement range.
+    # TODO the difference is negligible but should be fixed for new models.
+    sound = sound.astype('float32') / 32767  # normalize audio
     if len(sound.shape) > 1:
         if sound.shape[1] == 1:
             sound = sound.squeeze()
