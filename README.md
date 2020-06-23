@@ -86,8 +86,11 @@ python merge_manifests.py --output-path merged_manifest.csv --merge-dir all-mani
 
 ### Training a Model
 
+Configuration is done via [Hydra](https://github.com/facebookresearch/hydra), and the config file can be seen [here](./config.yaml). 
+You can either edit the defaults in the config file, or override via the cmdline as done below.
+
 ```
-python train.py --train-manifest data/train_manifest.csv --val-manifest data/val_manifest.csv
+python train.py data.train_manifest=data/train_manifest.csv data.val_manifest=data/val_manifest.csv
 ```
 
 Use `python train.py --help` for more parameters and options.
@@ -95,13 +98,13 @@ Use `python train.py --help` for more parameters and options.
 There is also [Visdom](https://github.com/facebookresearch/visdom) support to visualize training. Once a server has been started, to use:
 
 ```
-python train.py --visdom
+python train.py visualization.visdom=true
 ```
 
 There is also [Tensorboard](https://github.com/lanpa/tensorboard-pytorch) support to visualize training. Follow the instructions to set up. To use:
 
 ```
-python train.py --tensorboard --log-dir log_dir/ # Make sure the Tensorboard instance is made pointing to this log directory
+python train.py visualization.tensorboard=true visualization.log_dir=log_dir/ # Make sure the Tensorboard instance is made pointing to this log directory
 ```
 
 For both visualisation tools, you can add your own name to the run by changing the `--id` parameter when training.
@@ -117,9 +120,9 @@ python -m torchelastic.distributed.launch \
         --standalone \
         --nnodes=1 \
         --nproc_per_node=4 \
-        train.py --train-manifest data/an4_train_manifest.csv \
-                 --val-manifest data/an4_val_manifest.csv  --opt-level O1 --num-workers 8 \
-                 --batch-size 8 --epochs 70 --checkpoint --save-n-recent-models 3
+        train.py data.train_manifest=data/an4_train_manifest.csv \
+                 data.val_manifest=data/an4_val_manifest.csv  apex.opt_level=O1 data.num_workers=8 \
+                 data.batch_size=8 training.epochs=70 checkpointing.checkpoint=true checkpointing.save_n_recent_models=3
 ```
 
 You'll see the output for all the processes running on each individual GPU.
@@ -150,12 +153,14 @@ python -m torchelastic.distributed.launch \
         --rdzv_id=123 \
         --rdzv_backend=etcd \
         --rdzv_endpoint=$PUBLIC_HOST_NAME:4377 \
-        train.py --train-manifest /share/data/an4_train_manifest.csv \
-                 --val-manifest /share/data/an4_val_manifest.csv  --opt-level O1 --num-workers 8 --save_folder /share/checkpoints/ \
-                 --batch-size 8 --epochs 70 --checkpoint --load_auto_checkpoint --save-n-recent-models 3
+        train.py data.train_manifest=/share/data/an4_train_manifest.csv \
+                 data.val_manifest=/share/data/an4_val_manifest.csv apex.opt_level=O1 \
+                 data.num_workers=8 checkpointing.save_folder=/share/checkpoints/ \
+                 checkpointing.checkpoint=true checkpointing.load_auto_checkpoint=true checkpointing.save_n_recent_models=3 \
+                 data.batch_size=8 training.epochs=70 
 ```
 
-Using the `--load_auto_checkpoint` flag and the `--checkpoint_per_iteration` flag we can re-continue training from the latest saved checkpoint.
+Using the `checkpointing.load_auto_checkpoint=true` flag and the `checkpointing.checkpoint_per_iteration` flag we can re-continue training from the latest saved checkpoint.
 
 Currently it is expected that there is an NFS drive/shared mount across all nodes within the cluster to load the latest checkpoint from.
 
@@ -166,7 +171,7 @@ If you are using NVIDIA volta cards or above to train your model, it's highly su
 Different Optimization levels are available. More information on the Nvidia Apex API can be seen [here](https://nvidia.github.io/apex/amp.html#opt-levels).
 
 ```
-python train.py --train-manifest data/train_manifest.csv --val-manifest data/val_manifest.csv --opt-level O1 --loss-scale 1.0
+python train.py data.train_manifest=data/train_manifest.csv data.val_manifest=data/val_manifest.csv apex.opt_level=O1 apex.loss_scale=1.0
 ```
 
 Training a model in mixed-precision means you can use 32 bit float or half precision at runtime. Float32 is default, to use half precision (Which on V100s come with a speedup and better memory use) use the `--half` flag when testing or transcribing.
@@ -205,13 +210,13 @@ Training supports saving checkpoints of the model to continue training from shou
 checkpoints use:
 
 ```
-python train.py --checkpoint
+python train.py checkpoint=true
 ```
 
 To enable checkpoints every N batches through the epoch as well as epoch saving:
 
 ```
-python train.py --checkpoint --checkpoint-per-batch N # N is the number of batches to wait till saving a checkpoint at this batch.
+python train.py checkpoint=true --checkpoint-per-batch N # N is the number of batches to wait till saving a checkpoint at this batch.
 ```
 
 Note for the batch checkpointing system to work, you cannot change the batch size when loading a checkpointed model from it's original training
@@ -220,13 +225,13 @@ run.
 To continue from a checkpointed model that has been saved:
 
 ```
-python train.py --continue-from models/deepspeech_checkpoint_epoch_N_iter_N.pth
+python train.py checkpointing.continue_from=models/deepspeech_checkpoint_epoch_N_iter_N.pth
 ```
 
 This continues from the same training state as well as recreates the visdom graph to continue from if enabled.
 
-If you would like to start from a previous checkpoint model but not continue training, add the `--finetune` flag to restart training
-from the `--continue-from` weights.
+If you would like to start from a previous checkpoint model but not continue training, add the `training.finetune=true` flag to restart training
+from the `checkpointing.continue_from` weights.
 
 ### Choosing batch sizes
 

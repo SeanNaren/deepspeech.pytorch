@@ -13,3 +13,4 @@ flask
 sox
 sklearn
 soundfile
+hydra-core
