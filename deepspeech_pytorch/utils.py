@@ -3,7 +3,8 @@ from pathlib import Path
 
 import torch
 
-from model import DeepSpeech
+from deepspeech_pytorch.decoder import GreedyDecoder
+from deepspeech_pytorch.model import DeepSpeech
 
 
 class CheckpointHandler:
@@ -97,13 +98,41 @@ def check_loss(loss, loss_value):
     return loss_valid, error
 
 
-def load_model(device, model_path, use_half):
+def load_model(device,
+               model_path,
+               use_half):
     model = DeepSpeech.load_model(model_path)
     model.eval()
     model = model.to(device)
     if use_half:
         model = model.half()
     return model
+
+
+def load_decoder(decoder_type,
+                 labels,
+                 lm_path,
+                 alpha,
+                 beta,
+                 cutoff_top_n,
+                 cutoff_prob,
+                 beam_width,
+                 lm_workers):
+    if decoder_type == "beam":
+        from deepspeech_pytorch.decoder import BeamCTCDecoder
+
+        decoder = BeamCTCDecoder(labels=labels,
+                                 lm_path=lm_path,
+                                 alpha=alpha,
+                                 beta=beta,
+                                 cutoff_top_n=cutoff_top_n,
+                                 cutoff_prob=cutoff_prob,
+                                 beam_width=beam_width,
+                                 num_processes=lm_workers)
+    else:
+        decoder = GreedyDecoder(labels=labels,
+                                blank_index=labels.index('_'))
+    return decoder
 
 
 def remove_parallel_wrapper(model):

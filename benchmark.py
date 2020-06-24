@@ -12,7 +12,7 @@ from tqdm import tqdm
 from tqdm import trange
 from warpctc_pytorch import CTCLoss
 
-from model import DeepSpeech, supported_rnns
+from deepspeech_pytorch.model import DeepSpeech, supported_rnns
 
 parser = argparse.ArgumentParser(description="Benchmark script to check stability of training with CUDA. "
                                              "Assumes a few hardcoded defaults which shouldn't make a large difference")

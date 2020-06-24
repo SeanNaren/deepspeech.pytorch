@@ -1,7 +1,7 @@
 import torch
 
-from model import DeepSpeech
-from utils import remove_parallel_wrapper
+from deepspeech_pytorch.model import DeepSpeech
+from deepspeech_pytorch.utils import remove_parallel_wrapper
 
 
 class ResultState:
