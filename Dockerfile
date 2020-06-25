@@ -1,4 +1,4 @@
-FROM pytorch/pytorch:1.5-cuda10.1-cudnn7-devel
+FROM pytorch/pytorch:1.5.1-cuda10.1-cudnn7-devel
 ENV LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
 
 WORKDIR /workspace/
@@ -26,7 +26,7 @@ RUN cd apex; pip install .
 
 # install deepspeech.pytorch
 ADD . /workspace/deepspeech.pytorch
-RUN cd deepspeech.pytorch; pip install -r requirements.txt
+RUN cd deepspeech.pytorch; pip install -r requirements.txt && pip install -e .
 
 # launch jupyter
 RUN mkdir data; mkdir notebooks;

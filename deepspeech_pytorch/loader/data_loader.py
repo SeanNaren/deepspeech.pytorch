@@ -10,7 +10,7 @@ import sox
 import torch
 from torch.utils.data import Dataset, Sampler, DistributedSampler, DataLoader
 
-from .spec_augment import spec_augment
+from deepspeech_pytorch.loader.spec_augment import spec_augment
 
 windows = {
     'hamming': scipy.signal.hamming,

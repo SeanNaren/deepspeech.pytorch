@@ -7,10 +7,9 @@ import numpy as np
 from tqdm import tqdm
 
 import torch
-from decoder import BeamCTCDecoder
-from model import DeepSpeech
-from opts import add_decoder_args
-from utils import load_model
+from deepspeech_pytorch.decoder import BeamCTCDecoder
+from deepspeech_pytorch.opts import add_decoder_args
+from deepspeech_pytorch.utils import load_model
 
 parser = argparse.ArgumentParser(description='Tune an ARPA LM based on a pre-trained acoustic model output')
 parser.add_argument('--model-path', default='models/deepspeech_final.pth',

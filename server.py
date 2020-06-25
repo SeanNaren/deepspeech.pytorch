@@ -4,11 +4,11 @@ from tempfile import NamedTemporaryFile
 import torch
 from flask import Flask, request, jsonify
 import logging
-from data.data_loader import SpectrogramParser
-from decoder import GreedyDecoder
-from opts import add_decoder_args, add_inference_args
+from deepspeech_pytorch.loader.data_loader import SpectrogramParser
+from deepspeech_pytorch.decoder import GreedyDecoder
+from deepspeech_pytorch.opts import add_decoder_args, add_inference_args
 from transcribe import transcribe
-from utils import load_model
+from deepspeech_pytorch.utils import load_model
 
 app = Flask(__name__)
 ALLOWED_EXTENSIONS = set(['.wav', '.mp3', '.ogg', '.webm'])
@@ -61,7 +61,7 @@ def main():
     model = load_model(device, args.model_path, args.half)
 
     if args.decoder == "beam":
-        from decoder import BeamCTCDecoder
+        from deepspeech_pytorch.decoder import BeamCTCDecoder
 
         decoder = BeamCTCDecoder(model.labels, lm_path=args.lm_path, alpha=args.alpha, beta=args.beta,
                                  cutoff_top_n=args.cutoff_top_n, cutoff_prob=args.cutoff_prob,

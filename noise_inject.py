@@ -3,7 +3,7 @@ import argparse
 import torch
 from scipy.io.wavfile import write
 
-from data.data_loader import load_audio, NoiseInjection
+from deepspeech_pytorch.loader.data_loader import load_audio, NoiseInjection
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--input-path', default='input.wav', help='The input audio to inject noise into')

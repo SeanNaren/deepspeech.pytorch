@@ -1,18 +1,13 @@
 import argparse
-import warnings
-
-from opts import add_decoder_args, add_inference_args
-from utils import load_model
-
-warnings.simplefilter('ignore')
-
-from decoder import GreedyDecoder
+import json
+import os
 
 import torch
 
-from data.data_loader import SpectrogramParser
-import os.path
-import json
+from deepspeech_pytorch.loader.data_loader import SpectrogramParser
+from deepspeech_pytorch.inference import transcribe
+from deepspeech_pytorch.opts import add_decoder_args, add_inference_args
+from deepspeech_pytorch.utils import load_model, load_decoder
 
 
 def decode_results(decoded_output, decoded_offsets):
@@ -43,39 +38,33 @@ def decode_results(decoded_output, decoded_offsets):
     return results
 
 
-def transcribe(audio_path, spect_parser, model, decoder, device, use_half):
-    spect = spect_parser.parse_audio(audio_path).contiguous()
-    spect = spect.view(1, 1, spect.size(0), spect.size(1))
-    spect = spect.to(device)
-    if use_half:
-        spect = spect.half()
-    input_sizes = torch.IntTensor([spect.size(3)]).int()
-    out, output_sizes = model(spect, input_sizes)
-    decoded_output, decoded_offsets = decoder.decode(out, output_sizes)
-    return decoded_output, decoded_offsets
-
-
 if __name__ == '__main__':
     arg_parser = argparse.ArgumentParser(description='DeepSpeech transcription')
     arg_parser = add_inference_args(arg_parser)
-    arg_parser.add_argument('--audio-path', default='audio.wav',
-                              help='Audio file to predict on')
-    arg_parser.add_argument('--offsets', dest='offsets', action='store_true', help='Returns time offset information')
+    arg_parser.add_argument('--audio-path',
+                            default='audio.wav',
+                            help='Audio file to predict on')
+    arg_parser.add_argument('--offsets',
+                            dest='offsets',
+                            action='store_true',
+                            help='Returns time offset information')
     arg_parser = add_decoder_args(arg_parser)
     args = arg_parser.parse_args()
     device = torch.device("cuda" if args.cuda else "cpu")
     model = load_model(device, args.model_path, args.half)
 
-    if args.decoder == "beam":
-        from decoder import BeamCTCDecoder
+    decoder = load_decoder(decoder_type=args.decoder,
+                           labels=model.labels,
+                           lm_path=args.lm_path,
+                           alpha=args.alpha,
+                           beta=args.beta,
+                           cutoff_top_n=args.cutoff_top_n,
+                           cutoff_prob=args.cutoff_prob,
+                           beam_width=args.beam_width,
+                           lm_workers=args.lm_workers)
 
-        decoder = BeamCTCDecoder(model.labels, lm_path=args.lm_path, alpha=args.alpha, beta=args.beta,
-                                 cutoff_top_n=args.cutoff_top_n, cutoff_prob=args.cutoff_prob,
-                                 beam_width=args.beam_width, num_processes=args.lm_workers)
-    else:
-        decoder = GreedyDecoder(model.labels, blank_index=model.labels.index('_'))
-
-    spect_parser = SpectrogramParser(model.audio_conf, normalize=True)
+    spect_parser = SpectrogramParser(audio_conf=model.audio_conf,
+                                     normalize=True)
 
     decoded_output, decoded_offsets = transcribe(audio_path=args.audio_path,
                                                  spect_parser=spect_parser,
