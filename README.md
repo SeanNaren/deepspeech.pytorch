@@ -48,6 +48,7 @@ cd ctcdecode && pip install .
 Finally clone this repo and run this within the repo:
 ```
 pip install -r requirements.txt
+pip install -e . # Dev install
 ```
 
 If you plan to use Multi-GPU/Multi-node training, you'll need etcd. Below is the command to install on Ubuntu.
