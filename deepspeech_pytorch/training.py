@@ -2,6 +2,7 @@ import json
 import os
 import random
 import time
+from enum import Enum
 
 import numpy as np
 import torch.distributed as dist
@@ -12,12 +13,19 @@ from hydra.utils import to_absolute_path
 from torch.nn.parallel import DistributedDataParallel
 from warpctc_pytorch import CTCLoss
 
-from deepspeech_pytorch.loader.data_loader import SpectrogramDataset, DSRandomSampler, DSElasticDistributedSampler, AudioDataLoader
+from deepspeech_pytorch.loader.data_loader import SpectrogramDataset, DSRandomSampler, DSElasticDistributedSampler, \
+    AudioDataLoader
 from deepspeech_pytorch.decoder import GreedyDecoder
 from deepspeech_pytorch.logger import VisdomLogger, TensorBoardLogger
 from deepspeech_pytorch.model import DeepSpeech, supported_rnns
 from deepspeech_pytorch.state import TrainingState
 from deepspeech_pytorch.utils import check_loss, CheckpointHandler
+
+
+class DistributedBackend(Enum):
+    gloo = 'gloo'
+    mpi = 'mpi'
+    nccl = 'nccl'
 
 
 class AverageMeter(object):

@@ -1,10 +1,10 @@
 import math
 import os
+from enum import Enum
 from tempfile import NamedTemporaryFile
 
 import librosa
 import numpy as np
-import scipy.signal
 import soundfile as sf
 import sox
 import torch
@@ -12,12 +12,12 @@ from torch.utils.data import Dataset, Sampler, DistributedSampler, DataLoader
 
 from deepspeech_pytorch.loader.spec_augment import spec_augment
 
-windows = {
-    'hamming': scipy.signal.hamming,
-    'hann': scipy.signal.hann,
-    'blackman': scipy.signal.blackman,
-    'bartlett': scipy.signal.bartlett
-}
+
+class SpectrogramWindow(Enum):
+    hamming = 'hamming'
+    hann = 'hann'
+    blackman = 'blackman'
+    bartlett = 'bartlett'
 
 
 def load_audio(path):
@@ -96,7 +96,7 @@ class SpectrogramParser(AudioParser):
         self.window_stride = audio_conf['window_stride']
         self.window_size = audio_conf['window_size']
         self.sample_rate = audio_conf['sample_rate']
-        self.window = windows.get(audio_conf['window'], windows['hamming'])
+        self.window = audio_conf['window']
         self.normalize = normalize
         self.speed_volume_perturb = speed_volume_perturb
         self.spec_augment = spec_augment

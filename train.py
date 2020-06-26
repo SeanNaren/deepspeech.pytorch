@@ -1,9 +1,10 @@
 import hydra
-from attr import dataclass
+from dataclasses import dataclass
 from hydra.core.config_store import ConfigStore
 from omegaconf import DictConfig
 
-from deepspeech_pytorch.training import train
+from deepspeech_pytorch.loader.data_loader import SpectrogramWindow
+from deepspeech_pytorch.training import train, DistributedBackend
 
 
 @dataclass
@@ -11,7 +12,7 @@ class TrainConfig:
     no_cuda: bool = False  # Enable CPU only training
     finetune: bool = False  # Fine-tune the model from checkpoint "continue_from"
     seed: int = 123456  # Seed for generators
-    dist_backend: str = 'nccl'  # If using distribution, the backend to be used
+    dist_backend: DistributedBackend = DistributedBackend.nccl  # If using distribution, the backend to be used
     epochs: int = 70  # Number of Training Epochs
 
 
@@ -25,7 +26,7 @@ class DataConfig:
     labels_path: str = 'labels.json'  # Contains tokens for model output
     window_size: float = .02  # Window size for spectrogram generation (seconds)
     window_stride: float = .01  # Window stride for spectrogram generation (seconds)
-    window: str = 'hamming'  # Window type for spectrogram generation
+    window: SpectrogramWindow = SpectrogramWindow.hamming  # Window type for spectrogram generation
 
 
 @dataclass
