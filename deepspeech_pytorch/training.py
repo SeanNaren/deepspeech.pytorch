@@ -2,30 +2,24 @@ import json
 import os
 import random
 import time
-from enum import Enum
 
 import numpy as np
 import torch.distributed as dist
 import torch.utils.data.distributed
 from apex import amp
-from deepspeech_pytorch.testing import evaluate
 from hydra.utils import to_absolute_path
 from torch.nn.parallel import DistributedDataParallel
 from warpctc_pytorch import CTCLoss
 
+from deepspeech_pytorch.config import SGDConfig, AdamConfig
+from deepspeech_pytorch.decoder import GreedyDecoder
 from deepspeech_pytorch.loader.data_loader import SpectrogramDataset, DSRandomSampler, DSElasticDistributedSampler, \
     AudioDataLoader
-from deepspeech_pytorch.decoder import GreedyDecoder
 from deepspeech_pytorch.logger import VisdomLogger, TensorBoardLogger
 from deepspeech_pytorch.model import DeepSpeech, supported_rnns
 from deepspeech_pytorch.state import TrainingState
+from deepspeech_pytorch.testing import evaluate
 from deepspeech_pytorch.utils import check_loss, CheckpointHandler
-
-
-class DistributedBackend(Enum):
-    gloo = 'gloo'
-    mpi = 'mpi'
-    nccl = 'nccl'
 
 
 class AverageMeter(object):
@@ -105,10 +99,10 @@ def train(cfg):
         with open(to_absolute_path(cfg.data.labels_path)) as label_file:
             labels = json.load(label_file)
 
-        audio_conf = dict(sample_rate=cfg.data.sample_rate,
-                          window_size=cfg.data.window_size,
-                          window_stride=cfg.data.window_stride,
-                          window=cfg.data.window)
+        audio_conf = dict(sample_rate=cfg.data.spect_config.sample_rate,
+                          window_size=cfg.data.spect_config.window_size,
+                          window_stride=cfg.data.spect_config.window_stride,
+                          window=cfg.data.spect_config.window)
         if cfg.augmentation.noise_dir:
             audio_conf += dict(noise_dir=to_absolute_path(cfg.augmentation.noise_dir),
                                noise_prob=cfg.augmentation.noise_prob,
@@ -157,18 +151,20 @@ def train(cfg):
 
     model = model.to(device)
     parameters = model.parameters()
-    if cfg.optimizer.adam:
+    if type(cfg.optimizer) == SGDConfig:
+        optimizer = torch.optim.SGD(parameters,
+                                    lr=cfg.optimizer.learning_rate,
+                                    momentum=cfg.optimizer.momentum,
+                                    nesterov=True,
+                                    weight_decay=cfg.optimizer.weight_decay)
+    elif type(cfg.optimizer) == AdamConfig:
         optimizer = torch.optim.AdamW(parameters,
                                       lr=cfg.optimizer.learning_rate,
                                       betas=cfg.optimizer.betas,
                                       eps=cfg.optimizer.eps,
                                       weight_decay=cfg.optimizer.weight_decay)
     else:
-        optimizer = torch.optim.SGD(parameters,
-                                    lr=cfg.optimizer.learning_rate,
-                                    momentum=cfg.optimizer.momentum,
-                                    nesterov=True,
-                                    weight_decay=cfg.optimizer.weight_decay)
+        raise ValueError("Optimizer has not been specified correctly.")
 
     model, optimizer = amp.initialize(model, optimizer,
                                       opt_level=cfg.apex.opt_level,
