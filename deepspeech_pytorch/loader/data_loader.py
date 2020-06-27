@@ -1,6 +1,5 @@
 import math
 import os
-from enum import Enum
 from tempfile import NamedTemporaryFile
 
 import librosa
