@@ -1,20 +1,13 @@
 from dataclasses import dataclass, field
-from enum import Enum
 from typing import Any, List
 
 from omegaconf import MISSING, DictConfig
 
-from deepspeech_pytorch.loader.data_loader import SpectrogramWindow
+from deepspeech_pytorch.enums import DistributedBackend, SpectrogramWindow, RNNType
 
 defaults = [
     {"optim": "sgd"}
 ]
-
-
-class DistributedBackend(Enum):
-    gloo = 'gloo'
-    mpi = 'mpi'
-    nccl = 'nccl'
 
 
 @dataclass
@@ -35,18 +28,29 @@ class SpectConfig:
 
 
 @dataclass
+class AugmentationConfig:
+    speed_volume_perturb: bool = False  # Use random tempo and gain perturbations.
+    spec_augment: bool = False  # Use simple spectral augmentation on mel spectograms.
+    noise_dir: str = ''  # Directory to inject noise into audio. If default, noise Inject not added
+    noise_prob: float = 0.4  # Probability of noise being added per sample
+    noise_min: float = 0.0  # Minimum noise level to sample from. (1.0 means all noise, not original signal)
+    noise_max: float = 0.5  # Maximum noise levels to sample from. Maximum 1.0
+
+
+@dataclass
 class DataConfig:
     train_manifest: str = 'data/train_manifest.csv'
     val_manifest: str = 'data/val_manifest.csv'
     batch_size: int = 20  # Batch size for training
     num_workers: int = 4  # Number of workers used in data-loading
     labels_path: str = 'labels.json'  # Contains tokens for model output
-    spect_config: SpectConfig = SpectConfig()
+    spect: SpectConfig = SpectConfig()
+    augmentation: AugmentationConfig = AugmentationConfig()
 
 
 @dataclass
 class ModelConfig:
-    rnn_type: str = 'lstm'  # Type of RNN to use in model, rnn/gru/lstm are supported
+    rnn_type: RNNType = RNNType.lstm  # Type of RNN to use in model
     hidden_size: int = 1024  # Hidden size of RNN Layer
     hidden_layers: int = 5  # Number of RNN layers
     bidirectional: bool = True  # Use BiRNNs. If False, uses lookahead conv
@@ -80,16 +84,6 @@ class CheckpointingConfig:
     save_folder: str = 'models/'  # Location to save epoch models
     best_val_model_name: str = 'deepspeech_final.pth'  # Name to save best validated model within the save folder
     load_auto_checkpoint: bool = False  # Automatically load the latest checkpoint from save folder
-
-
-@dataclass
-class AugmentationConfig:
-    speed_volume_perturb: bool = False  # Use random tempo and gain perturbations.
-    spec_augment: bool = False  # Use simple spectral augmentation on mel spectograms.
-    noise_dir: str = ''  # Directory to inject noise into audio. If default, noise Inject not added
-    noise_prob: float = 0.4  # Probability of noise being added per sample
-    noise_min: float = 0.0  # Minimum noise level to sample from. (1.0 means all noise, not original signal)
-    noise_max: float = 0.5  # Maximum noise levels to sample from. Maximum 1.0
 
 
 @dataclass

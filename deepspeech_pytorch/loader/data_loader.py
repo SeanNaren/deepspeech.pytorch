@@ -10,14 +10,8 @@ import sox
 import torch
 from torch.utils.data import Dataset, Sampler, DistributedSampler, DataLoader
 
+from deepspeech_pytorch.config import SpectConfig, AugmentationConfig
 from deepspeech_pytorch.loader.spec_augment import spec_augment
-
-
-class SpectrogramWindow(Enum):
-    hamming = 'hamming'
-    hann = 'hann'
-    blackman = 'blackman'
-    bartlett = 'bartlett'
 
 
 def load_audio(path):
@@ -84,36 +78,39 @@ class NoiseInjection(object):
 
 
 class SpectrogramParser(AudioParser):
-    def __init__(self, audio_conf, normalize=False, speed_volume_perturb=False, spec_augment=False):
+    def __init__(self,
+                 audio_conf: SpectConfig,
+                 normalize: bool = False,
+                 augmentation_conf: AugmentationConfig = None):
         """
         Parses audio file into spectrogram with optional normalization and various augmentations
         :param audio_conf: Dictionary containing the sample rate, window and the window length/stride in seconds
         :param normalize(default False):  Apply standard mean and deviation normalization to audio tensor
-        :param speed_volume_perturb(default False): Apply random tempo and gain perturbations
-        :param spec_augment(default False): Apply simple spectral augmentation to mel spectograms
+        :param augmentation_conf(Optional): Config containing the augmentation parameters
         """
         super(SpectrogramParser, self).__init__()
-        self.window_stride = audio_conf['window_stride']
-        self.window_size = audio_conf['window_size']
-        self.sample_rate = audio_conf['sample_rate']
-        self.window = audio_conf['window']
+        self.window_stride = audio_conf.window_stride
+        self.window_size = audio_conf.window_size
+        self.sample_rate = audio_conf.sample_rate
+        self.window = audio_conf.window.value
         self.normalize = normalize
-        self.speed_volume_perturb = speed_volume_perturb
-        self.spec_augment = spec_augment
-        self.noiseInjector = NoiseInjection(audio_conf['noise_dir'], self.sample_rate,
-                                            audio_conf['noise_levels']) if audio_conf.get(
-            'noise_dir') is not None else None
-        self.noise_prob = audio_conf.get('noise_prob')
+        self.aug_conf = augmentation_conf
+        if augmentation_conf and augmentation_conf.noise_dir:
+            self.noise_injector = NoiseInjection(path=augmentation_conf.noise_dir,
+                                                 sample_rate=self.sample_rate,
+                                                 noise_levels=augmentation_conf.noise_levels)
+        else:
+            self.noise_injector = None
 
     def parse_audio(self, audio_path):
-        if self.speed_volume_perturb:
+        if self.aug_conf and self.aug_conf.speed_volume_perturb:
             y = load_randomly_augmented_audio(audio_path, self.sample_rate)
         else:
             y = load_audio(audio_path)
-        if self.noiseInjector:
-            add_noise = np.random.binomial(1, self.noise_prob)
+        if self.noise_injector:
+            add_noise = np.random.binomial(1, self.aug_conf.noise_prob)
             if add_noise:
-                y = self.noiseInjector.inject_noise(y)
+                y = self.noise_injector.inject_noise(y)
         n_fft = int(self.sample_rate * self.window_size)
         win_length = n_fft
         hop_length = int(self.sample_rate * self.window_stride)
@@ -130,7 +127,7 @@ class SpectrogramParser(AudioParser):
             spect.add_(-mean)
             spect.div_(std)
 
-        if self.spec_augment:
+        if self.aug_conf and self.aug_conf.spec_augment:
             spect = spec_augment(spect)
 
         return spect
@@ -140,8 +137,12 @@ class SpectrogramParser(AudioParser):
 
 
 class SpectrogramDataset(Dataset, SpectrogramParser):
-    def __init__(self, audio_conf, manifest_filepath, labels, normalize=False, speed_volume_perturb=False,
-                 spec_augment=False):
+    def __init__(self,
+                 audio_conf: SpectConfig,
+                 manifest_filepath: str,
+                 labels: list,
+                 normalize: bool = False,
+                 augmentation_conf: AugmentationConfig = None):
         """
         Dataset that loads tensors via a csv containing file paths to audio files and transcripts separated by
         a comma. Each new line is a different sample. Example below:
@@ -149,12 +150,11 @@ class SpectrogramDataset(Dataset, SpectrogramParser):
         /path/to/audio.wav,/path/to/audio.txt
         ...
 
-        :param audio_conf: Dictionary containing the sample rate, window and the window length/stride in seconds
+        :param audio_conf: Config containing the sample rate, window and the window length/stride in seconds
         :param manifest_filepath: Path to manifest csv as describe above
-        :param labels: String containing all the possible characters to map to
+        :param labels: List containing all the possible characters to map to
         :param normalize: Apply standard mean and deviation normalization to audio tensor
-        :param speed_volume_perturb(default False): Apply random tempo and gain perturbations
-        :param spec_augment(default False): Apply simple spectral augmentation to mel spectograms
+        :param augmentation_conf(Optional): Config containing the augmentation parameters
         """
         with open(manifest_filepath) as f:
             ids = f.readlines()
@@ -162,7 +162,7 @@ class SpectrogramDataset(Dataset, SpectrogramParser):
         self.ids = ids
         self.size = len(ids)
         self.labels_map = dict([(labels[i], i) for i in range(len(labels))])
-        super(SpectrogramDataset, self).__init__(audio_conf, normalize, speed_volume_perturb, spec_augment)
+        super(SpectrogramDataset, self).__init__(audio_conf, normalize, augmentation_conf)
 
     def __getitem__(self, index):
         sample = self.ids[index]

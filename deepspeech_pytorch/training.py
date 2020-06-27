@@ -63,7 +63,7 @@ def train(cfg):
         torch.cuda.set_device(device_id)
         print(f"Setting CUDA Device to {device_id}")
 
-        dist.init_process_group(backend=cfg.training.dist_backend)
+        dist.init_process_group(backend=cfg.training.dist_backend.value)
         main_proc = device_id == 0  # Main process handles saving of models and reporting
 
     checkpoint_handler = CheckpointHandler(save_folder=to_absolute_path(cfg.checkpointing.save_folder),
@@ -99,22 +99,11 @@ def train(cfg):
         with open(to_absolute_path(cfg.data.labels_path)) as label_file:
             labels = json.load(label_file)
 
-        audio_conf = dict(sample_rate=cfg.data.spect_config.sample_rate,
-                          window_size=cfg.data.spect_config.window_size,
-                          window_stride=cfg.data.spect_config.window_stride,
-                          window=cfg.data.spect_config.window)
-        if cfg.augmentation.noise_dir:
-            audio_conf += dict(noise_dir=to_absolute_path(cfg.augmentation.noise_dir),
-                               noise_prob=cfg.augmentation.noise_prob,
-                               noise_levels=(cfg.augmentation.noise_min, cfg.augmentation.noise_max))
-
-        rnn_type = cfg.model.rnn_type.lower()
-        assert rnn_type in supported_rnns, "rnn_type should be either lstm, rnn or gru"
         model = DeepSpeech(rnn_hidden_size=cfg.model.hidden_size,
                            nb_layers=cfg.model.hidden_layers,
                            labels=labels,
-                           rnn_type=supported_rnns[rnn_type],
-                           audio_conf=audio_conf,
+                           rnn_type=supported_rnns[cfg.model.rnn_type.value],
+                           audio_conf=cfg.data.spect,
                            bidirectional=cfg.model.bidirectional)
 
         state = TrainingState(model=model)
@@ -126,14 +115,11 @@ def train(cfg):
                                        manifest_filepath=to_absolute_path(cfg.data.train_manifest),
                                        labels=model.labels,
                                        normalize=True,
-                                       speed_volume_perturb=cfg.augmentation.speed_volume_perturb,
-                                       spec_augment=cfg.augmentation.spec_augment)
+                                       augmentation_conf=cfg.data.augmentation)
     test_dataset = SpectrogramDataset(audio_conf=model.audio_conf,
                                       manifest_filepath=to_absolute_path(cfg.data.val_manifest),
                                       labels=model.labels,
-                                      normalize=True,
-                                      speed_volume_perturb=False,
-                                      spec_augment=False)
+                                      normalize=True)
     if not is_distributed:
         train_sampler = DSRandomSampler(dataset=train_dataset,
                                         batch_size=cfg.data.batch_size,
