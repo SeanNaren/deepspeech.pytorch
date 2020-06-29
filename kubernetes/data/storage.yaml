@@ -1,0 +1,10 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+provisioner: pd.csi.storage.gke.io
+metadata:
+  name: storage
+  namespace: elastic-job
+parameters:
+  type: pd-ssd
+  fstype: ext4
+  replication-type: none
