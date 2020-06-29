@@ -7,14 +7,12 @@ import tarfile
 from sklearn.model_selection import train_test_split
 import wget
 
-from utils import create_manifest
+from deepspeech_pytorch.data.data_opts import add_data_opts
+from deepspeech_pytorch.data.utils import create_manifest
 
 parser = argparse.ArgumentParser(description='Processes and downloads an4.')
+parser = add_data_opts(parser)
 parser.add_argument('--target-dir', default='an4_dataset/', help='Path to save dataset')
-parser.add_argument('--min-duration', default=1, type=int,
-                    help='Prunes training samples shorter than the min duration (given in seconds, default 1)')
-parser.add_argument('--max-duration', default=15, type=int,
-                    help='Prunes training samples longer than the max duration (given in seconds, default 15)')
 parser.add_argument('--val-fraction', default=0.1, type=float,
                     help='Number of files in the training set to use as validation.')
 args = parser.parse_args()
@@ -78,7 +76,7 @@ def _convert_audio_to_wav(an4_audio_path):
             raw_path = line.strip()
             new_path = line.replace('.raw', '.wav').strip()
             cmd = 'sox -t raw -r %d -b 16 -e signed-integer -B -c 1 \"%s\" \"%s\"' % (
-                16000, raw_path, new_path)
+                args.sample_rate, raw_path, new_path)
             os.system(cmd)
 
 
@@ -92,7 +90,8 @@ def _save_files(file_ids, transcripts, wav_dir, new_wav_dir, new_transcript_dir)
         with io.FileIO(text_path, "w") as file:
             file.write(extracted_transcript.encode('utf-8'))
         current_path = os.path.abspath(path)
-        os.rename(current_path, new_path)
+        shutil.copy(current_path, new_path)
+        os.remove(current_path)
 
 
 def _retrieve_file_ids_and_transcripts(file_id_path, transcripts_path):
@@ -118,7 +117,7 @@ def main():
         wget.download('http://www.speech.cs.cmu.edu/databases/an4/an4_raw.bigendian.tar.gz')
     tar = tarfile.open('an4_raw.bigendian.tar.gz')
     tar.extractall()
-    os.makedirs(args.target_dir)
+    os.makedirs(args.target_dir, exist_ok=True)
     _format_training_data(root_path=root_path)
     _format_test_data(root_path=root_path)
     shutil.rmtree(root_path)
@@ -127,9 +126,19 @@ def main():
     val_path = args.target_dir + '/val/'
     test_path = args.target_dir + '/test/'
     print('Creating manifests...')
-    create_manifest(train_path, 'an4_train_manifest.csv', args.min_duration, args.max_duration)
-    create_manifest(val_path, 'an4_val_manifest.csv', args.min_duration, args.max_duration)
-    create_manifest(test_path, 'an4_test_manifest.csv')
+    create_manifest(data_path=train_path,
+                    output_name='an4_train_manifest.csv',
+                    manifest_path=args.manifest_dir,
+                    min_duration=args.min_duration,
+                    max_duration=args.max_duration)
+    create_manifest(data_path=val_path,
+                    output_name='an4_val_manifest.csv',
+                    manifest_path=args.manifest_dir,
+                    min_duration=args.min_duration,
+                    max_duration=args.max_duration)
+    create_manifest(data_path=test_path,
+                    output_name='an4_test_manifest.csv',
+                    manifest_path=args.manifest_dir)
 
 
 if __name__ == '__main__':
