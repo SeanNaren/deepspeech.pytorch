@@ -9,18 +9,14 @@ import tarfile
 import io
 from tqdm import tqdm
 
-from utils import create_manifest
+from deepspeech_pytorch.data.data_opts import add_data_opts
+from deepspeech_pytorch.data.utils import create_manifest
 
 VOXFORGE_URL_16kHz = 'http://www.repository.voxforge1.org/downloads/SpeechCorpus/Trunk/Audio/Main/16kHz_16bit/'
 
 parser = argparse.ArgumentParser(description='Processes and downloads VoxForge dataset.')
+parser = add_data_opts(parser)
 parser.add_argument("--target-dir", default='voxforge_dataset/', type=str, help="Directory to store the dataset.")
-parser.add_argument('--sample-rate', default=16000,
-                    type=int, help='Sample rate')
-parser.add_argument('--min-duration', default=1, type=int,
-                    help='Prunes training samples shorter than the min duration (given in seconds, default 1)')
-parser.add_argument('--max-duration', default=15, type=int,
-                    help='Prunes training samples longer than the max duration (given in seconds, default 15)')
 args = parser.parse_args()
 
 
@@ -99,4 +95,8 @@ if __name__ == '__main__':
     for f in tqdm(all_files, total=len(all_files)):
         prepare_sample(f.replace(".tgz", ""), VOXFORGE_URL_16kHz + f, target_dir)
     print('Creating manifests...')
-    create_manifest(target_dir, 'voxforge_train_manifest.csv', args.min_duration, args.max_duration)
+    create_manifest(data_path=target_dir,
+                    output_name='voxforge_train_manifest.csv',
+                    manifest_path=args.manifest_dir,
+                    min_duration=args.min_duration,
+                    max_duration=args.max_duration)

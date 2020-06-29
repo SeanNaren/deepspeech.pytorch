@@ -5,16 +5,14 @@ import argparse
 import csv
 from multiprocessing.pool import ThreadPool
 import subprocess
-from utils import create_manifest
+
+from deepspeech_pytorch.data.data_opts import add_data_opts
+from deepspeech_pytorch.data.utils import create_manifest
 
 parser = argparse.ArgumentParser(description='Downloads and processes Mozilla Common Voice dataset.')
+parser = add_data_opts(parser)
 parser.add_argument("--target-dir", default='CommonVoice_dataset/', type=str, help="Directory to store the dataset.")
 parser.add_argument("--tar-path", type=str, help="Path to the Common Voice *.tar file if downloaded (Optional).")
-parser.add_argument('--sample-rate', default=16000, type=int, help='Sample rate')
-parser.add_argument('--min-duration', default=1, type=int,
-                    help='Prunes training samples shorter than the min duration (given in seconds, default 1)')
-parser.add_argument('--max-duration', default=15, type=int,
-                    help='Prunes training samples longer than the max duration (given in seconds, default 15)')
 parser.add_argument('--files-to-process', default="cv-valid-dev.csv,cv-valid-test.csv,cv-valid-train.csv",
                     type=str, help='list of *.csv file names to process')
 args = parser.parse_args()
@@ -81,10 +79,11 @@ def main():
 
     print('Creating manifests...')
     for csv_file in args.files_to_process.split(','):
-        create_manifest(os.path.join(target_dir, os.path.splitext(csv_file)[0]),
-                        os.path.splitext(csv_file)[0] + '_manifest.csv',
-                        args.min_duration,
-                        args.max_duration)
+        create_manifest(data_path=os.path.join(target_dir, os.path.splitext(csv_file)[0]),
+                        output_name=os.path.splitext(csv_file)[0] + '_manifest.csv',
+                        manifest_path=args.manifest_dir,
+                        min_duration=args.min_duration,
+                        max_duration=args.max_duration)
 
 
 if __name__ == "__main__":
