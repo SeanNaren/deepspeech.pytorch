@@ -7,6 +7,8 @@ torchelastic
 visdom
 wget
 librosa
+numba==0.43.0
+llvmlite==0.32.1
 tqdm
 matplotlib
 flask
