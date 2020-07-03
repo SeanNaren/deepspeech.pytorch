@@ -87,14 +87,28 @@ python merge_manifests.py --output-path merged_manifest.csv --merge-dir all-mani
 
 ### Training a Model
 
-Configuration is done via [Hydra](https://github.com/facebookresearch/hydra), and the config file can be seen [here](./config.yaml). 
-You can either edit the defaults in the config file, or override via the cmdline as done below.
+Configuration is done via [Hydra](https://github.com/facebookresearch/hydra).
+
+Defaults can be seen in [config.py](./deepspeech_pytorch/config.py). Below is how you can override values set already:
 
 ```
 python train.py data.train_manifest=data/train_manifest.csv data.val_manifest=data/val_manifest.csv
 ```
 
-Use `python train.py --help` for more parameters and options.
+Use `python train.py --help` for all parameters and options.
+
+You can also specify a config file to keep parameters stored in a yaml file like so:
+
+Create folder `experiment/` and file `experiment/an4.yaml`:
+```yaml
+data:
+  train_manifest: data/an4_train_manifest.csv
+  val_manifest: data/an4_val_manifest.csv
+```
+
+```
+python train.py +experiment=an4
+```
 
 There is also [Visdom](https://github.com/facebookresearch/visdom) support to visualize training. Once a server has been started, to use:
 
@@ -102,7 +116,7 @@ There is also [Visdom](https://github.com/facebookresearch/visdom) support to vi
 python train.py visualization.visdom=true
 ```
 
-There is also [Tensorboard](https://github.com/lanpa/tensorboard-pytorch) support to visualize training. Follow the instructions to set up. To use:
+There is also Tensorboard support to visualize training. Follow the instructions to set up. To use:
 
 ```
 python train.py visualization.tensorboard=true visualization.log_dir=log_dir/ # Make sure the Tensorboard instance is made pointing to this log directory
@@ -176,6 +190,14 @@ python train.py data.train_manifest=data/train_manifest.csv data.val_manifest=da
 ```
 
 Training a model in mixed-precision means you can use 32 bit float or half precision at runtime. Float32 is default, to use half precision (Which on V100s come with a speedup and better memory use) use the `--half` flag when testing or transcribing.
+
+### Swapping to ADAMW Optimizer
+
+ADAMW may provide better convergence and stability when training than SGD. In the future this may replace SGD within this repo.
+
+```
+python train.py data.train_manifest=data/train_manifest.csv data.val_manifest=data/val_manifest.csv optim=adam 
+```
 
 ### Augmentation
 

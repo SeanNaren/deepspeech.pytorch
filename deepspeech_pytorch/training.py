@@ -7,16 +7,19 @@ import numpy as np
 import torch.distributed as dist
 import torch.utils.data.distributed
 from apex import amp
-from deepspeech_pytorch.testing import evaluate
 from hydra.utils import to_absolute_path
+from omegaconf import OmegaConf
 from torch.nn.parallel import DistributedDataParallel
 from warpctc_pytorch import CTCLoss
 
-from deepspeech_pytorch.loader.data_loader import SpectrogramDataset, DSRandomSampler, DSElasticDistributedSampler, AudioDataLoader
+from deepspeech_pytorch.config import SGDConfig, AdamConfig, BiDirectionalConfig, UniDirectionalConfig
 from deepspeech_pytorch.decoder import GreedyDecoder
+from deepspeech_pytorch.loader.data_loader import SpectrogramDataset, DSRandomSampler, DSElasticDistributedSampler, \
+    AudioDataLoader
 from deepspeech_pytorch.logger import VisdomLogger, TensorBoardLogger
 from deepspeech_pytorch.model import DeepSpeech, supported_rnns
 from deepspeech_pytorch.state import TrainingState
+from deepspeech_pytorch.testing import evaluate
 from deepspeech_pytorch.utils import check_loss, CheckpointHandler
 
 
@@ -61,7 +64,7 @@ def train(cfg):
         torch.cuda.set_device(device_id)
         print(f"Setting CUDA Device to {device_id}")
 
-        dist.init_process_group(backend=cfg.training.dist_backend)
+        dist.init_process_group(backend=cfg.training.dist_backend.value)
         main_proc = device_id == 0  # Main process handles saving of models and reporting
 
     checkpoint_handler = CheckpointHandler(save_folder=to_absolute_path(cfg.checkpointing.save_folder),
@@ -97,23 +100,23 @@ def train(cfg):
         with open(to_absolute_path(cfg.data.labels_path)) as label_file:
             labels = json.load(label_file)
 
-        audio_conf = dict(sample_rate=cfg.data.sample_rate,
-                          window_size=cfg.data.window_size,
-                          window_stride=cfg.data.window_stride,
-                          window=cfg.data.window)
-        if cfg.augmentation.noise_dir:
-            audio_conf += dict(noise_dir=to_absolute_path(cfg.augmentation.noise_dir),
-                               noise_prob=cfg.augmentation.noise_prob,
-                               noise_levels=(cfg.augmentation.noise_min, cfg.augmentation.noise_max))
-
-        rnn_type = cfg.model.rnn_type.lower()
-        assert rnn_type in supported_rnns, "rnn_type should be either lstm, rnn or gru"
-        model = DeepSpeech(rnn_hidden_size=cfg.model.hidden_size,
-                           nb_layers=cfg.model.hidden_layers,
-                           labels=labels,
-                           rnn_type=supported_rnns[rnn_type],
-                           audio_conf=audio_conf,
-                           bidirectional=cfg.model.bidirectional)
+        if OmegaConf.get_type(cfg.model) is BiDirectionalConfig:
+            model = DeepSpeech(rnn_hidden_size=cfg.model.hidden_size,
+                               nb_layers=cfg.model.hidden_layers,
+                               labels=labels,
+                               rnn_type=supported_rnns[cfg.model.rnn_type.value],
+                               audio_conf=cfg.data.spect,
+                               bidirectional=True)
+        elif OmegaConf.get_type(cfg.model) is UniDirectionalConfig:
+            model = DeepSpeech(rnn_hidden_size=cfg.model.hidden_size,
+                               nb_layers=cfg.model.hidden_layers,
+                               labels=labels,
+                               rnn_type=supported_rnns[cfg.model.rnn_type.value],
+                               audio_conf=cfg.data.spect,
+                               bidirectional=False,
+                               context=cfg.model.lookahead_context)
+        else:
+            raise ValueError("Model Config has not been specified correctly.")
 
         state = TrainingState(model=model)
         state.init_results_tracking(epochs=cfg.training.epochs)
@@ -124,14 +127,11 @@ def train(cfg):
                                        manifest_filepath=to_absolute_path(cfg.data.train_manifest),
                                        labels=model.labels,
                                        normalize=True,
-                                       speed_volume_perturb=cfg.augmentation.speed_volume_perturb,
-                                       spec_augment=cfg.augmentation.spec_augment)
+                                       augmentation_conf=cfg.data.augmentation)
     test_dataset = SpectrogramDataset(audio_conf=model.audio_conf,
                                       manifest_filepath=to_absolute_path(cfg.data.val_manifest),
                                       labels=model.labels,
-                                      normalize=True,
-                                      speed_volume_perturb=False,
-                                      spec_augment=False)
+                                      normalize=True)
     if not is_distributed:
         train_sampler = DSRandomSampler(dataset=train_dataset,
                                         batch_size=cfg.data.batch_size,
@@ -149,18 +149,20 @@ def train(cfg):
 
     model = model.to(device)
     parameters = model.parameters()
-    if cfg.optimizer.adam:
+    if OmegaConf.get_type(cfg.optim) is SGDConfig:
+        optimizer = torch.optim.SGD(parameters,
+                                    lr=cfg.optimizer.learning_rate,
+                                    momentum=cfg.optimizer.momentum,
+                                    nesterov=True,
+                                    weight_decay=cfg.optimizer.weight_decay)
+    elif OmegaConf.get_type(cfg.optim) is AdamConfig:
         optimizer = torch.optim.AdamW(parameters,
                                       lr=cfg.optimizer.learning_rate,
                                       betas=cfg.optimizer.betas,
                                       eps=cfg.optimizer.eps,
                                       weight_decay=cfg.optimizer.weight_decay)
     else:
-        optimizer = torch.optim.SGD(parameters,
-                                    lr=cfg.optimizer.learning_rate,
-                                    momentum=cfg.optimizer.momentum,
-                                    nesterov=True,
-                                    weight_decay=cfg.optimizer.weight_decay)
+        raise ValueError("Optimizer has not been specified correctly.")
 
     model, optimizer = amp.initialize(model, optimizer,
                                       opt_level=cfg.apex.opt_level,
