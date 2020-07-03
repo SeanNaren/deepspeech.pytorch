@@ -15,4 +15,4 @@ flask
 sox
 sklearn
 soundfile
-hydra-core --pre
+hydra-core==1.0.0rc1
