@@ -5,7 +5,8 @@ from deepspeech_pytorch.enums import DistributedBackend, SpectrogramWindow, RNNT
 from omegaconf import MISSING
 
 defaults = [
-    {"optim": "sgd"}
+    {"optim": "sgd"},
+    {"model": "bidirectional"}
 ]
 
 
@@ -48,11 +49,15 @@ class DataConfig:
 
 
 @dataclass
-class ModelConfig:
+class BiDirectionalConfig:
     rnn_type: RNNType = RNNType.lstm  # Type of RNN to use in model
     hidden_size: int = 1024  # Hidden size of RNN Layer
     hidden_layers: int = 5  # Number of RNN layers
-    bidirectional: bool = True  # Use BiRNNs. If False, uses lookahead conv
+
+
+@dataclass
+class UniDirectionalConfig(BiDirectionalConfig):
+    lookahead_context: int = 20  # The lookahead context for convolution after RNN layers
 
 
 @dataclass
@@ -104,9 +109,9 @@ class ApexConfig:
 class DeepSpeechConfig:
     defaults: List[Any] = field(default_factory=lambda: defaults)
     optim: Any = MISSING
+    model: Any = MISSING
     training: TrainingConfig = TrainingConfig()
     data: DataConfig = DataConfig()
-    model: ModelConfig = ModelConfig()
     checkpointing: CheckpointingConfig = CheckpointingConfig()
     augmentation: AugmentationConfig = AugmentationConfig()
     apex: ApexConfig = ApexConfig()

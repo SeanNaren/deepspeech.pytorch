@@ -1,13 +1,15 @@
 import hydra
 from hydra.core.config_store import ConfigStore
 
-from deepspeech_pytorch.config import DeepSpeechConfig, AdamConfig, SGDConfig
+from deepspeech_pytorch.config import DeepSpeechConfig, AdamConfig, SGDConfig, BiDirectionalConfig, UniDirectionalConfig
 from deepspeech_pytorch.training import train
 
 cs = ConfigStore.instance()
+cs.store(name="config", node=DeepSpeechConfig)
 cs.store(group="optim", name="sgd", node=SGDConfig)
 cs.store(group="optim", name="adam", node=AdamConfig)
-cs.store(name="config", node=DeepSpeechConfig)
+cs.store(group="model", name="bidirectional", node=BiDirectionalConfig)
+cs.store(group="model", name="unidirectional", node=UniDirectionalConfig)
 
 
 @hydra.main(config_name="config")

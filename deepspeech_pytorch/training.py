@@ -8,10 +8,11 @@ import torch.distributed as dist
 import torch.utils.data.distributed
 from apex import amp
 from hydra.utils import to_absolute_path
+from omegaconf import OmegaConf
 from torch.nn.parallel import DistributedDataParallel
 from warpctc_pytorch import CTCLoss
 
-from deepspeech_pytorch.config import SGDConfig, AdamConfig
+from deepspeech_pytorch.config import SGDConfig, AdamConfig, BiDirectionalConfig, UniDirectionalConfig
 from deepspeech_pytorch.decoder import GreedyDecoder
 from deepspeech_pytorch.loader.data_loader import SpectrogramDataset, DSRandomSampler, DSElasticDistributedSampler, \
     AudioDataLoader
@@ -99,12 +100,23 @@ def train(cfg):
         with open(to_absolute_path(cfg.data.labels_path)) as label_file:
             labels = json.load(label_file)
 
-        model = DeepSpeech(rnn_hidden_size=cfg.model.hidden_size,
-                           nb_layers=cfg.model.hidden_layers,
-                           labels=labels,
-                           rnn_type=supported_rnns[cfg.model.rnn_type.value],
-                           audio_conf=cfg.data.spect,
-                           bidirectional=cfg.model.bidirectional)
+        if OmegaConf.get_type(cfg.model) is BiDirectionalConfig:
+            model = DeepSpeech(rnn_hidden_size=cfg.model.hidden_size,
+                               nb_layers=cfg.model.hidden_layers,
+                               labels=labels,
+                               rnn_type=supported_rnns[cfg.model.rnn_type.value],
+                               audio_conf=cfg.data.spect,
+                               bidirectional=True)
+        elif OmegaConf.get_type(cfg.model) is UniDirectionalConfig:
+            model = DeepSpeech(rnn_hidden_size=cfg.model.hidden_size,
+                               nb_layers=cfg.model.hidden_layers,
+                               labels=labels,
+                               rnn_type=supported_rnns[cfg.model.rnn_type.value],
+                               audio_conf=cfg.data.spect,
+                               bidirectional=False,
+                               context=cfg.model.lookahead_context)
+        else:
+            raise ValueError("Model Config has not been specified correctly.")
 
         state = TrainingState(model=model)
         state.init_results_tracking(epochs=cfg.training.epochs)
@@ -137,13 +149,13 @@ def train(cfg):
 
     model = model.to(device)
     parameters = model.parameters()
-    if type(cfg.optimizer) == SGDConfig:
+    if OmegaConf.get_type(cfg.optim) is SGDConfig:
         optimizer = torch.optim.SGD(parameters,
                                     lr=cfg.optimizer.learning_rate,
                                     momentum=cfg.optimizer.momentum,
                                     nesterov=True,
                                     weight_decay=cfg.optimizer.weight_decay)
-    elif type(cfg.optimizer) == AdamConfig:
+    elif OmegaConf.get_type(cfg.optim) is AdamConfig:
         optimizer = torch.optim.AdamW(parameters,
                                       lr=cfg.optimizer.learning_rate,
                                       betas=cfg.optimizer.betas,
