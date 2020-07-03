@@ -1,9 +1,8 @@
 from dataclasses import dataclass, field
 from typing import Any, List
 
-from omegaconf import MISSING, DictConfig
-
 from deepspeech_pytorch.enums import DistributedBackend, SpectrogramWindow, RNNType
+from omegaconf import MISSING
 
 defaults = [
     {"optim": "sgd"}
@@ -102,7 +101,7 @@ class ApexConfig:
 
 
 @dataclass
-class DeepSpeechConfig(DictConfig):
+class DeepSpeechConfig:
     defaults: List[Any] = field(default_factory=lambda: defaults)
     optim: Any = MISSING
     training: TrainingConfig = TrainingConfig()

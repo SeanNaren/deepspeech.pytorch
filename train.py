@@ -12,7 +12,6 @@ cs.store(name="config", node=DeepSpeechConfig)
 
 @hydra.main(config_name="config")
 def hydra_main(cfg: DeepSpeechConfig):
-    print(cfg.pretty())
     train(cfg=cfg)
 
 

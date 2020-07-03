@@ -97,6 +97,19 @@ python train.py data.train_manifest=data/train_manifest.csv data.val_manifest=da
 
 Use `python train.py --help` for all parameters and options.
 
+You can also specify a config file to keep parameters stored in a yaml file like so:
+
+Create folder `experiment/` and file `experiment/an4.yaml`:
+```yaml
+data:
+  train_manifest: data/an4_train_manifest.csv
+  val_manifest: data/an4_val_manifest.csv
+```
+
+```
+python train.py +experiment=an4
+```
+
 There is also [Visdom](https://github.com/facebookresearch/visdom) support to visualize training. Once a server has been started, to use:
 
 ```
