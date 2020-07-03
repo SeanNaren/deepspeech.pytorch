@@ -76,7 +76,7 @@ class SGDConfig(OptimConfig):
 @dataclass
 class AdamConfig(OptimConfig):
     eps: float = 1e-8  # Adam eps
-    beta: tuple = (0.9, 0.999)  # Adam betas
+    betas: tuple = (0.9, 0.999)  # Adam betas
 
 
 @dataclass
