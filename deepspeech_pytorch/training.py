@@ -151,16 +151,16 @@ def train(cfg):
     parameters = model.parameters()
     if OmegaConf.get_type(cfg.optim) is SGDConfig:
         optimizer = torch.optim.SGD(parameters,
-                                    lr=cfg.optimizer.learning_rate,
-                                    momentum=cfg.optimizer.momentum,
+                                    lr=cfg.optim.learning_rate,
+                                    momentum=cfg.optim.momentum,
                                     nesterov=True,
-                                    weight_decay=cfg.optimizer.weight_decay)
+                                    weight_decay=cfg.optim.weight_decay)
     elif OmegaConf.get_type(cfg.optim) is AdamConfig:
         optimizer = torch.optim.AdamW(parameters,
-                                      lr=cfg.optimizer.learning_rate,
-                                      betas=cfg.optimizer.betas,
-                                      eps=cfg.optimizer.eps,
-                                      weight_decay=cfg.optimizer.weight_decay)
+                                      lr=cfg.optim.learning_rate,
+                                      betas=cfg.optim.betas,
+                                      eps=cfg.optim.eps,
+                                      weight_decay=cfg.optim.weight_decay)
     else:
         raise ValueError("Optimizer has not been specified correctly.")
 
@@ -216,7 +216,7 @@ def train(cfg):
                 # compute gradient
                 with amp.scale_loss(loss, optimizer) as scaled_loss:
                     scaled_loss.backward()
-                torch.nn.utils.clip_grad_norm_(amp.master_params(optimizer), cfg.optimizer.max_norm)
+                torch.nn.utils.clip_grad_norm_(amp.master_params(optimizer), cfg.optim.max_norm)
                 optimizer.step()
             else:
                 print(error)
@@ -271,7 +271,7 @@ def train(cfg):
             checkpoint_handler.save_checkpoint_model(epoch=epoch, state=state)
         # anneal lr
         for g in optimizer.param_groups:
-            g['lr'] = g['lr'] / cfg.optimizer.learning_anneal
+            g['lr'] = g['lr'] / cfg.optim.learning_anneal
         print('Learning rate annealed to: {lr:.6f}'.format(lr=g['lr']))
 
         if main_proc and (state.best_wer is None or state.best_wer > wer):
