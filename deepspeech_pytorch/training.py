@@ -7,12 +7,14 @@ import numpy as np
 import torch.distributed as dist
 import torch.utils.data.distributed
 from apex import amp
+from deepspeech_pytorch.checkpoint import FileCheckpointHandler, GCSCheckpointHandler
 from hydra.utils import to_absolute_path
 from omegaconf import OmegaConf
 from torch.nn.parallel import DistributedDataParallel
 from warpctc_pytorch import CTCLoss
 
-from deepspeech_pytorch.config import SGDConfig, AdamConfig, BiDirectionalConfig, UniDirectionalConfig
+from deepspeech_pytorch.config import SGDConfig, AdamConfig, BiDirectionalConfig, UniDirectionalConfig, \
+    FileCheckpointConfig, GCSCheckpointConfig
 from deepspeech_pytorch.decoder import GreedyDecoder
 from deepspeech_pytorch.loader.data_loader import SpectrogramDataset, DSRandomSampler, DSElasticDistributedSampler, \
     AudioDataLoader
@@ -20,7 +22,7 @@ from deepspeech_pytorch.logger import VisdomLogger, TensorBoardLogger
 from deepspeech_pytorch.model import DeepSpeech, supported_rnns
 from deepspeech_pytorch.state import TrainingState
 from deepspeech_pytorch.testing import evaluate
-from deepspeech_pytorch.utils import check_loss, CheckpointHandler
+from deepspeech_pytorch.utils import check_loss
 
 
 class AverageMeter(object):
@@ -67,10 +69,12 @@ def train(cfg):
         dist.init_process_group(backend=cfg.training.dist_backend.value)
         main_proc = device_id == 0  # Main process handles saving of models and reporting
 
-    checkpoint_handler = CheckpointHandler(save_folder=to_absolute_path(cfg.checkpointing.save_folder),
-                                           best_val_model_name=cfg.checkpointing.best_val_model_name,
-                                           checkpoint_per_iteration=cfg.checkpointing.checkpoint_per_iteration,
-                                           save_n_recent_models=cfg.checkpointing.save_n_recent_models)
+    if OmegaConf.get_type(cfg.checkpointing) == FileCheckpointConfig:
+        checkpoint_handler = FileCheckpointHandler(cfg=cfg.checkpointing)
+    elif OmegaConf.get_type(cfg.checkpointing) == GCSCheckpointConfig:
+        checkpoint_handler = GCSCheckpointHandler(cfg=cfg.checkpointing)
+    else:
+        raise ValueError("Checkpoint Config has not been specified correctly.")
 
     if main_proc and cfg.visualization.visdom:
         visdom_logger = VisdomLogger(id=cfg.visualization.id,
