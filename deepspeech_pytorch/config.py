@@ -6,7 +6,8 @@ from omegaconf import MISSING
 
 defaults = [
     {"optim": "sgd"},
-    {"model": "bidirectional"}
+    {"model": "bidirectional"},
+    {"checkpointing": "file"}
 ]
 
 
@@ -80,14 +81,25 @@ class AdamConfig(OptimConfig):
 
 
 @dataclass
-class CheckpointingConfig:
+class CheckpointConfig:
     continue_from: str = ''  # Continue training from checkpoint model
     checkpoint: bool = True  # Enables epoch checkpoint saving of model
     checkpoint_per_iteration: int = 0  # Save checkpoint per N number of iterations. Default is disabled
     save_n_recent_models: int = 10  # Max number of checkpoints to save, delete older checkpoints
-    save_folder: str = 'models/'  # Location to save epoch models
     best_val_model_name: str = 'deepspeech_final.pth'  # Name to save best validated model within the save folder
     load_auto_checkpoint: bool = False  # Automatically load the latest checkpoint from save folder
+
+
+@dataclass
+class FileCheckpointConfig(CheckpointConfig):
+    save_folder: str = 'models/'  # Location to save checkpoint models
+
+
+@dataclass
+class GCSCheckpointConfig(CheckpointConfig):
+    gcs_bucket: str = MISSING  # Bucket to store model checkpoints e.g bucket-name
+    gcs_save_folder: str = MISSING  # Folder to store model checkpoints in bucket e.g models/
+    local_save_file: str = './local_checkpoint.pth'  # Place to store temp file on disk
 
 
 @dataclass
@@ -110,9 +122,9 @@ class DeepSpeechConfig:
     defaults: List[Any] = field(default_factory=lambda: defaults)
     optim: Any = MISSING
     model: Any = MISSING
+    checkpointing: Any = MISSING
     training: TrainingConfig = TrainingConfig()
     data: DataConfig = DataConfig()
-    checkpointing: CheckpointingConfig = CheckpointingConfig()
     augmentation: AugmentationConfig = AugmentationConfig()
     apex: ApexConfig = ApexConfig()
     visualization: VisualizationConfig = VisualizationConfig()
