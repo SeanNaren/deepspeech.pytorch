@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: transfer-data
+  namespace: elastic-job
+spec:
+  containers:
+    - image: seannaren/deepspeech.pytorch:latest
+      imagePullPolicy: Always
+      name: deepspeech
+      command: ["python"]
+      args:
+        - "/workspace/deepspeech.pytorch/data/an4.py"
+        - "--target-dir=/audio-data/an4_dataset/"
+        - "--manifest-dir=/audio-data/an4_manifests/"
+      volumeMounts:
+        - mountPath: /audio-data/
+          name: audio-data
+  restartPolicy: Never
+  volumes:
+    - name: audio-data
+      persistentVolumeClaim:
+        claimName: audio-data

@@ -1,0 +1,50 @@
+apiVersion: elastic.pytorch.org/v1alpha1
+kind: ElasticJob
+metadata:
+  name: deepspeech
+  namespace: elastic-job
+spec:
+  # Use "etcd-service:2379" if you already apply etcd.yaml
+  rdzvEndpoint: "etcd-service:2379"
+  minReplicas: 1
+  maxReplicas: 1
+  replicaSpecs:
+    Worker:
+      replicas: 1
+      restartPolicy: ExitCode
+      template:
+        apiVersion: v1
+        kind: Pod
+        spec:
+          containers:
+            - name: deepspeech
+              image: seannaren/deepspeech.pytorch:latest
+              imagePullPolicy: Always
+              command: ["python", "-m", "torchelastic.distributed.launch"]
+              args:
+                - "--nproc_per_node=1"
+                - "/workspace/deepspeech.pytorch/train.py"
+                - "data.train_manifest=/audio-data/an4_manifests/an4_train_manifest.csv"
+                - "data.val_manifest=/audio-data/an4_manifests/an4_val_manifest.csv"
+                - "data.labels_path=/workspace/deepspeech.pytorch/labels.json"
+                - "data.num_workers=8"
+                - "training.epochs=70"
+                - "data.batch_size=8"
+                - "checkpointing=gcs"
+                - "checkpointing.gcs_bucket=deepspeech-1234" # Swap this to point to the appropriate GCS bucket
+                - "checkpointing.gcs_save_folder=models/"
+                - "checkpointing.load_auto_checkpoint=true"
+              resources:
+                limits:
+                  nvidia.com/gpu: 1
+              volumeMounts:
+                - mountPath: /audio-data/
+                  name: audio-data
+                  readOnly: true
+          volumes:
+            - name: audio-data
+              persistentVolumeClaim:
+                claimName: audio-data
+                readOnly: true
+          nodeSelector:
+            cloud.google.com/gke-nodepool: gpu-pool
