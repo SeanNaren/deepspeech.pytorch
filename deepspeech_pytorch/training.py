@@ -169,6 +169,7 @@ def train(cfg):
         raise ValueError("Optimizer has not been specified correctly.")
 
     model, optimizer = amp.initialize(model, optimizer,
+                                      enabled=not cfg.training.no_cuda,
                                       opt_level=cfg.apex.opt_level,
                                       loss_scale=cfg.apex.loss_scale)
     if state.optim_state is not None:
@@ -177,7 +178,8 @@ def train(cfg):
 
     # Track states for optimizer/amp
     state.track_optim_state(optimizer)
-    state.track_amp_state(amp)
+    if not cfg.training.no_cuda:
+        state.track_amp_state(amp)
 
     if is_distributed:
         model = DistributedDataParallel(model, device_ids=[device_id])

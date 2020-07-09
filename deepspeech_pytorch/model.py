@@ -140,8 +140,8 @@ class DeepSpeech(nn.Module):
         self.labels = labels
         self.bidirectional = bidirectional
 
-        sample_rate = self.audio_conf["sample_rate"]
-        window_size = self.audio_conf["window_size"]
+        sample_rate = self.audio_conf.sample_rate
+        window_size = self.audio_conf.window_size
         num_classes = len(self.labels)
 
         self.conv = MaskConv(nn.Sequential(
