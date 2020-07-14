@@ -1,3 +1,4 @@
+import hydra
 import torch
 from tqdm import tqdm
 
@@ -20,20 +21,26 @@ def evaluate(cfg: EvalConfig):
     target_decoder = GreedyDecoder(model.labels,
                                    blank_index=model.labels.index('_'))
     test_dataset = SpectrogramDataset(audio_conf=model.audio_conf,
-                                      manifest_filepath=cfg.test_manifest,
+                                      manifest_filepath=hydra.utils.to_absolute_path(cfg.test_manifest),
                                       labels=model.labels,
                                       normalize=True)
     test_loader = AudioDataLoader(test_dataset,
                                   batch_size=cfg.batch_size,
                                   num_workers=cfg.num_workers)
-    return run_evaluation(test_loader=test_loader,
-                          device=device,
-                          model=model,
-                          decoder=decoder,
-                          target_decoder=target_decoder,
-                          save_output=cfg.save_output,
-                          verbose=cfg.verbose,
-                          use_half=cfg.model.use_half)
+    wer, cer, output_data = run_evaluation(test_loader=test_loader,
+                                           device=device,
+                                           model=model,
+                                           decoder=decoder,
+                                           target_decoder=target_decoder,
+                                           save_output=cfg.save_output,
+                                           verbose=cfg.verbose,
+                                           use_half=cfg.model.use_half)
+
+    print('Test Summary \t'
+          'Average WER {wer:.3f}\t'
+          'Average CER {cer:.3f}\t'.format(wer=wer, cer=cer))
+    if cfg.save_output:
+        torch.save(output_data, hydra.utils.to_absolute_path(cfg.save_output))
 
 
 @torch.no_grad()

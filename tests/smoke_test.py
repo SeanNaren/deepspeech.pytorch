@@ -40,7 +40,9 @@ class DeepSpeechSmokeTest(unittest.TestCase):
     def build_train_evaluate_model(self,
                                    epoch: int,
                                    batch_size: int,
-                                   model_config: BiDirectionalConfig):
+                                   model_config: BiDirectionalConfig,
+                                   use_half: bool,
+                                   cuda: bool):
         train_manifest, val_manifest, test_manifest = self.download_data(DatasetConfig(target_dir=self.target_dir,
                                                                                        manifest_dir=self.manifest_dir))
 
@@ -48,7 +50,8 @@ class DeepSpeechSmokeTest(unittest.TestCase):
                                                 batch_size=batch_size,
                                                 train_manifest=train_manifest,
                                                 val_manifest=val_manifest,
-                                                model_config=model_config)
+                                                model_config=model_config,
+                                                cuda=cuda)
         train(train_cfg)
 
         # Expected final model path after training
@@ -56,38 +59,47 @@ class DeepSpeechSmokeTest(unittest.TestCase):
         assert os.path.exists(model_path)
 
         self.eval_model(model_path=model_path,
-                        test_manifest=test_manifest)
+                        test_manifest=test_manifest,
+                        cuda=cuda,
+                        use_half=use_half)
 
-        with open(test_manifest) as f:
-            test_file_paths = [x.strip().split(',')[0] for x in f]
-
-        self.inference(test_file_paths=test_file_paths,
-                       model_path=model_path)
+        self.inference(test_manifest=test_manifest,
+                       model_path=model_path,
+                       cuda=cuda,
+                       use_half=use_half)
 
     def eval_model(self,
                    model_path: str,
-                   test_manifest: str):
+                   test_manifest: str,
+                   cuda: bool,
+                   use_half: bool):
+        # Due to using TravisCI with no GPU support we have to disable cuda
         eval_cfg = EvalConfig(
             model=ModelConfig(
-                cuda=False,
+                cuda=cuda,
                 model_path=model_path,
-                use_half=False
+                use_half=use_half
             ),
             test_manifest=test_manifest
         )
         evaluate(eval_cfg)
 
     def inference(self,
-                  test_file_paths: List,
-                  model_path: str):
-        path = test_file_paths[0]
+                  test_manifest: str,
+                  model_path: str,
+                  cuda: bool,
+                  use_half: bool):
+        # Select one file from our test manifest to run inference
+        with open(test_manifest) as f:
+            file_path = next(f).strip().split(',')[0]
+
         transcribe_cfg = TranscribeConfig(
             model=ModelConfig(
-                cuda=False,
+                cuda=cuda,
                 model_path=model_path,
-                use_half=False
+                use_half=use_half
             ),
-            audio_path=path
+            audio_path=file_path
         )
         transcribe(transcribe_cfg)
 
@@ -114,10 +126,11 @@ class DeepSpeechSmokeTest(unittest.TestCase):
                                batch_size: int,
                                train_manifest: str,
                                val_manifest: str,
-                               model_config: BiDirectionalConfig):
+                               model_config: BiDirectionalConfig,
+                               cuda: bool):
         return DeepSpeechConfig(
             training=TrainingConfig(epochs=epoch,
-                                    no_cuda=True),
+                                    no_cuda=not cuda),
             data=DataConfig(train_manifest=train_manifest,
                             val_manifest=val_manifest,
                             batch_size=batch_size),
@@ -130,11 +143,14 @@ class DeepSpeechSmokeTest(unittest.TestCase):
 class AN4SmokeTest(DeepSpeechSmokeTest):
 
     def test_train_eval_inference(self):
+        # Hardcoded sizes to reduce memory/time, and disabled GPU due to using TravisCI
         model_cfg = BiDirectionalConfig(hidden_size=10,
                                         hidden_layers=1)
         self.build_train_evaluate_model(epoch=1,
                                         batch_size=10,
-                                        model_config=model_cfg)
+                                        model_config=model_cfg,
+                                        cuda=False,
+                                        use_half=False)
 
 
 if __name__ == '__main__':

@@ -1,3 +1,4 @@
+import hydra
 import torch
 
 from deepspeech_pytorch.configs.inference_config import LMConfig
@@ -28,7 +29,7 @@ def check_loss(loss, loss_value):
 def load_model(device,
                model_path,
                use_half):
-    model = DeepSpeech.load_model(model_path)
+    model = DeepSpeech.load_model(hydra.utils.to_absolute_path(model_path))
     model.eval()
     model = model.to(device)
     if use_half:
@@ -41,7 +42,7 @@ def load_decoder(labels, cfg: LMConfig):
         from deepspeech_pytorch.decoder import BeamCTCDecoder
 
         decoder = BeamCTCDecoder(labels=labels,
-                                 lm_path=cfg.lm_path,
+                                 lm_path=hydra.utils.to_absolute_path(cfg.lm_path),
                                  alpha=cfg.alpha,
                                  beta=cfg.beta,
                                  cutoff_top_n=cfg.cutoff_top_n,

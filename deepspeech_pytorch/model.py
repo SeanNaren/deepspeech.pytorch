@@ -1,11 +1,9 @@
 import math
 from collections import OrderedDict
-from enum import Enum
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
 # Due to backwards compatibility we need to keep the below structure for mapping RNN type
 from omegaconf import OmegaConf
 

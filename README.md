@@ -267,14 +267,6 @@ python benchmark.py --batch-size 32
 
 Use the flag `--help` to see other parameters that can be used with the script.
 
-### Model details
-
-Saved models contain the metadata of their training process. To see the metadata run the below command:
-
-```
-python model.py --model-path models/deepspeech.pth
-```
-
 To also note, there is no final softmax layer on the model as when trained, warp-ctc does this softmax internally. This will have to also be implemented in complex decoders if anything is built on top of the model, so take this into consideration!
 
 ## Testing/Inference
@@ -282,13 +274,13 @@ To also note, there is no final softmax layer on the model as when trained, warp
 To evaluate a trained model on a test set (has to be in the same format as the training set):
 
 ```
-python test.py --model-path models/deepspeech.pth --test-manifest /path/to/test_manifest.csv --cuda
+python test.py model.model_path=models/deepspeech.pth test_manifest=/path/to/test_manifest.csv
 ```
 
 An example script to output a transcription has been provided:
 
 ```
-python transcribe.py --model-path models/deepspeech.pth --audio-path /path/to/audio.wav
+python transcribe.py model.model_path=models/deepspeech.pth audio_path=/path/to/audio.wav
 ```
 
 If you used mixed-precision or half precision when training the model, you can use the `--half` flag for a speed/memory benefit.
@@ -314,7 +306,7 @@ In addition download the latest pre-trained librispeech model from the releases 
 
 First we need to generate the acoustic output to be used to evaluate the model on LibriSpeech val.
 ```
-python test.py --test-manifest data/librispeech_val_manifest.csv --model-path librispeech_pretrained_v2.pth --cuda --half --save-output librispeech_val_output.npy
+python test.py data.test_manifest=data/librispeech_val_manifest.csv model.model_path=librispeech_pretrained_v2.pth save_output=librispeech_val_output.npy
 ```
 
 We use a beam width of 128 which gives reasonable results. We suggest using a CPU intensive node to carry out the grid search.

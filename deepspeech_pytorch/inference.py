@@ -1,11 +1,10 @@
 import json
-import os
-
-import torch
 from typing import List
 
+import torch
+
 from deepspeech_pytorch.configs.inference_config import TranscribeConfig
-from deepspeech_pytorch.decoder import Decoder, GreedyDecoder
+from deepspeech_pytorch.decoder import Decoder
 from deepspeech_pytorch.loader.data_loader import SpectrogramParser
 from deepspeech_pytorch.model import DeepSpeech
 from deepspeech_pytorch.utils import load_decoder, load_model
