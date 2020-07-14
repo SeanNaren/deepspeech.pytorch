@@ -4,13 +4,12 @@ import tempfile
 import unittest
 from dataclasses import dataclass
 
-from typing import List
-
 from data.an4 import download_an4
-from deepspeech_pytorch.configs.inference_config import EvalConfig, ModelConfig, TranscribeConfig
+from deepspeech_pytorch.configs.inference_config import EvalConfig, ModelConfig, TranscribeConfig, LMConfig
 from deepspeech_pytorch.configs.train_config import DeepSpeechConfig, AdamConfig, BiDirectionalConfig, \
     FileCheckpointConfig, \
     DataConfig, TrainingConfig
+from deepspeech_pytorch.enums import DecoderType
 from deepspeech_pytorch.inference import transcribe
 from deepspeech_pytorch.testing import evaluate
 from deepspeech_pytorch.training import train
@@ -58,21 +57,34 @@ class DeepSpeechSmokeTest(unittest.TestCase):
         model_path = self.model_dir + '/deepspeech_final.pth'
         assert os.path.exists(model_path)
 
-        self.eval_model(model_path=model_path,
-                        test_manifest=test_manifest,
-                        cuda=cuda,
-                        use_half=use_half)
+        lm_configs = [
+            LMConfig(),  # Test Greedy
+            LMConfig(
+                decoder_type=DecoderType.beam
+            )  # Test Beam Decoder
+        ]
 
-        self.inference(test_manifest=test_manifest,
-                       model_path=model_path,
-                       cuda=cuda,
-                       use_half=use_half)
+        for lm_config in lm_configs:
+            self.eval_model(
+                model_path=model_path,
+                test_manifest=test_manifest,
+                cuda=cuda,
+                use_half=use_half,
+                lm_config=lm_config
+            )
+
+            self.inference(test_manifest=test_manifest,
+                           model_path=model_path,
+                           cuda=cuda,
+                           use_half=use_half,
+                           lm_config=lm_config)
 
     def eval_model(self,
                    model_path: str,
                    test_manifest: str,
                    cuda: bool,
-                   use_half: bool):
+                   use_half: bool,
+                   lm_config: LMConfig):
         # Due to using TravisCI with no GPU support we have to disable cuda
         eval_cfg = EvalConfig(
             model=ModelConfig(
@@ -80,6 +92,7 @@ class DeepSpeechSmokeTest(unittest.TestCase):
                 model_path=model_path,
                 use_half=use_half
             ),
+            lm=lm_config,
             test_manifest=test_manifest
         )
         evaluate(eval_cfg)
@@ -88,7 +101,8 @@ class DeepSpeechSmokeTest(unittest.TestCase):
                   test_manifest: str,
                   model_path: str,
                   cuda: bool,
-                  use_half: bool):
+                  use_half: bool,
+                  lm_config: LMConfig):
         # Select one file from our test manifest to run inference
         with open(test_manifest) as f:
             file_path = next(f).strip().split(',')[0]
@@ -99,6 +113,7 @@ class DeepSpeechSmokeTest(unittest.TestCase):
                 model_path=model_path,
                 use_half=use_half
             ),
+            lm=lm_config,
             audio_path=file_path
         )
         transcribe(transcribe_cfg)

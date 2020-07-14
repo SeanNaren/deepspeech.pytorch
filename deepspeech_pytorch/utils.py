@@ -40,9 +40,10 @@ def load_model(device,
 def load_decoder(labels, cfg: LMConfig):
     if cfg.decoder_type == DecoderType.beam:
         from deepspeech_pytorch.decoder import BeamCTCDecoder
-
+        if cfg.lm_path:
+            cfg.lm_path = hydra.utils.to_absolute_path(cfg.lm_path)
         decoder = BeamCTCDecoder(labels=labels,
-                                 lm_path=hydra.utils.to_absolute_path(cfg.lm_path),
+                                 lm_path=cfg.lm_path,
                                  alpha=cfg.alpha,
                                  beta=cfg.beta,
                                  cutoff_top_n=cfg.cutoff_top_n,
