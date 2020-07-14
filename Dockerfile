@@ -7,9 +7,6 @@ WORKDIR /workspace/
 RUN apt-get update -y
 RUN apt-get install -y git curl ca-certificates bzip2 cmake tree htop bmon iotop sox libsox-dev libsox-fmt-all vim
 
-# install python deps
-RUN pip install cython visdom cffi tensorboardX wget jupyter
-
 # install warp-CTC
 ENV CUDA_HOME=/usr/local/cuda
 RUN git clone https://github.com/SeanNaren/warp-ctc.git
@@ -29,5 +26,6 @@ ADD . /workspace/deepspeech.pytorch
 RUN cd deepspeech.pytorch; pip install -r requirements.txt && pip install -e .
 
 # launch jupyter
+WORKDIR /workspace/deepspeech.pytorch
 RUN mkdir data; mkdir notebooks;
 CMD jupyter-notebook --ip="*" --no-browser --allow-root
