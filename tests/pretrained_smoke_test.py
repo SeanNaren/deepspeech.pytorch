@@ -25,6 +25,7 @@ class PretrainedSmokeTest(DeepSpeechSmokeTest):
                                                                                        manifest_dir=self.manifest_dir))
         wget.download(lm_path)
         for pretrained_url in pretrained_urls:
+            print("Running Pre-trained Smoke test for: ", pretrained_url)
             wget.download(pretrained_url)
             file_path = os.path.basename(pretrained_url)
             pretrained_path = os.path.abspath(file_path)

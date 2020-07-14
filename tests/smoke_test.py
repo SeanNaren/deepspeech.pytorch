@@ -51,6 +51,7 @@ class DeepSpeechSmokeTest(unittest.TestCase):
                                                 val_manifest=val_manifest,
                                                 model_config=model_config,
                                                 cuda=cuda)
+        print("Running Training DeepSpeech Model Smoke Test")
         train(train_cfg)
 
         # Expected final model path after training
@@ -63,7 +64,7 @@ class DeepSpeechSmokeTest(unittest.TestCase):
                 decoder_type=DecoderType.beam
             )  # Test Beam Decoder
         ]
-
+        print("Running Inference Smoke Tests")
         for lm_config in lm_configs:
             self.eval_model(
                 model_path=model_path,
