@@ -1,14 +1,50 @@
+import torch
 from tqdm import tqdm
 
+from deepspeech_pytorch.configs.inference_config import EvalConfig
+from deepspeech_pytorch.decoder import GreedyDecoder
+from deepspeech_pytorch.loader.data_loader import SpectrogramDataset, AudioDataLoader
+from deepspeech_pytorch.utils import load_model, load_decoder
 
-def evaluate(test_loader,
-             device,
-             model,
-             decoder,
-             target_decoder,
-             save_output=None,
-             verbose=False,
-             half=False):
+
+@torch.no_grad()
+def evaluate(cfg: EvalConfig):
+    device = torch.device("cuda" if cfg.model.cuda else "cpu")
+
+    model = load_model(device=device,
+                       model_path=cfg.model.model_path,
+                       use_half=cfg.model.use_half)
+
+    decoder = load_decoder(labels=model.labels,
+                           cfg=cfg.lm)
+    target_decoder = GreedyDecoder(model.labels,
+                                   blank_index=model.labels.index('_'))
+    test_dataset = SpectrogramDataset(audio_conf=model.audio_conf,
+                                      manifest_filepath=cfg.test_manifest,
+                                      labels=model.labels,
+                                      normalize=True)
+    test_loader = AudioDataLoader(test_dataset,
+                                  batch_size=cfg.batch_size,
+                                  num_workers=cfg.num_workers)
+    return run_evaluation(test_loader=test_loader,
+                          device=device,
+                          model=model,
+                          decoder=decoder,
+                          target_decoder=target_decoder,
+                          save_output=cfg.save_output,
+                          verbose=cfg.verbose,
+                          use_half=cfg.model.use_half)
+
+
+@torch.no_grad()
+def run_evaluation(test_loader,
+                   device,
+                   model,
+                   decoder,
+                   target_decoder,
+                   save_output=None,
+                   verbose=False,
+                   use_half=False):
     model.eval()
     total_cer, total_wer, num_tokens, num_chars = 0, 0, 0, 0
     output_data = []
@@ -16,7 +52,7 @@ def evaluate(test_loader,
         inputs, targets, input_percentages, target_sizes = data
         input_sizes = input_percentages.mul_(int(inputs.size(3))).int()
         inputs = inputs.to(device)
-        if half:
+        if use_half:
             inputs = inputs.half()
         # unflatten targets
         split_targets = []

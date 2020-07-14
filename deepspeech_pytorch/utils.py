@@ -1,6 +1,8 @@
 import torch
 
+from deepspeech_pytorch.configs.inference_config import LMConfig
 from deepspeech_pytorch.decoder import GreedyDecoder
+from deepspeech_pytorch.enums import DecoderType
 from deepspeech_pytorch.model import DeepSpeech
 
 
@@ -34,26 +36,18 @@ def load_model(device,
     return model
 
 
-def load_decoder(decoder_type,
-                 labels,
-                 lm_path,
-                 alpha,
-                 beta,
-                 cutoff_top_n,
-                 cutoff_prob,
-                 beam_width,
-                 lm_workers):
-    if decoder_type == "beam":
+def load_decoder(labels, cfg: LMConfig):
+    if cfg.decoder_type == DecoderType.beam:
         from deepspeech_pytorch.decoder import BeamCTCDecoder
 
         decoder = BeamCTCDecoder(labels=labels,
-                                 lm_path=lm_path,
-                                 alpha=alpha,
-                                 beta=beta,
-                                 cutoff_top_n=cutoff_top_n,
-                                 cutoff_prob=cutoff_prob,
-                                 beam_width=beam_width,
-                                 num_processes=lm_workers)
+                                 lm_path=cfg.lm_path,
+                                 alpha=cfg.alpha,
+                                 beta=cfg.beta,
+                                 cutoff_top_n=cfg.cutoff_top_n,
+                                 cutoff_prob=cfg.cutoff_prob,
+                                 beam_width=cfg.beam_width,
+                                 num_processes=cfg.lm_workers)
     else:
         decoder = GreedyDecoder(labels=labels,
                                 blank_index=labels.index('_'))

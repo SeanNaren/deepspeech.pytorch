@@ -7,6 +7,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 # Due to backwards compatibility we need to keep the below structure for mapping RNN type
+from omegaconf import OmegaConf
+
+from deepspeech_pytorch.configs.train_config import SpectConfig
+from deepspeech_pytorch.enums import SpectrogramWindow
+
 supported_rnns = {
     'lstm': nn.LSTM,
     'rnn': nn.RNN,
@@ -224,6 +229,12 @@ class DeepSpeech(nn.Module):
 
     @classmethod
     def load_model_package(cls, package):
+        # TODO Added for backwards compatibility, should be remove for new release
+        if OmegaConf.get_type(package['audio_conf']) == dict:
+            audio_conf = package['audio_conf']
+            package['audio_conf'] = SpectConfig(sample_rate=audio_conf['sample_rate'],
+                                                window_size=audio_conf['window_size'],
+                                                window=SpectrogramWindow(audio_conf['window']))
         model = cls(rnn_hidden_size=package['hidden_size'],
                     nb_layers=package['hidden_layers'],
                     labels=package['labels'],

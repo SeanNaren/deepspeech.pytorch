@@ -9,7 +9,7 @@ import sox
 import torch
 from torch.utils.data import Dataset, Sampler, DistributedSampler, DataLoader
 
-from deepspeech_pytorch.config import SpectConfig, AugmentationConfig
+from deepspeech_pytorch.configs.train_config import SpectConfig, AugmentationConfig
 from deepspeech_pytorch.loader.spec_augment import spec_augment
 
 

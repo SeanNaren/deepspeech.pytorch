@@ -89,7 +89,7 @@ python merge_manifests.py --output-path merged_manifest.csv --merge-dir all-mani
 
 Configuration is done via [Hydra](https://github.com/facebookresearch/hydra).
 
-Defaults can be seen in [config.py](./deepspeech_pytorch/config.py). Below is how you can override values set already:
+Defaults can be seen in [config.py](deepspeech_pytorch/configs/train_config.py). Below is how you can override values set already:
 
 ```
 python train.py data.train_manifest=data/train_manifest.csv data.val_manifest=data/val_manifest.csv

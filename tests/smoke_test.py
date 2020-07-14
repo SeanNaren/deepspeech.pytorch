@@ -1,0 +1,141 @@
+import os
+import shutil
+import tempfile
+import unittest
+from dataclasses import dataclass
+
+from typing import List
+
+from data.an4 import download_an4
+from deepspeech_pytorch.configs.inference_config import EvalConfig, ModelConfig, TranscribeConfig
+from deepspeech_pytorch.configs.train_config import DeepSpeechConfig, AdamConfig, BiDirectionalConfig, \
+    FileCheckpointConfig, \
+    DataConfig, TrainingConfig
+from deepspeech_pytorch.inference import transcribe
+from deepspeech_pytorch.testing import evaluate
+from deepspeech_pytorch.training import train
+
+
+@dataclass
+class DatasetConfig:
+    target_dir: str = ''
+    manifest_dir: str = ''
+    min_duration: float = 0
+    max_duration: float = 15
+    val_fraction: float = 0.1
+    sample_rate: int = 16000
+
+
+class DeepSpeechSmokeTest(unittest.TestCase):
+    def setUp(self):
+        self.target_dir = tempfile.mkdtemp()
+        self.manifest_dir = tempfile.mkdtemp()
+        self.model_dir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.target_dir)
+        shutil.rmtree(self.manifest_dir)
+        shutil.rmtree(self.model_dir)
+
+    def build_train_evaluate_model(self,
+                                   epoch: int,
+                                   batch_size: int,
+                                   model_config: BiDirectionalConfig):
+        train_manifest, val_manifest, test_manifest = self.download_data(DatasetConfig(target_dir=self.target_dir,
+                                                                                       manifest_dir=self.manifest_dir))
+
+        train_cfg = self.create_training_config(epoch=epoch,
+                                                batch_size=batch_size,
+                                                train_manifest=train_manifest,
+                                                val_manifest=val_manifest,
+                                                model_config=model_config)
+        train(train_cfg)
+
+        # Expected final model path after training
+        model_path = self.model_dir + '/deepspeech_final.pth'
+        assert os.path.exists(model_path)
+
+        self.eval_model(model_path=model_path,
+                        test_manifest=test_manifest)
+
+        with open(test_manifest) as f:
+            test_file_paths = [x.strip().split(',')[0] for x in f]
+
+        self.inference(test_file_paths=test_file_paths,
+                       model_path=model_path)
+
+    def eval_model(self,
+                   model_path: str,
+                   test_manifest: str):
+        eval_cfg = EvalConfig(
+            model=ModelConfig(
+                cuda=False,
+                model_path=model_path,
+                use_half=False
+            ),
+            test_manifest=test_manifest
+        )
+        evaluate(eval_cfg)
+
+    def inference(self,
+                  test_file_paths: List,
+                  model_path: str):
+        path = test_file_paths[0]
+        transcribe_cfg = TranscribeConfig(
+            model=ModelConfig(
+                cuda=False,
+                model_path=model_path,
+                use_half=False
+            ),
+            audio_path=path
+        )
+        transcribe(transcribe_cfg)
+
+    def download_data(self, cfg: DatasetConfig):
+        download_an4(target_dir=cfg.target_dir,
+                     manifest_dir=cfg.manifest_dir,
+                     min_duration=cfg.min_duration,
+                     max_duration=cfg.max_duration,
+                     val_fraction=cfg.val_fraction,
+                     sample_rate=cfg.sample_rate)
+        # Expected manifests paths
+        train_manifest = os.path.join(self.manifest_dir, 'an4_train_manifest.csv')
+        val_manifest = os.path.join(self.manifest_dir, 'an4_val_manifest.csv')
+        test_manifest = os.path.join(self.manifest_dir, 'an4_test_manifest.csv')
+
+        # Assert manifest paths exists
+        assert os.path.exists(train_manifest)
+        assert os.path.exists(val_manifest)
+        assert os.path.exists(test_manifest)
+        return train_manifest, val_manifest, test_manifest
+
+    def create_training_config(self,
+                               epoch: int,
+                               batch_size: int,
+                               train_manifest: str,
+                               val_manifest: str,
+                               model_config: BiDirectionalConfig):
+        return DeepSpeechConfig(
+            training=TrainingConfig(epochs=epoch,
+                                    no_cuda=True),
+            data=DataConfig(train_manifest=train_manifest,
+                            val_manifest=val_manifest,
+                            batch_size=batch_size),
+            optim=AdamConfig(),
+            model=model_config,
+            checkpointing=FileCheckpointConfig(save_folder=self.model_dir)
+        )
+
+
+class AN4SmokeTest(DeepSpeechSmokeTest):
+
+    def test_train_eval_inference(self):
+        model_cfg = BiDirectionalConfig(hidden_size=10,
+                                        hidden_layers=1)
+        self.build_train_evaluate_model(epoch=1,
+                                        batch_size=10,
+                                        model_config=model_cfg)
+
+
+if __name__ == '__main__':
+    unittest.main()
