@@ -5,4 +5,4 @@ before_install:
   - docker build -t seannaren/deepspeech .
 
 script:
-  - docker run --ipc=host --entrypoint=/opt/conda/bin/pytest seannaren/deepspeech tests/
+  - docker run --ipc=host --entrypoint=/opt/conda/bin/pytest seannaren/deepspeech tests/ -vv
