@@ -1,17 +1,22 @@
+import logging
 import os
 from tempfile import NamedTemporaryFile
 
+import hydra
 import torch
 from flask import Flask, request, jsonify
-import logging
+from hydra.core.config_store import ConfigStore
+
+from deepspeech_pytorch.configs.inference_config import ServerConfig
+from deepspeech_pytorch.inference import run_transcribe
 from deepspeech_pytorch.loader.data_loader import SpectrogramParser
-from deepspeech_pytorch.decoder import GreedyDecoder
-from deepspeech_pytorch.opts import add_decoder_args, add_inference_args
-from transcribe import transcribe
-from deepspeech_pytorch.utils import load_model
+from deepspeech_pytorch.utils import load_model, load_decoder
 
 app = Flask(__name__)
 ALLOWED_EXTENSIONS = set(['.wav', '.mp3', '.ogg', '.webm'])
+
+cs = ConfigStore.instance()
+cs.store(name="config", node=ServerConfig)
 
 
 @app.route('/transcribe', methods=['POST'])
@@ -32,46 +37,40 @@ def transcribe_file():
         with NamedTemporaryFile(suffix=file_extension) as tmp_saved_audio_file:
             file.save(tmp_saved_audio_file.name)
             logging.info('Transcribing file...')
-            transcription, _ = transcribe(audio_path=tmp_saved_audio_file,
-                                          spect_parser=spect_parser,
-                                          model=model,
-                                          decoder=decoder,
-                                          device=device,
-                                          use_half=args.half)
+            transcription, _ = run_transcribe(audio_path=tmp_saved_audio_file,
+                                              spect_parser=spect_parser,
+                                              model=model,
+                                              decoder=decoder,
+                                              device=device,
+                                              use_half=args.half)
             logging.info('File transcribed')
             res['status'] = "OK"
             res['transcription'] = transcription
             return jsonify(res)
 
 
-def main():
-    import argparse
-    global model, spect_parser, decoder, args, device
-    parser = argparse.ArgumentParser(description='DeepSpeech transcription server')
-    parser.add_argument('--host', type=str, default='0.0.0.0', help='Host to be used by the server')
-    parser.add_argument('--port', type=int, default=8888, help='Port to be used by the server')
-    parser = add_inference_args(parser)
-    parser = add_decoder_args(parser)
-    args = parser.parse_args()
+@hydra.main(config_name="config")
+def main(cfg: ServerConfig):
+    global model, spect_parser, decoder, config, device
+    config = cfg
     logging.getLogger().setLevel(logging.DEBUG)
 
     logging.info('Setting up server...')
-    torch.set_grad_enabled(False)
-    device = torch.device("cuda" if args.cuda else "cpu")
-    model = load_model(device, args.model_path, args.half)
+    device = torch.device("cuda" if cfg.model.cuda else "cpu")
 
-    if args.decoder == "beam":
-        from deepspeech_pytorch.decoder import BeamCTCDecoder
+    model = load_model(device=device,
+                       model_path=cfg.model.model_path,
+                       use_half=cfg.model.use_half)
 
-        decoder = BeamCTCDecoder(model.labels, lm_path=args.lm_path, alpha=args.alpha, beta=args.beta,
-                                 cutoff_top_n=args.cutoff_top_n, cutoff_prob=args.cutoff_prob,
-                                 beam_width=args.beam_width, num_processes=args.lm_workers)
-    else:
-        decoder = GreedyDecoder(model.labels, blank_index=model.labels.index('_'))
+    decoder = load_decoder(labels=model.labels,
+                           cfg=cfg.lm)
+
+    spect_parser = SpectrogramParser(audio_conf=model.audio_conf,
+                                     normalize=True)
 
     spect_parser = SpectrogramParser(model.audio_conf, normalize=True)
     logging.info('Server initialised')
-    app.run(host=args.host, port=args.port, debug=True, use_reloader=False)
+    app.run(host=cfg.host, port=cfg.port, debug=True, use_reloader=False)
 
 
 if __name__ == "__main__":

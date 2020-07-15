@@ -4,7 +4,7 @@ from pathlib import Path, PosixPath
 
 import hydra
 import torch
-from deepspeech_pytorch.config import GCSCheckpointConfig, CheckpointConfig, FileCheckpointConfig
+from deepspeech_pytorch.configs.train_config import GCSCheckpointConfig, CheckpointConfig, FileCheckpointConfig
 from deepspeech_pytorch.state import TrainingState
 from google.cloud import storage
 

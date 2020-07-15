@@ -114,7 +114,10 @@ class TrainingState:
         state = torch.load(state_path, map_location=lambda storage, loc: storage)
         model = DeepSpeech.load_model_package(state)
         optim_state = state['optim_dict']
-        amp_state = state['amp']
+        amp_state = state.get('amp')
+        if not amp_state:
+            print("WARNING: No state for Apex has been stored in the model.")
+
         epoch = int(state.get('epoch', 1)) - 1  # Index start at 0 for training
         training_step = state.get('iteration', None)
         if training_step is None:

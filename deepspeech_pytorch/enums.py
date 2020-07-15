@@ -1,6 +1,11 @@
 from enum import Enum
 
 
+class DecoderType(Enum):
+    greedy: str = 'greedy'
+    beam: str = 'beam'
+
+
 class DistributedBackend(Enum):
     gloo = 'gloo'
     mpi = 'mpi'

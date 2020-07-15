@@ -7,13 +7,13 @@ import numpy as np
 import torch.distributed as dist
 import torch.utils.data.distributed
 from apex import amp
-from deepspeech_pytorch.checkpoint import FileCheckpointHandler, GCSCheckpointHandler
 from hydra.utils import to_absolute_path
 from omegaconf import OmegaConf
 from torch.nn.parallel import DistributedDataParallel
 from warpctc_pytorch import CTCLoss
 
-from deepspeech_pytorch.config import SGDConfig, AdamConfig, BiDirectionalConfig, UniDirectionalConfig, \
+from deepspeech_pytorch.checkpoint import FileCheckpointHandler, GCSCheckpointHandler
+from deepspeech_pytorch.configs.train_config import SGDConfig, AdamConfig, BiDirectionalConfig, UniDirectionalConfig, \
     FileCheckpointConfig, GCSCheckpointConfig
 from deepspeech_pytorch.decoder import GreedyDecoder
 from deepspeech_pytorch.loader.data_loader import SpectrogramDataset, DSRandomSampler, DSElasticDistributedSampler, \
@@ -21,7 +21,7 @@ from deepspeech_pytorch.loader.data_loader import SpectrogramDataset, DSRandomSa
 from deepspeech_pytorch.logger import VisdomLogger, TensorBoardLogger
 from deepspeech_pytorch.model import DeepSpeech, supported_rnns
 from deepspeech_pytorch.state import TrainingState
-from deepspeech_pytorch.testing import evaluate
+from deepspeech_pytorch.testing import run_evaluation
 from deepspeech_pytorch.utils import check_loss
 
 
@@ -169,15 +169,18 @@ def train(cfg):
         raise ValueError("Optimizer has not been specified correctly.")
 
     model, optimizer = amp.initialize(model, optimizer,
+                                      enabled=not cfg.training.no_cuda,
                                       opt_level=cfg.apex.opt_level,
                                       loss_scale=cfg.apex.loss_scale)
     if state.optim_state is not None:
         optimizer.load_state_dict(state.optim_state)
+    if state.amp_state is not None:
         amp.load_state_dict(state.amp_state)
 
     # Track states for optimizer/amp
     state.track_optim_state(optimizer)
-    state.track_amp_state(amp)
+    if not cfg.training.no_cuda:
+        state.track_amp_state(amp)
 
     if is_distributed:
         model = DistributedDataParallel(model, device_ids=[device_id])
@@ -251,11 +254,11 @@ def train(cfg):
               'Average Loss {loss:.3f}\t'.format(epoch + 1, epoch_time=epoch_time, loss=state.avg_loss))
 
         with torch.no_grad():
-            wer, cer, output_data = evaluate(test_loader=test_loader,
-                                             device=device,
-                                             model=model,
-                                             decoder=evaluation_decoder,
-                                             target_decoder=evaluation_decoder)
+            wer, cer, output_data = run_evaluation(test_loader=test_loader,
+                                                   device=device,
+                                                   model=model,
+                                                   decoder=evaluation_decoder,
+                                                   target_decoder=evaluation_decoder)
 
         state.add_results(epoch=epoch,
                           loss_result=state.avg_loss,

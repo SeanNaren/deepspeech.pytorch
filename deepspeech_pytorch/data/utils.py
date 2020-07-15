@@ -13,9 +13,8 @@ def create_manifest(data_path, output_name, manifest_path, min_duration=None, ma
                   for dirpath, dirnames, files in os.walk(data_path)
                   for f in fnmatch.filter(files, '*.wav')]
     file_paths = order_and_prune_files(file_paths, min_duration, max_duration)
-
     os.makedirs(manifest_path, exist_ok=True)
-    with io.FileIO(manifest_path + output_name, "w") as file:
+    with io.FileIO(os.path.join(manifest_path, output_name), "w") as file:
         for wav_path in tqdm(file_paths, total=len(file_paths)):
             transcript_path = wav_path.replace('/wav/', '/txt/').replace('.wav', '.txt')
             sample = os.path.abspath(wav_path) + ',' + os.path.abspath(transcript_path) + '\n'

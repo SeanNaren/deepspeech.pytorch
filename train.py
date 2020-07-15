@@ -1,7 +1,7 @@
 import hydra
 from hydra.core.config_store import ConfigStore
 
-from deepspeech_pytorch.config import DeepSpeechConfig, AdamConfig, SGDConfig, BiDirectionalConfig, \
+from deepspeech_pytorch.configs.train_config import DeepSpeechConfig, AdamConfig, SGDConfig, BiDirectionalConfig, \
     UniDirectionalConfig, GCSCheckpointConfig, FileCheckpointConfig
 from deepspeech_pytorch.training import train
 
