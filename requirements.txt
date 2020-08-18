@@ -4,6 +4,7 @@ soundfile
 python-levenshtein
 torch
 torchelastic
+pytorch-lightning==0.9.0rc12
 visdom
 wget
 librosa

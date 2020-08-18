@@ -2,12 +2,31 @@ import os
 
 import torch
 
+from pytorch_lightning.utilities import rank_zero_only
+from pytorch_lightning.loggers import LightningLoggerBase
+
 
 def to_np(x):
     return x.cpu().numpy()
 
 
-class VisdomLogger(object):
+class TrainsLogger(LightningLoggerBase):
+
+    @rank_zero_only
+    def log_hyperparams(self, params):
+        print(params)
+        raise ValueError
+        pass
+
+    @rank_zero_only
+    def log_metrics(self, metrics, step):
+        # metrics is a dictionary of metric names and values
+        # your code to record metrics goes here
+        pass
+
+
+
+class Temp(object):
     def __init__(self, id, num_epochs):
         from visdom import Visdom
         self.viz = Visdom()

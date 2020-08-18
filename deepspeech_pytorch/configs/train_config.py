@@ -13,7 +13,7 @@ defaults = [
 
 @dataclass
 class TrainingConfig:
-    no_cuda: bool = False  # Enable CPU only training
+    gpus: int = 1  # Number of GPUs to use for training
     finetune: bool = False  # Fine-tune the model from checkpoint "continue_from"
     seed: int = 123456  # Seed for generators
     dist_backend: DistributedBackend = DistributedBackend.nccl  # If using distribution, the backend to be used
@@ -64,7 +64,7 @@ class UniDirectionalConfig(BiDirectionalConfig):
 @dataclass
 class OptimConfig:
     learning_rate: float = 3e-4  # Initial Learning Rate
-    learning_anneal: float = 1.1  # Annealing applied to learning rate after each epoch
+    learning_anneal: float = 0.9  # Annealing applied to learning rate after each epoch
     weight_decay: float = 1e-5  # Initial Weight Decay
     max_norm: float = 400  # Norm cutoff to prevent explosion of gradients
 

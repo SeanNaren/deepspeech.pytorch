@@ -1,5 +1,7 @@
 from enum import Enum
 
+from torch import nn
+
 
 class DecoderType(Enum):
     greedy: str = 'greedy'
@@ -20,6 +22,6 @@ class SpectrogramWindow(Enum):
 
 
 class RNNType(Enum):
-    lstm = 'lstm'
-    rnn = 'rnn'
-    gru = 'gru'
+    lstm = nn.LSTM
+    rnn = nn.RNN
+    gru = nn.GRU
