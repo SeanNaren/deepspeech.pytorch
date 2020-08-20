@@ -8,7 +8,6 @@ from tqdm import tqdm
 
 import torch
 from deepspeech_pytorch.decoder import BeamCTCDecoder
-from deepspeech_pytorch.opts import add_decoder_args
 from deepspeech_pytorch.utils import load_model
 
 parser = argparse.ArgumentParser(description='Tune an ARPA LM based on a pre-trained acoustic model output')
@@ -25,7 +24,9 @@ parser.add_argument('--lm-beta-to', default=0.5, type=float,
                     help='Language model word bonus (all words) end tuning')
 parser.add_argument('--lm-num-alphas', default=45, type=float, help='Number of alpha candidates for tuning')
 parser.add_argument('--lm-num-betas', default=8, type=float, help='Number of beta candidates for tuning')
-parser = add_decoder_args(parser)
+parser.add_argument('--lm-path', default='3-gram.pruned.3e-7.arpa', type=str, help='Path to language model')
+parser.add_argument('--lm-workers', default=16, type=int, help='Number of parallel lm workers to run')
+parser.add_argument('--beam-width', default=128, type=int, help='Number of top tokens to consider while decoding')
 args = parser.parse_args()
 
 if args.lm_path is None:
