@@ -44,7 +44,7 @@ def evaluate(cfg: EvalConfig):
         target_decoder=target_decoder,
         save_output=cfg.save_output,
         verbose=cfg.verbose,
-        use_half=cfg.model.use_half
+        precision=cfg.model.precision
     )
 
     print('Test Summary \t'

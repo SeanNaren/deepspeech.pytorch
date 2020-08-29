@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Any, List
+from typing import Any, List, Optional
 
 from deepspeech_pytorch.enums import MultiGPUType, SpectrogramWindow, RNNType, Precision
 from omegaconf import MISSING
@@ -13,10 +13,11 @@ defaults = [
 
 @dataclass
 class TrainingConfig:
-    gpus: int = 1  # Number of GPUs to use for training
     finetune: bool = False  # Fine-tune the model from checkpoint "continue_from"
     seed: int = 123456  # Seed for generators
+    gpus: int = 1  # Number of GPUs to use for training
     multigpu: MultiGPUType = MultiGPUType.disabled  # If using distribution, the lightning backend to be used
+    precision: Precision = Precision.full
     epochs: int = 70  # Number of Training Epochs
 
 
@@ -103,11 +104,9 @@ class GCSCheckpointConfig(CheckpointConfig):
 
 @dataclass
 class VisualizationConfig:
-    id: str = 'DeepSpeech training'  # Name to use when visualizing/storing the run
-    visdom: bool = False  # Turn on visdom graphing
-    tensorboard: bool = False  # Turn on Tensorboard graphing
-    log_dir: str = 'visualize/deepspeech_final'  # Location of Tensorboard log
-    log_params: bool = False  # Log parameter values and gradients
+    trains: bool = False  # Turn on AllegroAI Trains Visualization Support
+    project_name: str = 'DeepSpeech training'  # Name to use when visualizing/storing the run
+    task_name: Optional[str] = field(default=None)  # The name of the experiment. Defaults to None.
 
 
 @dataclass
@@ -116,8 +115,7 @@ class DeepSpeechConfig:
     optim: Any = MISSING
     model: Any = MISSING
     checkpointing: Any = MISSING
-    precision: Precision = Precision.full
     training: TrainingConfig = TrainingConfig()
     data: DataConfig = DataConfig()
     augmentation: AugmentationConfig = AugmentationConfig()
-    visualization: VisualizationConfig = VisualizationConfig()
+    viz: VisualizationConfig = VisualizationConfig()

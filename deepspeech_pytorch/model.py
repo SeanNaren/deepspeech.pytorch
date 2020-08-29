@@ -203,6 +203,7 @@ class DeepSpeech(pl.LightningModule):
         self.inference_softmax = InferenceBatchSoftmax()
         self.criterion = CTCLoss()
         self.evaluation_decoder = GreedyDecoder(self.labels)  # Decoder used for validation
+        self.avg_loss = 0
 
     @autocast()
     def forward(self, x, lengths):
@@ -234,7 +235,14 @@ class DeepSpeech(pl.LightningModule):
             out = out.transpose(0, 1)  # TxNxH
             loss = self.criterion(out, targets.cpu(), output_sizes.cpu(), target_sizes.cpu())
             loss = loss.type_as(inputs)
+        self.avg_loss += loss.item()
         return loss
+
+    def on_train_epoch_end(self):
+        self.avg_loss = self.avg_loss / self.trainer.num_training_batches
+        if self.logger:
+            self.logger.log_metrics({'Average Loss': float('%.3f' % self.avg_loss)}, step=self.current_epoch + 1)
+        self.avg_loss = 0
 
     def validation_step(self, batch, batch_idx):
         wer, cer, n_tokens, n_chars, _ = run_validation_step(
@@ -269,12 +277,15 @@ class DeepSpeech(pl.LightningModule):
         result = pl.EvalResult(wer)
         result.log('wer', wer)
         result.log('cer', cer)
+        metrics = {
+            'wer': wer.item(),
+            'cer': cer.item()
+        }
+        if self.logger:
+            self.logger.log_metrics(metrics, step=self.current_epoch + 1)
         return {
             'progress_bar':
-                {
-                    'wer': wer.item(),
-                    'cer': cer.item()
-                },
+                metrics,
             'loss': wer,
         }
 

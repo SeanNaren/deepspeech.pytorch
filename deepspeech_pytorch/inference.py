@@ -7,6 +7,7 @@ from torch.cuda.amp import autocast
 
 from deepspeech_pytorch.configs.inference_config import TranscribeConfig
 from deepspeech_pytorch.decoder import Decoder
+from deepspeech_pytorch.enums import Precision
 from deepspeech_pytorch.loader.data_loader import SpectrogramParser
 from deepspeech_pytorch.model import DeepSpeech
 from deepspeech_pytorch.utils import load_decoder, load_model
@@ -65,7 +66,7 @@ def transcribe(cfg: TranscribeConfig):
         model=model,
         decoder=decoder,
         device=device,
-        use_half=cfg.model.use_half
+        precision=cfg.model.precision
     )
     results = decode_results(
         decoded_output=decoded_output,
@@ -80,12 +81,12 @@ def run_transcribe(audio_path: str,
                    model: DeepSpeech,
                    decoder: Decoder,
                    device: torch.device,
-                   use_half: bool):
+                   precision: Precision):
     spect = spect_parser.parse_audio(audio_path).contiguous()
     spect = spect.view(1, 1, spect.size(0), spect.size(1))
     spect = spect.to(device)
     input_sizes = torch.IntTensor([spect.size(3)]).int()
-    with autocast(enabled=use_half):
+    with autocast(enabled=precision is Precision.half):
         out, output_sizes = model(spect, input_sizes)
     decoded_output, decoded_offsets = decoder.decode(out, output_sizes)
     return decoded_output, decoded_offsets

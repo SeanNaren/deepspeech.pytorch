@@ -2,28 +2,31 @@ import torch
 from torch.cuda.amp import autocast
 from tqdm import tqdm
 
+from deepspeech_pytorch.decoder import Decoder
+from deepspeech_pytorch.enums import Precision
+
 
 @torch.no_grad()
 def run_evaluation(test_loader,
                    model,
-                   decoder,
-                   device,
-                   target_decoder,
+                   decoder: Decoder,
+                   device: torch.device,
+                   target_decoder: Decoder,
+                   precision: Precision,
                    save_output=False,
-                   verbose=False,
-                   use_half=False):
+                   verbose=False):
     model.eval()
     total_cer, total_wer, num_tokens, num_chars = 0, 0, 0, 0
     output_data = []
     for i, (batch) in tqdm(enumerate(test_loader), total=len(test_loader)):
         wer, cer, n_tokens, n_chars, model_output = run_validation_step(
             batch=batch,
+            model=model,
             decoder=decoder,
             device=device,
-            model=model,
+            precision=precision,
             target_decoder=target_decoder,
-            verbose=verbose,
-            use_half=use_half
+            verbose=verbose
         )
         total_wer += wer
         total_cer += cer
@@ -37,12 +40,12 @@ def run_evaluation(test_loader,
 
 
 def run_validation_step(batch,
-                        device,
-                        decoder,
                         model,
-                        target_decoder,
-                        verbose,
-                        use_half):
+                        decoder: Decoder,
+                        device: torch.device,
+                        precision: Precision,
+                        target_decoder: Decoder,
+                        verbose: bool):
     inputs, targets, input_percentages, target_sizes = batch
     input_sizes = input_percentages.mul_(int(inputs.size(3))).int()
     inputs = inputs.to(device)
@@ -53,7 +56,7 @@ def run_validation_step(batch,
     for size in target_sizes:
         split_targets.append(targets[offset:offset + size])
         offset += size
-    with autocast(enabled=use_half):
+    with autocast(enabled=precision is Precision.half):
         out, output_sizes = model(inputs, input_sizes)
     decoded_output, _ = decoder.decode(out, output_sizes)
     target_strings = target_decoder.convert_to_strings(split_targets)

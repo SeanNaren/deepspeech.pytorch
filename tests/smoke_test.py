@@ -9,7 +9,7 @@ from deepspeech_pytorch.configs.inference_config import EvalConfig, ModelConfig,
 from deepspeech_pytorch.configs.train_config import DeepSpeechConfig, AdamConfig, BiDirectionalConfig, \
     FileCheckpointConfig, \
     DataConfig, TrainingConfig
-from deepspeech_pytorch.enums import DecoderType
+from deepspeech_pytorch.enums import DecoderType, Precision
 from deepspeech_pytorch.inference import transcribe
 from deepspeech_pytorch.testing import evaluate
 from deepspeech_pytorch.training import train
@@ -40,17 +40,27 @@ class DeepSpeechSmokeTest(unittest.TestCase):
                                    epoch: int,
                                    batch_size: int,
                                    model_config: BiDirectionalConfig,
-                                   use_half: bool,
-                                   cuda: bool):
-        train_manifest, val_manifest, test_manifest = self.download_data(DatasetConfig(target_dir=self.target_dir,
-                                                                                       manifest_dir=self.manifest_dir))
+                                   precision: Precision,
+                                   gpus: int):
+        cuda = gpus > 0
+        use_half = precision == Precision.half
 
-        train_cfg = self.create_training_config(epoch=epoch,
-                                                batch_size=batch_size,
-                                                train_manifest=train_manifest,
-                                                val_manifest=val_manifest,
-                                                model_config=model_config,
-                                                cuda=cuda)
+        train_manifest, val_manifest, test_manifest = self.download_data(
+            DatasetConfig(
+                target_dir=self.target_dir,
+                manifest_dir=self.manifest_dir
+            )
+        )
+
+        train_cfg = self.create_training_config(
+            epoch=epoch,
+            batch_size=batch_size,
+            train_manifest=train_manifest,
+            val_manifest=val_manifest,
+            model_config=model_config,
+            precision=precision,
+            gpus=gpus
+        )
         print("Running Training DeepSpeech Model Smoke Test")
         train(train_cfg)
 
@@ -143,10 +153,14 @@ class DeepSpeechSmokeTest(unittest.TestCase):
                                train_manifest: str,
                                val_manifest: str,
                                model_config: BiDirectionalConfig,
-                               cuda: bool):
+                               precision: Precision,
+                               gpus: int):
         return DeepSpeechConfig(
-            training=TrainingConfig(epochs=epoch,
-                                    no_cuda=not cuda),
+            training=TrainingConfig(
+                epochs=epoch,
+                precision=precision,
+                gpus=gpus
+            ),
             data=DataConfig(train_manifest=train_manifest,
                             val_manifest=val_manifest,
                             batch_size=batch_size),
@@ -160,13 +174,17 @@ class AN4SmokeTest(DeepSpeechSmokeTest):
 
     def test_train_eval_inference(self):
         # Hardcoded sizes to reduce memory/time, and disabled GPU due to using TravisCI
-        model_cfg = BiDirectionalConfig(hidden_size=10,
-                                        hidden_layers=1)
-        self.build_train_evaluate_model(epoch=1,
-                                        batch_size=10,
-                                        model_config=model_cfg,
-                                        cuda=False,
-                                        use_half=False)
+        model_cfg = BiDirectionalConfig(
+            hidden_size=10,
+            hidden_layers=1
+        )
+        self.build_train_evaluate_model(
+            epoch=1,
+            batch_size=10,
+            model_config=model_cfg,
+            precision=Precision.full,
+            gpus=0
+        )
 
 
 if __name__ == '__main__':
