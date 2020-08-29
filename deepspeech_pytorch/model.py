@@ -6,11 +6,14 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from omegaconf import OmegaConf
+from torch.cuda.amp import autocast
 from warpctc_pytorch import CTCLoss
 
-from deepspeech_pytorch.configs.train_config import SpectConfig, BiDirectionalConfig, OptimConfig, AdamConfig, SGDConfig
+from deepspeech_pytorch.configs.train_config import SpectConfig, BiDirectionalConfig, OptimConfig, AdamConfig, \
+    SGDConfig
 from deepspeech_pytorch.decoder import GreedyDecoder
-from deepspeech_pytorch.eval import run_validation_step
+from deepspeech_pytorch.enums import Precision
+from deepspeech_pytorch.validation import run_validation_step
 
 
 class SequenceWise(nn.Module):
@@ -137,11 +140,14 @@ class DeepSpeech(pl.LightningModule):
     def __init__(self,
                  labels: List,
                  model_cfg: BiDirectionalConfig,
+                 precision: Precision,
                  optim_cfg: OptimConfig,
-                 spect_cfg: SpectConfig,
+                 spect_cfg: SpectConfig
                  ):
-        super(DeepSpeech, self).__init__()
+        super().__init__()
+        self.save_hyperparameters()
         self.model_cfg = model_cfg
+        self.precision = precision
         self.optim_cfg = optim_cfg
         self.spect_cfg = spect_cfg
         self.bidirectional = True if OmegaConf.get_type(model_cfg) is BiDirectionalConfig else False
@@ -198,6 +204,7 @@ class DeepSpeech(pl.LightningModule):
         self.criterion = CTCLoss()
         self.evaluation_decoder = GreedyDecoder(self.labels)  # Decoder used for validation
 
+    @autocast()
     def forward(self, x, lengths):
         lengths = lengths.cpu().int()
         output_lengths = self.get_seq_lens(lengths)
@@ -220,21 +227,24 @@ class DeepSpeech(pl.LightningModule):
         return x, output_lengths
 
     def training_step(self, batch, batch_idx):
-        inputs, targets, input_percentages, target_sizes = batch
-        input_sizes = input_percentages.mul_(int(inputs.size(3))).int()
-
-        out, output_sizes = self(inputs, input_sizes)
-        out = out.transpose(0, 1)  # TxNxH
-        loss = self.criterion(out, targets.cpu(), output_sizes.cpu(), target_sizes.cpu())
+        with autocast():
+            inputs, targets, input_percentages, target_sizes = batch
+            input_sizes = input_percentages.mul_(int(inputs.size(3))).int()
+            out, output_sizes = self(inputs, input_sizes)
+            out = out.transpose(0, 1)  # TxNxH
+            loss = self.criterion(out, targets.cpu(), output_sizes.cpu(), target_sizes.cpu())
+            loss = loss.type_as(inputs)
         return loss
 
     def validation_step(self, batch, batch_idx):
         wer, cer, n_tokens, n_chars, _ = run_validation_step(
             batch=batch,
+            device=self.device,
             model=self,
             decoder=self.evaluation_decoder,
             target_decoder=self.evaluation_decoder,
-            verbose=False
+            verbose=False,
+            use_half=self.precision is Precision.half
         )
         return {
             'wer': wer,
@@ -267,12 +277,6 @@ class DeepSpeech(pl.LightningModule):
                 },
             'loss': wer,
         }
-
-    def on_after_backward(self):
-        torch.nn.utils.clip_grad_norm_(
-            parameters=self.parameters(),
-            max_norm=self.optim_cfg.max_norm
-        )
 
     def configure_optimizers(self):
         if OmegaConf.get_type(self.optim_cfg) is SGDConfig:

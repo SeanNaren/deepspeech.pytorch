@@ -222,11 +222,12 @@ class DSRandomSampler(Sampler):
     This is essential since we support saving/loading state during an epoch.
     """
 
-    def __init__(self, dataset, batch_size=1, start_index=0):
+    def __init__(self, dataset, batch_size=1):
         super().__init__(data_source=dataset)
 
         self.dataset = dataset
-        self.start_index = start_index
+        self.start_index = 0
+        self.epoch = 0
         self.batch_size = batch_size
         ids = list(range(len(self.dataset)))
         self.bins = [ids[i:i + self.batch_size] for i in range(0, len(ids), self.batch_size)]
@@ -251,9 +252,6 @@ class DSRandomSampler(Sampler):
     def set_epoch(self, epoch):
         self.epoch = epoch
 
-    def reset_training_step(self, training_step):
-        self.start_index = training_step
-
 
 class DSElasticDistributedSampler(DistributedSampler):
     """
@@ -261,9 +259,9 @@ class DSElasticDistributedSampler(DistributedSampler):
     This is essential since we support saving/loading state during an epoch.
     """
 
-    def __init__(self, dataset, num_replicas=None, rank=None, start_index=0, batch_size=1):
+    def __init__(self, dataset, num_replicas=None, rank=None, batch_size=1):
         super().__init__(dataset=dataset, num_replicas=num_replicas, rank=rank)
-        self.start_index = start_index
+        self.start_index = 0
         self.batch_size = batch_size
         ids = list(range(len(dataset)))
         self.bins = [ids[i:i + self.batch_size] for i in range(0, len(ids), self.batch_size)]
@@ -296,13 +294,6 @@ class DSElasticDistributedSampler(DistributedSampler):
 
     def __len__(self):
         return self.num_samples
-
-    def reset_training_step(self, training_step):
-        self.start_index = training_step
-        self.num_samples = int(
-            math.ceil(float(len(self.bins) - self.start_index) / self.num_replicas)
-        )
-        self.total_size = self.num_samples * self.num_replicas
 
 
 def audio_with_sox(path, sample_rate, start_time, end_time):

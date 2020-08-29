@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Any, List
 
-from deepspeech_pytorch.enums import DistributedBackend, SpectrogramWindow, RNNType
+from deepspeech_pytorch.enums import DistributedBackend, SpectrogramWindow, RNNType, Precision
 from omegaconf import MISSING
 
 defaults = [
@@ -84,7 +84,6 @@ class AdamConfig(OptimConfig):
 class CheckpointConfig:
     continue_from: str = ''  # Continue training from checkpoint model
     checkpoint: bool = True  # Enables epoch checkpoint saving of model
-    checkpoint_per_iteration: int = 0  # Save checkpoint per N number of iterations. Default is disabled
     save_n_recent_models: int = 10  # Max number of checkpoints to save, delete older checkpoints
     best_val_model_name: str = 'deepspeech_final.pth'  # Name to save best validated model within the save folder
     load_auto_checkpoint: bool = False  # Automatically load the latest checkpoint from save folder
@@ -112,19 +111,13 @@ class VisualizationConfig:
 
 
 @dataclass
-class ApexConfig:
-    opt_level: str = 'O1'  # Apex optimization level, check https://nvidia.github.io/apex/amp.html for more information
-    loss_scale: int = 1  # Loss scaling used by Apex. Default is 1 due to warp-ctc not supporting scaling of gradients
-
-
-@dataclass
 class DeepSpeechConfig:
     defaults: List[Any] = field(default_factory=lambda: defaults)
     optim: Any = MISSING
     model: Any = MISSING
     checkpointing: Any = MISSING
+    precision: Precision = Precision.full
     training: TrainingConfig = TrainingConfig()
     data: DataConfig = DataConfig()
     augmentation: AugmentationConfig = AugmentationConfig()
-    apex: ApexConfig = ApexConfig()
     visualization: VisualizationConfig = VisualizationConfig()

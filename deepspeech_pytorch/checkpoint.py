@@ -1,36 +1,53 @@
 import os
-from abc import ABC
 from pathlib import Path, PosixPath
 
 import hydra
-import torch
-from deepspeech_pytorch.configs.train_config import GCSCheckpointConfig, CheckpointConfig, FileCheckpointConfig
-from deepspeech_pytorch.state import TrainingState
 from google.cloud import storage
+from pytorch_lightning import Callback, Trainer
+from pytorch_lightning.utilities import rank_zero_only
+
+from deepspeech_pytorch.configs.train_config import GCSCheckpointConfig, CheckpointConfig, FileCheckpointConfig
 
 
-class CheckpointHandler(ABC):
+class CheckpointHandler(Callback):
 
     def __init__(self,
                  cfg: CheckpointConfig,
                  save_location):
+        self.cfg = cfg
+        self.lowest_loss = None
         self.checkpoint_prefix = 'deepspeech_checkpoint_'  # TODO do we want to expose this?
         self.save_location = save_location
-        self.checkpoint_per_iteration = cfg.checkpoint_per_iteration
         self.save_n_recent_models = cfg.save_n_recent_models
 
         if type(self.save_location) == PosixPath:
-            self.checkpoint_prefix_path = self.save_location / self.checkpoint_prefix
-            self.best_val_path = self.save_location / cfg.best_val_model_name
+            self.checkpoint_prefix_path = str(self.save_location / self.checkpoint_prefix)
+            self.best_val_path = str(self.save_location / cfg.best_val_model_name)
         else:
             self.checkpoint_prefix_path = self.save_location + self.checkpoint_prefix
             self.best_val_path = self.save_location + cfg.best_val_model_name
 
+    @rank_zero_only
+    def on_validation_epoch_end(self, trainer, pl_module):
+        metrics = trainer.callback_metrics
+        epoch = trainer.current_epoch
+        if self.cfg.checkpoint:
+            self.save_checkpoint_model(
+                epoch=epoch,
+                trainer=trainer
+            )
+        loss = metrics['loss']
+        if self.lowest_loss is None or self.lowest_loss > loss:
+            self.save_best_model(
+                epoch=epoch,
+                trainer=trainer
+            )
+            self.lowest_loss = loss
+
     def save_model(self,
                    model_path: str,
-                   state: TrainingState,
-                   epoch: int,
-                   i: int = None):
+                   trainer: Trainer,
+                   epoch: int):
         raise NotImplementedError
 
     def find_latest_checkpoint(self):
@@ -39,39 +56,36 @@ class CheckpointHandler(ABC):
     def check_and_delete_oldest_checkpoint(self):
         raise NotImplementedError
 
-    def save_checkpoint_model(self, epoch, state, i=None):
+    def save_checkpoint_model(self,
+                              epoch: int,
+                              trainer: Trainer):
         if self.save_n_recent_models > 0:
             self.check_and_delete_oldest_checkpoint()
-        model_path = self._create_checkpoint_path(epoch=epoch,
-                                                  i=i)
-        self.save_model(model_path=model_path,
-                        state=state,
-                        epoch=epoch,
-                        i=i)
+        model_path = self._create_checkpoint_path(
+            epoch=epoch
+        )
+        self.save_model(
+            model_path=model_path,
+            epoch=epoch,
+            trainer=trainer,
+        )
 
-    def save_iter_checkpoint_model(self, epoch, state, i):
-        if self.checkpoint_per_iteration > 0 and i > 0 and (i + 1) % self.checkpoint_per_iteration == 0:
-            self.save_checkpoint_model(epoch=epoch,
-                                       state=state,
-                                       i=i)
+    def save_best_model(self,
+                        epoch: int,
+                        trainer: Trainer):
+        self.save_model(
+            model_path=self.best_val_path,
+            trainer=trainer,
+            epoch=epoch
+        )
 
-    def save_best_model(self, epoch, state):
-        self.save_model(model_path=self.best_val_path,
-                        state=state,
-                        epoch=epoch)
-
-    def _create_checkpoint_path(self, epoch, i=None):
+    def _create_checkpoint_path(self, epoch):
         """
         Creates path to save checkpoint.
-        We automatically iterate the epoch and iteration for readibility.
-        :param epoch: The epoch (index starts at 0).
-        :param i: The iteration (index starts at 0).
+        :param epoch: The epoch.
         :return: The path to save the model
         """
-        if i:
-            checkpoint_path = str(self.checkpoint_prefix_path) + 'epoch_%d_iter_%d.pth' % (epoch + 1, i + 1)
-        else:
-            checkpoint_path = str(self.checkpoint_prefix_path) + 'epoch_%d.pth' % (epoch + 1)
+        checkpoint_path = str(self.checkpoint_prefix_path) + 'epoch_%d.pth' % epoch
         return checkpoint_path
 
 
@@ -103,11 +117,13 @@ class FileCheckpointHandler(CheckpointHandler):
             print("Deleting old checkpoint %s" % str(paths[0]))
             os.remove(paths[0])
 
-    def save_model(self, model_path, state, epoch, i=None):
+    def save_model(self,
+                   model_path: str,
+                   trainer: Trainer,
+                   epoch: int,
+                   i=None):
         print("Saving model to %s" % model_path)
-        torch.save(obj=state.serialize_state(epoch=epoch,
-                                             iteration=i),
-                   f=model_path)
+        trainer.save_checkpoint(model_path)
 
 
 class GCSCheckpointHandler(CheckpointHandler):
@@ -144,11 +160,12 @@ class GCSCheckpointHandler(CheckpointHandler):
             print("Deleting old checkpoint %s" % paths[0].name)
             paths[0].delete()
 
-    def save_model(self, model_path, state, epoch, i=None):
+    def save_model(self,
+                   model_path: str,
+                   trainer: Trainer,
+                   epoch: int):
         print("Saving model to %s" % model_path)
-        torch.save(obj=state.serialize_state(epoch=epoch,
-                                             iteration=i),
-                   f=self.local_save_file)
+        trainer.save_checkpoint(model_path)
         self._save_file_to_gcs(model_path)
 
     def _save_file_to_gcs(self, model_path):

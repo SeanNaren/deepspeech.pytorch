@@ -1,55 +1,17 @@
-import hydra
 import torch
+from torch.cuda.amp import autocast
 from tqdm import tqdm
-
-from deepspeech_pytorch.configs.inference_config import EvalConfig
-from deepspeech_pytorch.decoder import GreedyDecoder
-from deepspeech_pytorch.loader.data_loader import SpectrogramDataset, AudioDataLoader
-# from deepspeech_pytorch.utils import load_model, load_decoder
-#
-#
-# @torch.no_grad()
-# def evaluate(cfg: EvalConfig):
-#     device = torch.device("cuda" if cfg.model.cuda else "cpu")
-#
-#     model = load_model(device=device,
-#                        model_path=cfg.model.model_path,
-#                        use_half=cfg.model.use_half)
-#
-#     decoder = load_decoder(labels=model.labels,
-#                            cfg=cfg.lm)
-#     target_decoder = GreedyDecoder(model.labels,
-#                                    blank_index=model.labels.index('_'))
-#     test_dataset = SpectrogramDataset(audio_conf=model.audio_conf,
-#                                       manifest_filepath=hydra.utils.to_absolute_path(cfg.test_manifest),
-#                                       labels=model.labels,
-#                                       normalize=True)
-#     test_loader = AudioDataLoader(test_dataset,
-#                                   batch_size=cfg.batch_size,
-#                                   num_workers=cfg.num_workers)
-#     wer, cer, output_data = run_evaluation(test_loader=test_loader,
-#                                            device=device,
-#                                            model=model,
-#                                            decoder=decoder,
-#                                            target_decoder=target_decoder,
-#                                            save_output=cfg.save_output,
-#                                            verbose=cfg.verbose,
-#                                            use_half=cfg.model.use_half)
-#
-#     print('Test Summary \t'
-#           'Average WER {wer:.3f}\t'
-#           'Average CER {cer:.3f}\t'.format(wer=wer, cer=cer))
-#     if cfg.save_output:
-#         torch.save(output_data, hydra.utils.to_absolute_path(cfg.save_output))
 
 
 @torch.no_grad()
 def run_evaluation(test_loader,
                    model,
                    decoder,
+                   device,
                    target_decoder,
                    save_output=False,
-                   verbose=False):
+                   verbose=False,
+                   use_half=False):
     model.eval()
     total_cer, total_wer, num_tokens, num_chars = 0, 0, 0, 0
     output_data = []
@@ -57,9 +19,11 @@ def run_evaluation(test_loader,
         wer, cer, n_tokens, n_chars, model_output = run_validation_step(
             batch=batch,
             decoder=decoder,
+            device=device,
             model=model,
             target_decoder=target_decoder,
-            verbose=verbose
+            verbose=verbose,
+            use_half=use_half
         )
         total_wer += wer
         total_cer += cer
@@ -73,12 +37,15 @@ def run_evaluation(test_loader,
 
 
 def run_validation_step(batch,
+                        device,
                         decoder,
                         model,
                         target_decoder,
-                        verbose):
+                        verbose,
+                        use_half):
     inputs, targets, input_percentages, target_sizes = batch
     input_sizes = input_percentages.mul_(int(inputs.size(3))).int()
+    inputs = inputs.to(device)
 
     # unflatten targets
     split_targets = []
@@ -86,7 +53,8 @@ def run_validation_step(batch,
     for size in target_sizes:
         split_targets.append(targets[offset:offset + size])
         offset += size
-    out, output_sizes = model(inputs, input_sizes)
+    with autocast(enabled=use_half):
+        out, output_sizes = model(inputs, input_sizes)
     decoded_output, _ = decoder.decode(out, output_sizes)
     target_strings = target_decoder.convert_to_strings(split_targets)
     wer, cer, n_tokens, n_chars = 0, 0, 0, 0

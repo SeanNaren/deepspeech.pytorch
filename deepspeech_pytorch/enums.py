@@ -25,3 +25,8 @@ class RNNType(Enum):
     lstm = nn.LSTM
     rnn = nn.RNN
     gru = nn.GRU
+
+
+class Precision(Enum):
+    half = 16
+    full = 32

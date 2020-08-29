@@ -10,9 +10,7 @@ class DeepSpeechDataModule(pl.LightningDataModule):
     def __init__(self,
                  labels,
                  data_cfg: DataConfig,
-                 normalize,
-                 epoch,
-                 training_step):
+                 normalize):
         super().__init__()
         self.train_manifest = to_absolute_path(data_cfg.train_manifest)
         self.val_manifest = to_absolute_path(data_cfg.val_manifest)
@@ -21,17 +19,13 @@ class DeepSpeechDataModule(pl.LightningDataModule):
         self.spect_cfg = data_cfg.spect
         self.aug_cfg = data_cfg.augmentation
         self.normalize = normalize
-        self.epoch = epoch
-        self.training_step = training_step
 
     def train_dataloader(self):
         train_dataset = self._create_dataset(self.train_manifest)
         train_sampler = DSRandomSampler(
             dataset=train_dataset,
-            batch_size=self.data_cfg.batch_size,
-            start_index=self.training_step
+            batch_size=self.data_cfg.batch_size
         )
-        train_sampler.set_epoch(self.epoch)
         train_loader = AudioDataLoader(
             dataset=train_dataset,
             num_workers=self.data_cfg.num_workers,
