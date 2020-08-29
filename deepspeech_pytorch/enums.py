@@ -8,10 +8,10 @@ class DecoderType(Enum):
     beam: str = 'beam'
 
 
-class DistributedBackend(Enum):
-    gloo = 'gloo'
-    mpi = 'mpi'
-    nccl = 'nccl'
+class MultiGPUType(Enum):
+    disabled = None
+    distributed = 'ddp'
+    dataparallel = 'dp'
 
 
 class SpectrogramWindow(Enum):

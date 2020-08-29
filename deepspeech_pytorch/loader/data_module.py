@@ -2,7 +2,9 @@ import pytorch_lightning as pl
 from hydra.utils import to_absolute_path
 
 from deepspeech_pytorch.configs.train_config import DataConfig
-from deepspeech_pytorch.loader.data_loader import SpectrogramDataset, DSRandomSampler, AudioDataLoader
+from deepspeech_pytorch.enums import MultiGPUType
+from deepspeech_pytorch.loader.data_loader import SpectrogramDataset, DSRandomSampler, AudioDataLoader, \
+    DSElasticDistributedSampler
 
 
 class DeepSpeechDataModule(pl.LightningDataModule):
@@ -10,7 +12,8 @@ class DeepSpeechDataModule(pl.LightningDataModule):
     def __init__(self,
                  labels,
                  data_cfg: DataConfig,
-                 normalize):
+                 normalize,
+                 multigpu: MultiGPUType):
         super().__init__()
         self.train_manifest = to_absolute_path(data_cfg.train_manifest)
         self.val_manifest = to_absolute_path(data_cfg.val_manifest)
@@ -19,13 +22,20 @@ class DeepSpeechDataModule(pl.LightningDataModule):
         self.spect_cfg = data_cfg.spect
         self.aug_cfg = data_cfg.augmentation
         self.normalize = normalize
+        self.multigpu = multigpu
 
     def train_dataloader(self):
         train_dataset = self._create_dataset(self.train_manifest)
-        train_sampler = DSRandomSampler(
-            dataset=train_dataset,
-            batch_size=self.data_cfg.batch_size
-        )
+        if self.multigpu == MultiGPUType.distributed:
+            train_sampler = DSElasticDistributedSampler(
+                dataset=train_dataset,
+                batch_size=self.data_cfg.batch_size
+            )
+        else:
+            train_sampler = DSRandomSampler(
+                dataset=train_dataset,
+                batch_size=self.data_cfg.batch_size
+            )
         train_loader = AudioDataLoader(
             dataset=train_dataset,
             num_workers=self.data_cfg.num_workers,

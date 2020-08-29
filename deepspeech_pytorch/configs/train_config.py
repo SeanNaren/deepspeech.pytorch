@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Any, List
 
-from deepspeech_pytorch.enums import DistributedBackend, SpectrogramWindow, RNNType, Precision
+from deepspeech_pytorch.enums import MultiGPUType, SpectrogramWindow, RNNType, Precision
 from omegaconf import MISSING
 
 defaults = [
@@ -16,7 +16,7 @@ class TrainingConfig:
     gpus: int = 1  # Number of GPUs to use for training
     finetune: bool = False  # Fine-tune the model from checkpoint "continue_from"
     seed: int = 123456  # Seed for generators
-    dist_backend: DistributedBackend = DistributedBackend.nccl  # If using distribution, the backend to be used
+    multigpu: MultiGPUType = MultiGPUType.disabled  # If using distribution, the lightning backend to be used
     epochs: int = 70  # Number of Training Epochs
 
 

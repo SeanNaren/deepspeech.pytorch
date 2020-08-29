@@ -33,7 +33,8 @@ def train(cfg: DeepSpeechConfig):
     data_loader = DeepSpeechDataModule(
         labels=labels,
         data_cfg=cfg.data,
-        normalize=True
+        normalize=True,
+        multigpu=cfg.training.multigpu
     )
 
     model = DeepSpeech(
@@ -52,6 +53,7 @@ def train(cfg: DeepSpeechConfig):
         resume_from_checkpoint=cfg.checkpointing.continue_from if cfg.checkpointing.continue_from else None,
         precision=cfg.precision.value,
         gradient_clip_val=cfg.optim.max_norm,
-        replace_sampler_ddp=False
+        replace_sampler_ddp=False,
+        distributed_backend=cfg.training.multigpu.value
     )
     trainer.fit(model, data_loader)
