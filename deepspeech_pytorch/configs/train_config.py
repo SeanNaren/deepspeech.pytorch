@@ -5,7 +5,7 @@ from deepspeech_pytorch.enums import MultiGPUType, SpectrogramWindow, RNNType, P
 from omegaconf import MISSING
 
 defaults = [
-    {"optim": "sgd"},
+    {"optim": "adam"},
     {"model": "bidirectional"},
     {"checkpointing": "file"}
 ]

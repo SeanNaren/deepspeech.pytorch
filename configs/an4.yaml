@@ -1,0 +1,11 @@
+# @package _global_
+data:
+  train_manifest: data/an4_train_manifest.csv
+  val_manifest: data/an4_val_manifest.csv
+  batch_size: 8
+training:
+  gpus: 1
+  precision: half
+optim:
+  learning_anneal: 1.0
+  learning_rate: 1.5e-4

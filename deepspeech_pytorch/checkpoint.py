@@ -5,6 +5,7 @@ import hydra
 from google.cloud import storage
 from pytorch_lightning import Callback, Trainer
 from pytorch_lightning.utilities import rank_zero_only
+from tqdm import tqdm
 
 from deepspeech_pytorch.configs.train_config import GCSCheckpointConfig, CheckpointConfig, FileCheckpointConfig
 
@@ -114,7 +115,7 @@ class FileCheckpointHandler(CheckpointHandler):
         paths = list(self.save_folder.rglob(self.checkpoint_prefix + '*'))
         if paths and len(paths) >= self.save_n_recent_models:
             paths.sort(key=os.path.getctime)
-            print("Deleting old checkpoint %s" % str(paths[0]))
+            tqdm.write("Deleting old checkpoint %s" % str(paths[0]))
             os.remove(paths[0])
 
     def save_model(self,
@@ -122,7 +123,7 @@ class FileCheckpointHandler(CheckpointHandler):
                    trainer: Trainer,
                    epoch: int,
                    i=None):
-        print("Saving model to %s" % model_path)
+        tqdm.write("Saving model to %s" % model_path)
         trainer.save_checkpoint(model_path)
 
 
@@ -157,14 +158,14 @@ class GCSCheckpointHandler(CheckpointHandler):
         paths = list(self.client.list_blobs(self.gcs_bucket, prefix=prefix))
         if paths and len(paths) >= self.save_n_recent_models:
             paths.sort(key=lambda x: x.time_created)
-            print("Deleting old checkpoint %s" % paths[0].name)
+            tqdm.write("Deleting old checkpoint %s" % paths[0].name)
             paths[0].delete()
 
     def save_model(self,
                    model_path: str,
                    trainer: Trainer,
                    epoch: int):
-        print("Saving model to %s" % model_path)
+        tqdm.write("Saving model to %s" % model_path)
         trainer.save_checkpoint(model_path)
         self._save_file_to_gcs(model_path)
 
