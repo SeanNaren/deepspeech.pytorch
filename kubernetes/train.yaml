@@ -30,6 +30,8 @@ spec:
                 - "data.num_workers=8"
                 - "training.epochs=70"
                 - "data.batch_size=8"
+                - "training.multigpu=distributed"
+                - "model.precision=half"
                 - "checkpointing=gcs"
                 - "checkpointing.gcs_bucket=deepspeech-1234" # Swap this to point to the appropriate GCS bucket
                 - "checkpointing.gcs_save_folder=models/"

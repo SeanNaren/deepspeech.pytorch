@@ -2,6 +2,7 @@ from argparse import Namespace
 from enum import Enum
 from typing import Union, Dict, Any
 
+from omegaconf import ListConfig
 from pl_bolts.loggers import TrainsLogger
 from pytorch_lightning.utilities import rank_zero_only
 
@@ -20,7 +21,7 @@ class DeepSpeechTrainsLogger(TrainsLogger):
         for k, v in params.items():
             if isinstance(v, dict):
                 self._enums_convert(v)
-            if isinstance(v, Enum):
+            if isinstance(v, Enum) or isinstance(v, ListConfig):
                 params[k] = str(v)  # Convert into string form for Trains parsing
 
     @rank_zero_only

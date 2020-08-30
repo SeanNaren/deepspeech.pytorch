@@ -1,7 +1,7 @@
 # deepspeech.pytorch
 [![Build Status](https://travis-ci.org/SeanNaren/deepspeech.pytorch.svg?branch=master)](https://travis-ci.org/SeanNaren/deepspeech.pytorch)
 
-Implementation of DeepSpeech2 for PyTorch. The repo supports training/testing and inference using the [DeepSpeech2](http://arxiv.org/pdf/1512.02595v1.pdf) model. Optionally a [kenlm](https://github.com/kpu/kenlm) language model can be used at inference time.
+Implementation of DeepSpeech2 for PyTorch using [PyTorch Lightning](https://github.com/PyTorchLightning/pytorch-lightning). The repo supports training/testing and inference using the [DeepSpeech2](http://arxiv.org/pdf/1512.02595v1.pdf) model. Optionally a [kenlm](https://github.com/kpu/kenlm) language model can be used at inference time.
 
 ## Installation
 
@@ -26,18 +26,12 @@ an Anaconda installation on Ubuntu, with PyTorch installed.
 
 Install [PyTorch](https://github.com/pytorch/pytorch#installation) if you haven't already.
 
-Install this fork for Warp-CTC bindings:
+Install Warp-CTC bindings:
 ```
 git clone https://github.com/SeanNaren/warp-ctc.git
 cd warp-ctc; mkdir build; cd build; cmake ..; make
 export CUDA_HOME="/usr/local/cuda"
 cd ../pytorch_binding && python setup.py install
-```
-
-Install NVIDIA apex:
-```
-git clone --recursive https://github.com/NVIDIA/apex.git
-cd apex && pip install .
 ```
 
 If you want decoding to support beam search with an optional language model, install ctcdecode:
@@ -111,19 +105,14 @@ data:
 python train.py +experiment=an4
 ```
 
-There is also [Visdom](https://github.com/facebookresearch/visdom) support to visualize training. Once a server has been started, to use:
+There is [Trains](https://github.com/allegroai/trains) support to visualize training. Once a server has been started, to use:
 
 ```
-python train.py visualization.visdom=true
+trains-init # Ensure you are connected to your running server, or it will default to the global Trains demo server
+python train.py visualization.trains=true
 ```
 
-There is also Tensorboard support to visualize training. Follow the instructions to set up. To use:
-
-```
-python train.py visualization.tensorboard=true visualization.log_dir=log_dir/ # Make sure the Tensorboard instance is made pointing to this log directory
-```
-
-For both visualisation tools, you can add your own name to the run by changing the `--id` parameter when training.
+To see options available, check [here](./deepspeech_pytorch/configs/train_config.py).
 
 ### Multi-GPU Training
 
@@ -137,8 +126,9 @@ python -m torchelastic.distributed.launch \
         --nnodes=1 \
         --nproc_per_node=4 \
         train.py data.train_manifest=data/an4_train_manifest.csv \
-                 data.val_manifest=data/an4_val_manifest.csv  apex.opt_level=O1 data.num_workers=8 \
-                 data.batch_size=8 training.epochs=70 checkpointing.checkpoint=true checkpointing.save_n_recent_models=3
+                 data.val_manifest=data/an4_val_manifest.csv model.precision=half data.num_workers=8 \
+                 data.batch_size=8 training.epochs=70 checkpointing.checkpoint=true checkpointing.save_n_recent_models=3 \
+                 training.multigpu=distributed
 ```
 
 You'll see the output for all the processes running on each individual GPU.
@@ -170,10 +160,11 @@ python -m torchelastic.distributed.launch \
         --rdzv_backend=etcd \
         --rdzv_endpoint=$PUBLIC_HOST_NAME:4377 \
         train.py data.train_manifest=/share/data/an4_train_manifest.csv \
-                 data.val_manifest=/share/data/an4_val_manifest.csv apex.opt_level=O1 \
+                 data.val_manifest=/share/data/an4_val_manifest.csv model.precision=half \
                  data.num_workers=8 checkpointing.save_folder=/share/checkpoints/ \
                  checkpointing.checkpoint=true checkpointing.load_auto_checkpoint=true checkpointing.save_n_recent_models=3 \
-                 data.batch_size=8 training.epochs=70 
+                 data.batch_size=8 training.epochs=70 \
+                 training.multigpu=distributed
 ```
 
 Using the `checkpointing.load_auto_checkpoint=true` flag and the `checkpointing.checkpoint_per_iteration` flag we can re-continue training from the latest saved checkpoint.
@@ -184,13 +175,11 @@ Currently it is expected that there is an NFS drive/shared mount across all node
 
 If you are using NVIDIA volta cards or above to train your model, it's highly suggested to turn on mixed precision for speed/memory benefits. More information can be found [here](https://docs.nvidia.com/deeplearning/sdk/mixed-precision-training/index.html).
 
-Different Optimization levels are available. More information on the Nvidia Apex API can be seen [here](https://nvidia.github.io/apex/amp.html#opt-levels).
-
 ```
-python train.py data.train_manifest=data/train_manifest.csv data.val_manifest=data/val_manifest.csv apex.opt_level=O1 apex.loss_scale=1.0
+python train.py data.train_manifest=data/train_manifest.csv data.val_manifest=data/val_manifest.csv training.precision=half
 ```
 
-Training a model in mixed-precision means you can use 32 bit float or half precision at runtime. Float32 is default, to use half precision (Which on V100s come with a speedup and better memory use) use the `--half` flag when testing or transcribing.
+Training a model in mixed-precision means you can use 32 bit float or half precision at runtime. Float32 is default, to use half precision (Which on V100s come with a speedup and better memory use) use the `model.precision=half` flag when testing or transcribing.
 
 ### Swapping to ADAMW Optimizer
 
@@ -230,29 +219,21 @@ Applies small changes to the tempo and gain when loading audio to increase robus
 
 ### Checkpoints
 
-Training supports saving checkpoints of the model to continue training from should an error occur or early termination. To enable epoch
-checkpoints use:
+Training supports saving checkpoints of the model to continue training from should an error occur or early termination. 
+
+To enable epoch checkpoints use:
 
 ```
 python train.py checkpoint=true
 ```
 
-To enable checkpoints every N batches through the epoch as well as epoch saving:
-
-```
-python train.py checkpoint=true --checkpoint-per-batch N # N is the number of batches to wait till saving a checkpoint at this batch.
-```
-
-Note for the batch checkpointing system to work, you cannot change the batch size when loading a checkpointed model from it's original training
-run.
-
-To continue from a checkpointed model that has been saved:
+To continue from a checkpoint model:
 
 ```
 python train.py checkpointing.continue_from=models/deepspeech_checkpoint_epoch_N_iter_N.pth
 ```
 
-This continues from the same training state as well as recreates the visdom graph to continue from if enabled.
+This continues from the same training state.
 
 If you would like to start from a previous checkpoint model but not continue training, add the `training.finetune=true` flag to restart training
 from the `checkpointing.continue_from` weights.
@@ -284,7 +265,7 @@ An example script to output a transcription has been provided:
 python transcribe.py model.model_path=models/deepspeech.pth audio_path=/path/to/audio.wav
 ```
 
-If you used mixed-precision or half precision when training the model, you can use the `--half` flag for a speed/memory benefit.
+If you used mixed-precision or half precision when training the model, you can use the `model.precision=half` for a speed/memory benefit.
 
 ## Inference Server
 
@@ -331,7 +312,7 @@ To build your own LM you need to use the KenLM repo found [here](https://github.
 ### Alternate Decoders
 By default, `test.py` and `transcribe.py` use a `GreedyDecoder` which picks the highest-likelihood output label at each timestep. Repeated and blank symbols are then filtered to give the final output.
 
-A beam search decoder can optionally be used with the installation of the `ctcdecode` library as described in the Installation section. The `test` and `transcribe` scripts have a `decoder_type` argument. To use the beam decoder, add `lm.decoder_type=beam`. The beam decoder enables additional decoding parameters:
+A beam search decoder can optionally be used with the installation of the `ctcdecode` library as described in the Installation section. The `test` and `transcribe` scripts have a `lm` config. To use the beam decoder, add `lm.decoder_type=beam`. The beam decoder enables additional decoding parameters:
 - **lm.beam_width** how many beams to consider at each timestep
 - **lm.lm_path** optional binary KenLM language model to use for decoding
 - **lm.alpha** weight for language model
@@ -339,7 +320,7 @@ A beam search decoder can optionally be used with the installation of the `ctcde
 
 ### Time offsets
 
-Use the `--offsets` flag to get positional information of each character in the transcription when using `transcribe.py` script. The offsets are based on the size
+Use the `offsets=true` flag to get positional information of each character in the transcription when using `transcribe.py` script. The offsets are based on the size
 of the output tensor, which you need to convert into a format required.
 For example, based on default parameters you could multiply the offsets by a scalar (duration of file in seconds / size of output) to get the offsets in seconds.
 

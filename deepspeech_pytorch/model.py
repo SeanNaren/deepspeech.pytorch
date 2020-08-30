@@ -205,7 +205,6 @@ class DeepSpeech(pl.LightningModule):
         self.evaluation_decoder = GreedyDecoder(self.labels)  # Decoder used for validation
         self.avg_loss = 0
 
-    @autocast()
     def forward(self, x, lengths):
         lengths = lengths.cpu().int()
         output_lengths = self.get_seq_lens(lengths)
@@ -228,13 +227,12 @@ class DeepSpeech(pl.LightningModule):
         return x, output_lengths
 
     def training_step(self, batch, batch_idx):
-        with autocast():
-            inputs, targets, input_percentages, target_sizes = batch
-            input_sizes = input_percentages.mul_(int(inputs.size(3))).int()
-            out, output_sizes = self(inputs, input_sizes)
-            out = out.transpose(0, 1)  # TxNxH
-            loss = self.criterion(out, targets.cpu(), output_sizes.cpu(), target_sizes.cpu())
-            loss = loss.type_as(inputs)
+        inputs, targets, input_percentages, target_sizes = batch
+        input_sizes = input_percentages.mul_(int(inputs.size(3))).int()
+        out, output_sizes = self(inputs, input_sizes)
+        out = out.transpose(0, 1)  # TxNxH
+        loss = self.criterion(out, targets.cpu(), output_sizes.cpu(), target_sizes.cpu())
+        loss = loss.type_as(inputs)
         self.avg_loss += loss.item()
         return loss
 
@@ -252,7 +250,7 @@ class DeepSpeech(pl.LightningModule):
             decoder=self.evaluation_decoder,
             target_decoder=self.evaluation_decoder,
             verbose=False,
-            use_half=self.precision is Precision.half
+            precision=self.precision
         )
         return {
             'wer': wer,

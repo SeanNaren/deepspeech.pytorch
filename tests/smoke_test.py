@@ -43,7 +43,6 @@ class DeepSpeechSmokeTest(unittest.TestCase):
                                    precision: Precision,
                                    gpus: int):
         cuda = gpus > 0
-        use_half = precision == Precision.half
 
         train_manifest, val_manifest, test_manifest = self.download_data(
             DatasetConfig(
@@ -80,28 +79,28 @@ class DeepSpeechSmokeTest(unittest.TestCase):
                 model_path=model_path,
                 test_manifest=test_manifest,
                 cuda=cuda,
-                use_half=use_half,
+                precision=precision,
                 lm_config=lm_config
             )
 
             self.inference(test_manifest=test_manifest,
                            model_path=model_path,
                            cuda=cuda,
-                           use_half=use_half,
+                           precision=precision,
                            lm_config=lm_config)
 
     def eval_model(self,
                    model_path: str,
                    test_manifest: str,
                    cuda: bool,
-                   use_half: bool,
+                   precision: Precision,
                    lm_config: LMConfig):
         # Due to using TravisCI with no GPU support we have to disable cuda
         eval_cfg = EvalConfig(
             model=ModelConfig(
                 cuda=cuda,
                 model_path=model_path,
-                use_half=use_half
+                precision=precision
             ),
             lm=lm_config,
             test_manifest=test_manifest
@@ -112,7 +111,7 @@ class DeepSpeechSmokeTest(unittest.TestCase):
                   test_manifest: str,
                   model_path: str,
                   cuda: bool,
-                  use_half: bool,
+                  precision: Precision,
                   lm_config: LMConfig):
         # Select one file from our test manifest to run inference
         with open(test_manifest) as f:
@@ -122,7 +121,7 @@ class DeepSpeechSmokeTest(unittest.TestCase):
             model=ModelConfig(
                 cuda=cuda,
                 model_path=model_path,
-                use_half=use_half
+                precision=precision
             ),
             lm=lm_config,
             audio_path=file_path
