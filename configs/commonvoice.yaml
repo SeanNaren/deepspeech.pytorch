@@ -1,0 +1,7 @@
+# @package _global_
+data:
+  train_manifest: data/ted_train_manifest.csv
+  val_manifest: data/ted_val_manifest.csv
+training:
+  gpus: 1
+  precision: half

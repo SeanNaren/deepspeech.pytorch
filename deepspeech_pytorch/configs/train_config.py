@@ -43,7 +43,7 @@ class AugmentationConfig:
 class DataConfig:
     train_manifest: str = 'data/train_manifest.csv'
     val_manifest: str = 'data/val_manifest.csv'
-    batch_size: int = 20  # Batch size for training
+    batch_size: int = 64  # Batch size for training
     num_workers: int = 4  # Number of workers used in data-loading
     labels_path: str = 'labels.json'  # Contains tokens for model output
     spect: SpectConfig = SpectConfig()
@@ -64,8 +64,8 @@ class UniDirectionalConfig(BiDirectionalConfig):
 
 @dataclass
 class OptimConfig:
-    learning_rate: float = 3e-4  # Initial Learning Rate
-    learning_anneal: float = 0.9  # Annealing applied to learning rate after each epoch
+    learning_rate: float = 1.5e-4  # Initial Learning Rate
+    learning_anneal: float = 0.99  # Annealing applied to learning rate after each epoch
     weight_decay: float = 1e-5  # Initial Weight Decay
     max_norm: float = 400  # Norm cutoff to prevent explosion of gradients
 

@@ -6,6 +6,3 @@ data:
 training:
   gpus: 1
   precision: half
-optim:
-  learning_anneal: 1.0
-  learning_rate: 1.5e-4
