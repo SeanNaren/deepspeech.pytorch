@@ -18,7 +18,7 @@ class TrainingConfig:
     gpus: int = 1  # Number of GPUs to use for training
     multigpu: MultiGPUType = MultiGPUType.disabled  # If using distribution, the lightning backend to be used
     precision: Precision = Precision.full
-    epochs: int = 70  # Number of Training Epochs
+    epochs: int = 60  # Number of Training Epochs
 
 
 @dataclass
