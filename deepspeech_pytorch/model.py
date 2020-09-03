@@ -6,8 +6,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from omegaconf import OmegaConf
-from torch.cuda.amp import autocast
-from warpctc_pytorch import CTCLoss
+from torch.nn import CTCLoss
 
 from deepspeech_pytorch.configs.train_config import SpectConfig, BiDirectionalConfig, OptimConfig, AdamConfig, \
     SGDConfig
@@ -201,7 +200,7 @@ class DeepSpeech(pl.LightningModule):
             SequenceWise(fully_connected),
         )
         self.inference_softmax = InferenceBatchSoftmax()
-        self.criterion = CTCLoss()
+        self.criterion = CTCLoss(reduction='sum', zero_infinity=True)
         self.evaluation_decoder = GreedyDecoder(self.labels)  # Decoder used for validation
         self.avg_loss = 0
 
@@ -231,8 +230,9 @@ class DeepSpeech(pl.LightningModule):
         input_sizes = input_percentages.mul_(int(inputs.size(3))).int()
         out, output_sizes = self(inputs, input_sizes)
         out = out.transpose(0, 1)  # TxNxH
-        loss = self.criterion(out, targets.cpu(), output_sizes.cpu(), target_sizes.cpu())
-        loss = loss.type_as(inputs)
+        out = out.log_softmax(-1)
+
+        loss = self.criterion(out, targets, output_sizes, target_sizes)
         self.avg_loss += loss.item()
         return loss
 
