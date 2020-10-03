@@ -60,9 +60,9 @@ class TrainingState:
         self.amp_state = amp.state_dict()
 
     def init_results_tracking(self, epochs):
-        self.result_state = ResultState(loss_results=torch.IntTensor(epochs),
-                                        wer_results=torch.IntTensor(epochs),
-                                        cer_results=torch.IntTensor(epochs))
+        self.result_state = ResultState(loss_results=torch.FloatTensor(epochs),
+                                        wer_results=torch.FloatTensor(epochs),
+                                        cer_results=torch.FloatTensor(epochs))
 
     def add_results(self,
                     epoch,
