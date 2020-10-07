@@ -272,20 +272,13 @@ class DeepSpeech(pl.LightningModule):
         cer = float(total_cer) / num_chars
         wer = torch.tensor(wer * 100)
         cer = torch.tensor(cer * 100)
-        result = pl.EvalResult(wer)
-        result.log('wer', wer)
-        result.log('cer', cer)
+
         metrics = {
             'wer': wer.item(),
             'cer': cer.item()
         }
-        if self.logger:
-            self.logger.log_metrics(metrics, step=self.current_epoch + 1)
-        return {
-            'progress_bar':
-                metrics,
-            'loss': wer,
-        }
+
+        self.log_dict(metrics, prog_bar=True)
 
     def configure_optimizers(self):
         if OmegaConf.get_type(self.optim_cfg) is SGDConfig:
