@@ -10,7 +10,7 @@ class LMConfig:
     top_paths: int = 1  # Number of beams to return
     alpha: float = 0.0  # Language model weight
     beta: float = 0.0  # Language model word bonus (all words)
-    cutoff_top_n: float = 40  # Cutoff_top_n characters with highest probs in vocabulary will be used in beam search
+    cutoff_top_n: int = 40  # Cutoff_top_n characters with highest probs in vocabulary will be used in beam search
     cutoff_prob: float = 1.0  # Cutoff probability in pruning,default 1.0, no pruning.
     beam_width: int = 10  # Beam width to use
     lm_workers: int = 4  # Number of LM processes to use
