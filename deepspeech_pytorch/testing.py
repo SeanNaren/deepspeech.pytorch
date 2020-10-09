@@ -36,19 +36,15 @@ def evaluate(cfg: EvalConfig):
         batch_size=cfg.batch_size,
         num_workers=cfg.num_workers
     )
-    wer, cer, output_data = run_evaluation(
+    wer, cer = run_evaluation(
         test_loader=test_loader,
         device=device,
         model=model,
         decoder=decoder,
         target_decoder=target_decoder,
-        save_output=cfg.save_output,
-        verbose=cfg.verbose,
         precision=cfg.model.precision
     )
 
     print('Test Summary \t'
           'Average WER {wer:.3f}\t'
           'Average CER {cer:.3f}\t'.format(wer=wer, cer=cer))
-    if cfg.save_output:
-        torch.save(output_data, hydra.utils.to_absolute_path(cfg.save_output))

@@ -83,16 +83,17 @@ class AdamConfig(OptimConfig):
 
 @dataclass
 class CheckpointConfig:
+    filepath: Optional[str] = None
+    monitor: Optional[str] = 'wer'
+    verbose: bool = False
+    save_last: Optional[bool] = None
+    save_top_k: int = 1
+    save_weights_only: bool = False
+    mode: str = "auto"
+    period: int = 1
+    prefix: str = ""
     continue_from: str = ''  # Continue training from checkpoint model
-    checkpoint: bool = True  # Enables epoch checkpoint saving of model
-    save_n_recent_models: int = 10  # Max number of checkpoints to save, delete older checkpoints
-    best_val_model_name: str = 'deepspeech_final.pth'  # Name to save best validated model within the save folder
     load_auto_checkpoint: bool = False  # Automatically load the latest checkpoint from save folder
-
-
-@dataclass
-class FileCheckpointConfig(CheckpointConfig):
-    save_folder: str = 'models/'  # Location to save checkpoint models
 
 
 @dataclass

@@ -1,12 +1,14 @@
 import json
 
 import pytorch_lightning as pl
-from deepspeech_pytorch.configs.train_config import DeepSpeechConfig
+from hydra.utils import to_absolute_path
+from omegaconf import OmegaConf
+from pytorch_lightning import seed_everything
+
+from deepspeech_pytorch.checkpoint import CheckpointHandler, GCSCheckpointHandler
+from deepspeech_pytorch.configs.train_config import DeepSpeechConfig, CheckpointConfig
 from deepspeech_pytorch.loader.data_module import DeepSpeechDataModule
 from deepspeech_pytorch.model import DeepSpeech
-from hydra.utils import to_absolute_path
-from pytorch_lightning import seed_everything
-from pytorch_lightning.callbacks import ModelCheckpoint
 
 
 def train(cfg: DeepSpeechConfig):
@@ -16,11 +18,18 @@ def train(cfg: DeepSpeechConfig):
     with open(to_absolute_path(cfg.data.labels_path)) as label_file:
         labels = json.load(label_file)
 
-    checkpoint_callback = ModelCheckpoint(
-        filepath='./',
-        monitor='wer',
-        save_top_k=5
-    )
+    if OmegaConf.get_type(cfg.checkpointing) is CheckpointConfig:
+        checkpoint_callback = CheckpointHandler(
+            cfg=cfg.checkpointing
+        )
+    else:
+        checkpoint_callback = GCSCheckpointHandler(
+            cfg=cfg.checkpointing
+        )
+    if cfg.checkpointing.load_auto_checkpoint:
+        latest_checkpoint = checkpoint_callback.find_latest_checkpoint()
+        if latest_checkpoint:
+            cfg.checkpointing.continue_from = latest_checkpoint
 
     data_loader = DeepSpeechDataModule(
         labels=labels,

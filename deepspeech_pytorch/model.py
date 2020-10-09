@@ -6,13 +6,14 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from omegaconf import OmegaConf
+from torch.cuda.amp import autocast
 from torch.nn import CTCLoss
 
 from deepspeech_pytorch.configs.train_config import SpectConfig, BiDirectionalConfig, OptimConfig, AdamConfig, \
     SGDConfig
 from deepspeech_pytorch.decoder import GreedyDecoder
 from deepspeech_pytorch.enums import Precision
-from deepspeech_pytorch.validation import run_validation_step
+from deepspeech_pytorch.validation import CharErrorRate, WordErrorRate
 
 
 class SequenceWise(nn.Module):
@@ -202,7 +203,14 @@ class DeepSpeech(pl.LightningModule):
         self.inference_softmax = InferenceBatchSoftmax()
         self.criterion = CTCLoss(reduction='sum', zero_infinity=True)
         self.evaluation_decoder = GreedyDecoder(self.labels)  # Decoder used for validation
-        self.avg_loss = 0
+        self.wer = WordErrorRate(
+            decoder=self.evaluation_decoder,
+            target_decoder=self.evaluation_decoder
+        )
+        self.cer = CharErrorRate(
+            decoder=self.evaluation_decoder,
+            target_decoder=self.evaluation_decoder
+        )
 
     def forward(self, x, lengths):
         lengths = lengths.cpu().int()
@@ -233,52 +241,29 @@ class DeepSpeech(pl.LightningModule):
         out = out.log_softmax(-1)
 
         loss = self.criterion(out, targets, output_sizes, target_sizes)
-        self.avg_loss += loss.item()
         return loss
 
-    def on_train_epoch_end(self):
-        self.avg_loss = self.avg_loss / self.trainer.num_training_batches
-        if self.logger:
-            self.logger.log_metrics({'Average Loss': float('%.3f' % self.avg_loss)}, step=self.current_epoch + 1)
-        self.avg_loss = 0
-
     def validation_step(self, batch, batch_idx):
-        wer, cer, n_tokens, n_chars, _ = run_validation_step(
-            batch=batch,
-            device=self.device,
-            model=self,
-            decoder=self.evaluation_decoder,
-            target_decoder=self.evaluation_decoder,
-            verbose=False,
-            precision=self.precision
+        inputs, targets, input_percentages, target_sizes = batch
+        input_sizes = input_percentages.mul_(int(inputs.size(3))).int()
+        inputs = inputs.to(self.device)
+        with autocast(enabled=self.precision is Precision.half):
+            out, output_sizes = self(inputs, input_sizes)
+        decoded_output, _ = self.evaluation_decoder.decode(out, output_sizes)
+        self.wer(
+            preds=out,
+            preds_sizes=output_sizes,
+            targets=targets,
+            target_sizes=target_sizes
         )
-        return {
-            'wer': wer,
-            'cer': cer,
-            'n_tokens': n_tokens,
-            'n_chars': n_chars
-        }
-
-    def validation_epoch_end(self, outputs):
-        total_wer, total_cer, num_tokens, num_chars = 0, 0, 0, 0
-
-        for output in outputs:
-            total_wer += output['wer']
-            total_cer += output['cer']
-            num_tokens += output['n_tokens']
-            num_chars += output['n_chars']
-
-        wer = float(total_wer) / num_tokens
-        cer = float(total_cer) / num_chars
-        wer = torch.tensor(wer * 100)
-        cer = torch.tensor(cer * 100)
-
-        metrics = {
-            'wer': wer.item(),
-            'cer': cer.item()
-        }
-
-        self.log_dict(metrics, prog_bar=True)
+        self.cer(
+            preds=out,
+            preds_sizes=output_sizes,
+            targets=targets,
+            target_sizes=target_sizes
+        )
+        self.log('wer', self.wer, prog_bar=True, on_epoch=True)
+        self.log('cer', self.cer, prog_bar=True, on_epoch=True)
 
     def configure_optimizers(self):
         if OmegaConf.get_type(self.optim_cfg) is SGDConfig:
