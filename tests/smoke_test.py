@@ -67,7 +67,7 @@ class DeepSpeechSmokeTest(unittest.TestCase):
         train(train_cfg)
 
         # Expected final model path after training
-        model_path = self.model_dir + '/deepspeech_final.pth'
+        model_path = self.model_dir + '/epoch=0.ckpt'
         assert os.path.exists(model_path)
 
         lm_configs = [
@@ -177,12 +177,17 @@ class DeepSpeechSmokeTest(unittest.TestCase):
                 precision=precision,
                 gpus=gpus
             ),
-            data=DataConfig(train_path=train_path,
-                            val_path=val_path,
-                            batch_size=batch_size),
+            data=DataConfig(
+                train_path=train_path,
+                val_path=val_path,
+                batch_size=batch_size
+            ),
             optim=AdamConfig(),
             model=model_config,
-            checkpointing=CheckpointConfig(filepath=self.model_dir)
+            checkpointing=CheckpointConfig(
+                filepath=self.model_dir,
+                verbose=True
+            )
         )
 
 
