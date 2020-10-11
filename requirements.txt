@@ -4,7 +4,7 @@ soundfile
 python-levenshtein
 torch
 torchelastic
-pytorch-lightning==1.0.0rc2
+pytorch-lightning==1.0.0rc4
 pytorch-lightning-bolts
 trains
 wget

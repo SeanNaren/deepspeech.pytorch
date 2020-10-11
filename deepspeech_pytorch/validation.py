@@ -16,8 +16,8 @@ class ErrorRate(Metric, ABC):
                  decoder: Decoder,
                  target_decoder: GreedyDecoder,
                  save_output: bool = False,
-                 ddp_sync_on_step: bool = False):
-        super().__init__(ddp_sync_on_step=ddp_sync_on_step)
+                 dist_sync_on_step: bool = False):
+        super().__init__(dist_sync_on_step=dist_sync_on_step)
         self.decoder = decoder
         self.target_decoder = target_decoder
         self.save_output = save_output
@@ -51,12 +51,12 @@ class CharErrorRate(ErrorRate):
                  decoder: Decoder,
                  target_decoder: GreedyDecoder,
                  save_output: bool = False,
-                 ddp_sync_on_step: bool = False):
+                 dist_sync_on_step: bool = False):
         super().__init__(
             decoder=decoder,
             target_decoder=target_decoder,
             save_output=save_output,
-            ddp_sync_on_step=ddp_sync_on_step
+            dist_sync_on_step=dist_sync_on_step
         )
         self.decoder = decoder
         self.target_decoder = target_decoder
@@ -90,12 +90,12 @@ class WordErrorRate(ErrorRate):
                  decoder: Decoder,
                  target_decoder: GreedyDecoder,
                  save_output: bool = False,
-                 ddp_sync_on_step: bool = False):
+                 dist_sync_on_step: bool = False):
         super().__init__(
             decoder=decoder,
             target_decoder=target_decoder,
             save_output=save_output,
-            ddp_sync_on_step=ddp_sync_on_step
+            dist_sync_on_step=dist_sync_on_step
         )
         self.decoder = decoder
         self.target_decoder = target_decoder
