@@ -15,8 +15,8 @@ class DeepSpeechDataModule(pl.LightningDataModule):
                  normalize,
                  multigpu: MultiGPUType):
         super().__init__()
-        self.train_manifest = to_absolute_path(data_cfg.train_manifest)
-        self.val_manifest = to_absolute_path(data_cfg.val_manifest)
+        self.train_path = to_absolute_path(data_cfg.train_path)
+        self.val_path = to_absolute_path(data_cfg.val_path)
         self.labels = labels
         self.data_cfg = data_cfg
         self.spect_cfg = data_cfg.spect
@@ -25,7 +25,7 @@ class DeepSpeechDataModule(pl.LightningDataModule):
         self.multigpu = multigpu
 
     def train_dataloader(self):
-        train_dataset = self._create_dataset(self.train_manifest)
+        train_dataset = self._create_dataset(self.train_path)
         if self.multigpu == MultiGPUType.distributed:
             train_sampler = DSElasticDistributedSampler(
                 dataset=train_dataset,
@@ -44,7 +44,7 @@ class DeepSpeechDataModule(pl.LightningDataModule):
         return train_loader
 
     def val_dataloader(self):
-        val_dataset = self._create_dataset(self.val_manifest)
+        val_dataset = self._create_dataset(self.val_path)
         val_loader = AudioDataLoader(
             dataset=val_dataset,
             num_workers=self.data_cfg.num_workers,
@@ -52,10 +52,10 @@ class DeepSpeechDataModule(pl.LightningDataModule):
         )
         return val_loader
 
-    def _create_dataset(self, manifest_filepath):
+    def _create_dataset(self, input_path):
         dataset = SpectrogramDataset(
             audio_conf=self.spect_cfg,
-            manifest_filepath=manifest_filepath,
+            input_path=input_path,
             labels=self.labels,
             normalize=True,
             aug_cfg=self.aug_cfg

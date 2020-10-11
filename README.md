@@ -79,7 +79,7 @@ Configuration is done via [Hydra](https://github.com/facebookresearch/hydra).
 Defaults can be seen in [config.py](deepspeech_pytorch/configs/train_config.py). Below is how you can override values set already:
 
 ```
-python train.py data.train_manifest=data/train_manifest.csv data.val_manifest=data/val_manifest.csv
+python train.py data.train_path=data/train_manifest.csv data.val_path=data/val_manifest.csv
 ```
 
 Use `python train.py --help` for all parameters and options.
@@ -89,8 +89,8 @@ You can also specify a config file to keep parameters stored in a yaml file like
 Create folder `experiment/` and file `experiment/an4.yaml`:
 ```yaml
 data:
-  train_manifest: data/an4_train_manifest.csv
-  val_manifest: data/an4_val_manifest.csv
+  train_path: data/an4_train_manifest.csv
+  val_path: data/an4_val_manifest.csv
 ```
 
 ```
@@ -117,8 +117,8 @@ python -m torchelastic.distributed.launch \
         --standalone \
         --nnodes=1 \
         --nproc_per_node=4 \
-        train.py data.train_manifest=data/an4_train_manifest.csv \
-                 data.val_manifest=data/an4_val_manifest.csv model.precision=half data.num_workers=8 \
+        train.py data.train_path=data/an4_train_manifest.csv \
+                 data.val_path=data/an4_val_manifest.csv model.precision=half data.num_workers=8 \
                  data.batch_size=8 training.epochs=70 checkpointing.checkpoint=true checkpointing.save_n_recent_models=3 \
                  training.multigpu=distributed
 ```
@@ -151,8 +151,8 @@ python -m torchelastic.distributed.launch \
         --rdzv_id=123 \
         --rdzv_backend=etcd \
         --rdzv_endpoint=$PUBLIC_HOST_NAME:4377 \
-        train.py data.train_manifest=/share/data/an4_train_manifest.csv \
-                 data.val_manifest=/share/data/an4_val_manifest.csv model.precision=half \
+        train.py data.train_path=/share/data/an4_train_manifest.csv \
+                 data.val_path=/share/data/an4_val_manifest.csv model.precision=half \
                  data.num_workers=8 checkpointing.save_folder=/share/checkpoints/ \
                  checkpointing.checkpoint=true checkpointing.load_auto_checkpoint=true checkpointing.save_n_recent_models=3 \
                  data.batch_size=8 training.epochs=70 \
@@ -248,7 +248,7 @@ To also note, there is no final softmax layer on the model as when trained, warp
 To evaluate a trained model on a test set (has to be in the same format as the training set):
 
 ```
-python test.py model.model_path=models/deepspeech.pth test_manifest=/path/to/test_manifest.csv
+python test.py model.model_path=models/deepspeech.pth test_path=/path/to/test_manifest.csv
 ```
 
 An example script to output a transcription has been provided:
@@ -280,7 +280,7 @@ In addition download the latest pre-trained librispeech model from the releases 
 
 First we need to generate the acoustic output to be used to evaluate the model on LibriSpeech val.
 ```
-python test.py data.test_manifest=data/librispeech_val_manifest.csv model.model_path=librispeech_pretrained_v2.pth save_output=librispeech_val_output.npy
+python test.py data.test_path=data/librispeech_val_manifest.csv model.model_path=librispeech_pretrained_v2.pth save_output=librispeech_val_output.npy
 ```
 
 We use a beam width of 128 which gives reasonable results. We suggest using a CPU intensive node to carry out the grid search.

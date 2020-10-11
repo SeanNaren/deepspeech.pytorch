@@ -41,8 +41,8 @@ class AugmentationConfig:
 
 @dataclass
 class DataConfig:
-    train_manifest: str = 'data/train_manifest.csv'
-    val_manifest: str = 'data/val_manifest.csv'
+    train_path: str = 'data/train_manifest.csv'
+    val_path: str = 'data/val_manifest.csv'
     batch_size: int = 64  # Batch size for training
     num_workers: int = 4  # Number of workers used in data-loading
     labels_path: str = 'labels.json'  # Contains tokens for model output

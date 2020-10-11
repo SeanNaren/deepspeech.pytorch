@@ -122,7 +122,8 @@ def download_an4(target_dir: str,
                  min_duration: float,
                  max_duration: float,
                  val_fraction: float,
-                 sample_rate: int):
+                 sample_rate: int,
+                 num_workers: int):
     root_path = 'an4/'
     raw_tar_path = 'an4_raw.bigendian.tar.gz'
     if not os.path.exists(raw_tar_path):
@@ -148,15 +149,18 @@ def download_an4(target_dir: str,
                     output_name='an4_train_manifest.csv',
                     manifest_path=manifest_dir,
                     min_duration=min_duration,
-                    max_duration=max_duration)
+                    max_duration=max_duration,
+                    num_workers=num_workers)
     create_manifest(data_path=val_path,
                     output_name='an4_val_manifest.csv',
                     manifest_path=manifest_dir,
                     min_duration=min_duration,
-                    max_duration=max_duration)
+                    max_duration=max_duration,
+                    num_workers=num_workers)
     create_manifest(data_path=test_path,
                     output_name='an4_test_manifest.csv',
-                    manifest_path=manifest_dir)
+                    manifest_path=manifest_dir,
+                    num_workers=num_workers)
 
 
 if __name__ == '__main__':
@@ -166,9 +170,12 @@ if __name__ == '__main__':
     parser.add_argument('--val-fraction', default=0.1, type=float,
                         help='Number of files in the training set to use as validation.')
     args = parser.parse_args()
-    download_an4(target_dir=args.target_dir,
-                 manifest_dir=args.manifest_dir,
-                 min_duration=args.min_duration,
-                 max_duration=args.max_duration,
-                 val_fraction=args.val_fraction,
-                 sample_rate=args.sample_rate)
+    download_an4(
+        target_dir=args.target_dir,
+        manifest_dir=args.manifest_dir,
+        min_duration=args.min_duration,
+        max_duration=args.max_duration,
+        val_fraction=args.val_fraction,
+        sample_rate=args.sample_rate,
+        num_workers=args.num_workers
+    )

@@ -1,5 +1,6 @@
 import math
 import os
+from pathlib import Path
 from tempfile import NamedTemporaryFile
 
 import librosa
@@ -138,7 +139,7 @@ class SpectrogramParser(AudioParser):
 class SpectrogramDataset(Dataset, SpectrogramParser):
     def __init__(self,
                  audio_conf: SpectConfig,
-                 manifest_filepath: str,
+                 input_path: str,
                  labels: list,
                  normalize: bool = False,
                  aug_cfg: AugmentationConfig = None):
@@ -148,18 +149,15 @@ class SpectrogramDataset(Dataset, SpectrogramParser):
 
         /path/to/audio.wav,/path/to/audio.txt
         ...
-
+        You can also pass the directory of dataset.
         :param audio_conf: Config containing the sample rate, window and the window length/stride in seconds
-        :param manifest_filepath: Path to manifest csv as describe above
+        :param input_path: Path to input.
         :param labels: List containing all the possible characters to map to
         :param normalize: Apply standard mean and deviation normalization to audio tensor
         :param augmentation_conf(Optional): Config containing the augmentation parameters
         """
-        with open(manifest_filepath) as f:
-            ids = f.readlines()
-        ids = [x.strip().split(',') for x in ids]
-        self.ids = ids
-        self.size = len(ids)
+        self.ids = self._parse_input(input_path)
+        self.size = len(self.ids)
         self.labels_map = dict([(labels[i], i) for i in range(len(labels))])
         super(SpectrogramDataset, self).__init__(audio_conf, normalize, aug_cfg)
 
@@ -169,6 +167,18 @@ class SpectrogramDataset(Dataset, SpectrogramParser):
         spect = self.parse_audio(audio_path)
         transcript = self.parse_transcript(transcript_path)
         return spect, transcript
+
+    def _parse_input(self, input_path):
+        if os.path.isdir(input_path):
+            ids = []
+            for wav_path in Path(input_path).rglob('*.wav'):
+                transcript_path = str(wav_path).replace('/wav/', '/txt/').replace('.wav', '.txt')
+                ids.append((wav_path, transcript_path))
+            return ids
+        else:
+            with open(input_path) as f:
+                ids = f.readlines()
+            return [x.strip().split(',') for x in ids]
 
     def parse_transcript(self, transcript_path):
         with open(transcript_path, 'r', encoding='utf8') as transcript_file:

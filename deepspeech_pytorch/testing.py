@@ -27,7 +27,7 @@ def evaluate(cfg: EvalConfig):
     )
     test_dataset = SpectrogramDataset(
         audio_conf=model.spect_cfg,
-        manifest_filepath=hydra.utils.to_absolute_path(cfg.test_manifest),
+        input_path=hydra.utils.to_absolute_path(cfg.test_path),
         labels=model.labels,
         normalize=True
     )

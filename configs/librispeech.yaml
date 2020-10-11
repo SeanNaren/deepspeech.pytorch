@@ -1,7 +1,7 @@
 # @package _global_
 data:
-  train_manifest: data/libri_train_manifest.csv
-  val_manifest: data/libri_val_manifest.csv
+  train_path: data/libri_train_manifest.csv
+  val_path: data/libri_val_manifest.csv
 training:
   gpus: 1
   precision: half

@@ -17,8 +17,6 @@ parser.add_argument("--target-dir", default='CommonVoice_dataset/', type=str, he
 parser.add_argument("--tar-path", type=str, help="Path to the Common Voice *.tar file if downloaded (Optional).")
 parser.add_argument('--files-to-process', nargs='+', default=['test.tsv', 'dev.tsv', 'train.tsv'],
                     type=str, help='list of *.csv file names to process')
-parser.add_argument("--num-workers", type=int, default=8,
-                    help="Number of workers when converting audio.")
 args = parser.parse_args()
 VERSION = 'cv-corpus-5.1-2020-06-22'
 COMMON_VOICE_URL = "https://voice-prod-bundler-ee1969a6ce8178826482b88e843c335139bd3fb4.s3.amazonaws.com/" \
@@ -100,7 +98,8 @@ def main():
             output_name='commonvoice_' + os.path.splitext(csv_file)[0] + '_manifest.csv',
             manifest_path=args.manifest_dir,
             min_duration=args.min_duration,
-            max_duration=args.max_duration
+            max_duration=args.max_duration,
+            num_workers=args.num_workers
         )
 
 

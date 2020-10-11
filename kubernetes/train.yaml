@@ -24,8 +24,8 @@ spec:
               args:
                 - "--nproc_per_node=1"
                 - "/workspace/deepspeech.pytorch/train.py"
-                - "data.train_manifest=/audio-data/an4_manifests/an4_train_manifest.csv"
-                - "data.val_manifest=/audio-data/an4_manifests/an4_val_manifest.csv"
+                - "data.train_path=/audio-data/an4_manifests/an4_train_manifest.csv"
+                - "data.val_path=/audio-data/an4_manifests/an4_val_manifest.csv"
                 - "data.labels_path=/workspace/deepspeech.pytorch/labels.json"
                 - "data.num_workers=8"
                 - "training.epochs=70"

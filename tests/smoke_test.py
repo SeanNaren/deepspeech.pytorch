@@ -3,12 +3,12 @@ import shutil
 import tempfile
 import unittest
 from dataclasses import dataclass
+from pathlib import Path
 
 from data.an4 import download_an4
 from deepspeech_pytorch.configs.inference_config import EvalConfig, ModelConfig, TranscribeConfig, LMConfig
 from deepspeech_pytorch.configs.train_config import DeepSpeechConfig, AdamConfig, BiDirectionalConfig, \
-    FileCheckpointConfig, \
-    DataConfig, TrainingConfig
+    DataConfig, TrainingConfig, CheckpointConfig
 from deepspeech_pytorch.enums import DecoderType, Precision
 from deepspeech_pytorch.inference import transcribe
 from deepspeech_pytorch.testing import evaluate
@@ -23,6 +23,7 @@ class DatasetConfig:
     max_duration: float = 15
     val_fraction: float = 0.1
     sample_rate: int = 16000
+    num_workers: int = 4
 
 
 class DeepSpeechSmokeTest(unittest.TestCase):
@@ -41,21 +42,23 @@ class DeepSpeechSmokeTest(unittest.TestCase):
                                    batch_size: int,
                                    model_config: BiDirectionalConfig,
                                    precision: Precision,
-                                   gpus: int):
+                                   gpus: int,
+                                   folders: bool):
         cuda = gpus > 0
 
-        train_manifest, val_manifest, test_manifest = self.download_data(
+        train_path, val_path, test_path = self.download_data(
             DatasetConfig(
                 target_dir=self.target_dir,
                 manifest_dir=self.manifest_dir
-            )
+            ),
+            folders=folders
         )
 
         train_cfg = self.create_training_config(
             epoch=epoch,
             batch_size=batch_size,
-            train_manifest=train_manifest,
-            val_manifest=val_manifest,
+            train_path=train_path,
+            val_path=val_path,
             model_config=model_config,
             precision=precision,
             gpus=gpus
@@ -77,13 +80,13 @@ class DeepSpeechSmokeTest(unittest.TestCase):
         for lm_config in lm_configs:
             self.eval_model(
                 model_path=model_path,
-                test_manifest=test_manifest,
+                test_path=test_path,
                 cuda=cuda,
                 precision=precision,
                 lm_config=lm_config
             )
 
-            self.inference(test_manifest=test_manifest,
+            self.inference(test_path=test_path,
                            model_path=model_path,
                            cuda=cuda,
                            precision=precision,
@@ -91,7 +94,7 @@ class DeepSpeechSmokeTest(unittest.TestCase):
 
     def eval_model(self,
                    model_path: str,
-                   test_manifest: str,
+                   test_path: str,
                    cuda: bool,
                    precision: Precision,
                    lm_config: LMConfig):
@@ -103,19 +106,22 @@ class DeepSpeechSmokeTest(unittest.TestCase):
                 precision=precision
             ),
             lm=lm_config,
-            test_manifest=test_manifest
+            test_path=test_path
         )
         evaluate(eval_cfg)
 
     def inference(self,
-                  test_manifest: str,
+                  test_path: str,
                   model_path: str,
                   cuda: bool,
                   precision: Precision,
                   lm_config: LMConfig):
         # Select one file from our test manifest to run inference
-        with open(test_manifest) as f:
-            file_path = next(f).strip().split(',')[0]
+        if os.path.isdir(test_path):
+            file_path = next(Path(test_path).rglob('*.wav'))
+        else:
+            with open(test_path) as f:
+                file_path = next(f).strip().split(',')[0]
 
         transcribe_cfg = TranscribeConfig(
             model=ModelConfig(
@@ -128,29 +134,40 @@ class DeepSpeechSmokeTest(unittest.TestCase):
         )
         transcribe(transcribe_cfg)
 
-    def download_data(self, cfg: DatasetConfig):
-        download_an4(target_dir=cfg.target_dir,
-                     manifest_dir=cfg.manifest_dir,
-                     min_duration=cfg.min_duration,
-                     max_duration=cfg.max_duration,
-                     val_fraction=cfg.val_fraction,
-                     sample_rate=cfg.sample_rate)
-        # Expected manifests paths
-        train_manifest = os.path.join(self.manifest_dir, 'an4_train_manifest.csv')
-        val_manifest = os.path.join(self.manifest_dir, 'an4_val_manifest.csv')
-        test_manifest = os.path.join(self.manifest_dir, 'an4_test_manifest.csv')
+    def download_data(self,
+                      cfg: DatasetConfig,
+                      folders: bool):
+        download_an4(
+            target_dir=cfg.target_dir,
+            manifest_dir=cfg.manifest_dir,
+            min_duration=cfg.min_duration,
+            max_duration=cfg.max_duration,
+            val_fraction=cfg.val_fraction,
+            sample_rate=cfg.sample_rate,
+            num_workers=cfg.num_workers
+        )
+
+        # Expected output paths
+        if folders:
+            train_path = os.path.join(self.target_dir, 'train/')
+            val_path = os.path.join(self.target_dir, 'val/')
+            test_path = os.path.join(self.target_dir, 'test/')
+        else:
+            train_path = os.path.join(self.manifest_dir, 'an4_train_manifest.csv')
+            val_path = os.path.join(self.manifest_dir, 'an4_val_manifest.csv')
+            test_path = os.path.join(self.manifest_dir, 'an4_test_manifest.csv')
 
         # Assert manifest paths exists
-        assert os.path.exists(train_manifest)
-        assert os.path.exists(val_manifest)
-        assert os.path.exists(test_manifest)
-        return train_manifest, val_manifest, test_manifest
+        assert os.path.exists(train_path)
+        assert os.path.exists(val_path)
+        assert os.path.exists(test_path)
+        return train_path, val_path, test_path
 
     def create_training_config(self,
                                epoch: int,
                                batch_size: int,
-                               train_manifest: str,
-                               val_manifest: str,
+                               train_path: str,
+                               val_path: str,
                                model_config: BiDirectionalConfig,
                                precision: Precision,
                                gpus: int):
@@ -160,12 +177,12 @@ class DeepSpeechSmokeTest(unittest.TestCase):
                 precision=precision,
                 gpus=gpus
             ),
-            data=DataConfig(train_manifest=train_manifest,
-                            val_manifest=val_manifest,
+            data=DataConfig(train_path=train_path,
+                            val_path=val_path,
                             batch_size=batch_size),
             optim=AdamConfig(),
             model=model_config,
-            checkpointing=FileCheckpointConfig(save_folder=self.model_dir)
+            checkpointing=CheckpointConfig(filepath=self.model_dir)
         )
 
 
@@ -182,7 +199,24 @@ class AN4SmokeTest(DeepSpeechSmokeTest):
             batch_size=10,
             model_config=model_cfg,
             precision=Precision.full,
-            gpus=0
+            gpus=0,
+            folders=False
+        )
+
+    def test_train_eval_inference_folder(self):
+        """Test train/eval/inference using folder directories rather than manifest files"""
+        # Hardcoded sizes to reduce memory/time, and disabled GPU due to using TravisCI
+        model_cfg = BiDirectionalConfig(
+            hidden_size=10,
+            hidden_layers=1
+        )
+        self.build_train_evaluate_model(
+            epoch=1,
+            batch_size=10,
+            model_config=model_cfg,
+            precision=Precision.full,
+            gpus=0,
+            folders=True
         )
 
 

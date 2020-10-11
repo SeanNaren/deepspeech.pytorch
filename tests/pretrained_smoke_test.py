@@ -4,7 +4,7 @@ import unittest
 import wget
 
 from deepspeech_pytorch.configs.inference_config import LMConfig
-from deepspeech_pytorch.enums import DecoderType
+from deepspeech_pytorch.enums import DecoderType, Precision
 from tests.smoke_test import DatasetConfig, DeepSpeechSmokeTest
 
 pretrained_urls = [
@@ -20,7 +20,7 @@ class PretrainedSmokeTest(DeepSpeechSmokeTest):
 
     def test_pretrained_eval_inference(self):
         # Disabled GPU due to using TravisCI
-        cuda, use_half = False, False
+        cuda, precision = False, Precision.full
         train_manifest, val_manifest, test_manifest = self.download_data(DatasetConfig(target_dir=self.target_dir,
                                                                                        manifest_dir=self.manifest_dir))
         wget.download(lm_path)
@@ -44,16 +44,20 @@ class PretrainedSmokeTest(DeepSpeechSmokeTest):
             ]
 
             for lm_config in lm_configs:
-                self.eval_model(model_path=pretrained_path,
-                                test_manifest=test_manifest,
-                                cuda=cuda,
-                                use_half=use_half,
-                                lm_config=lm_config)
-                self.inference(test_manifest=test_manifest,
-                               model_path=pretrained_path,
-                               cuda=cuda,
-                               lm_config=lm_config,
-                               use_half=use_half)
+                self.eval_model(
+                    model_path=pretrained_path,
+                    test_path=test_manifest,
+                    cuda=cuda,
+                    lm_config=lm_config,
+                    precision=precision
+                )
+                self.inference(
+                    test_path=test_manifest,
+                    model_path=pretrained_path,
+                    cuda=cuda,
+                    lm_config=lm_config,
+                    precision=precision
+                )
 
 
 if __name__ == '__main__':
