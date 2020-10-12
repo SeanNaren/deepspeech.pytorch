@@ -4,13 +4,11 @@ soundfile
 python-levenshtein
 torch
 torchelastic
-pytorch-lightning==1.0.0rc4
+pytorch-lightning==1.0.0rc5
 pytorch-lightning-bolts
 trains
 wget
 librosa
-numba==0.43.0
-llvmlite==0.32.1
 tqdm
 matplotlib
 flask
