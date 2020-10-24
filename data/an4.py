@@ -146,19 +146,19 @@ def download_an4(target_dir: str,
 
     print('Creating manifests...')
     create_manifest(data_path=train_path,
-                    output_name='an4_train_manifest.csv',
+                    output_name='an4_train_manifest.json',
                     manifest_path=manifest_dir,
                     min_duration=min_duration,
                     max_duration=max_duration,
                     num_workers=num_workers)
     create_manifest(data_path=val_path,
-                    output_name='an4_val_manifest.csv',
+                    output_name='an4_val_manifest.json',
                     manifest_path=manifest_dir,
                     min_duration=min_duration,
                     max_duration=max_duration,
                     num_workers=num_workers)
     create_manifest(data_path=test_path,
-                    output_name='an4_test_manifest.csv',
+                    output_name='an4_test_manifest.json',
                     manifest_path=manifest_dir,
                     num_workers=num_workers)
 

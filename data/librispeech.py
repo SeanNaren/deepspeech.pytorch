@@ -105,7 +105,7 @@ def main():
         if split_type == 'train':  # Prune to min/max duration
             create_manifest(
                 data_path=split_dir,
-                output_name='libri_' + split_type + '_manifest.csv',
+                output_name='libri_' + split_type + '_manifest.json',
                 manifest_path=args.manifest_dir,
                 min_duration=args.min_duration,
                 max_duration=args.max_duration,
@@ -114,7 +114,7 @@ def main():
         else:
             create_manifest(
                 data_path=split_dir,
-                output_name='libri_' + split_type + '_manifest.csv',
+                output_name='libri_' + split_type + '_manifest.json',
                 manifest_path=args.manifest_dir,
                 num_workers=args.num_workers
             )

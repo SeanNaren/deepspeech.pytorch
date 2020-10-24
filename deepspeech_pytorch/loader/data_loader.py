@@ -1,3 +1,4 @@
+import json
 import math
 import os
 from pathlib import Path
@@ -169,16 +170,20 @@ class SpectrogramDataset(Dataset, SpectrogramParser):
         return spect, transcript
 
     def _parse_input(self, input_path):
+        ids = []
         if os.path.isdir(input_path):
-            ids = []
             for wav_path in Path(input_path).rglob('*.wav'):
                 transcript_path = str(wav_path).replace('/wav/', '/txt/').replace('.wav', '.txt')
                 ids.append((wav_path, transcript_path))
-            return ids
         else:
+            # Assume it is a manifest file
             with open(input_path) as f:
-                ids = f.readlines()
-            return [x.strip().split(',') for x in ids]
+                manifest = json.load(f)
+            for sample in manifest['samples']:
+                wav_path = os.path.join(manifest['root_path'], sample['wav_path'])
+                transcript_path = os.path.join(manifest['root_path'], sample['transcript_path'])
+                ids.append((wav_path, transcript_path))
+        return ids
 
     def parse_transcript(self, transcript_path):
         with open(transcript_path, 'r', encoding='utf8') as transcript_file:

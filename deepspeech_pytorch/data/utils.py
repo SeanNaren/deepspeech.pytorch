@@ -2,8 +2,10 @@ from __future__ import print_function
 
 import fnmatch
 import io
+import json
 import os
 from multiprocessing import Pool
+from pathlib import Path
 from typing import Optional
 
 import sox
@@ -18,22 +20,30 @@ def create_manifest(
         min_duration: Optional[float] = None,
         max_duration: Optional[float] = None,
 ):
-    file_paths = [os.path.join(dirpath, f)
-                  for dirpath, dirnames, files in os.walk(data_path)
-                  for f in fnmatch.filter(files, '*.wav')]
+    file_paths = list(Path(data_path).rglob('*.wav'))
     file_paths = order_and_prune_files(
         file_paths=file_paths,
         min_duration=min_duration,
         max_duration=max_duration,
         num_workers=num_workers
     )
-    os.makedirs(manifest_path, exist_ok=True)
-    with io.FileIO(os.path.join(manifest_path, output_name), "w") as file:
-        for wav_path in tqdm(file_paths, total=len(file_paths)):
-            transcript_path = wav_path.replace('/wav/', '/txt/').replace('.wav', '.txt')
-            sample = os.path.abspath(wav_path) + ',' + os.path.abspath(transcript_path) + '\n'
-            file.write(sample.encode('utf-8'))
-    print('\n')
+
+    output_path = Path(manifest_path) / output_name
+    output_path.parent.mkdir(exist_ok=True, parents=True)
+
+    manifest = {
+        'root_path': data_path,
+        'samples': []
+    }
+    for wav_path in tqdm(file_paths, total=len(file_paths)):
+        wav_path = str(wav_path.relative_to(data_path))
+        transcript_path = wav_path.replace('/wav/', '/txt/').replace('.wav', '.txt')
+        manifest['samples'].append({
+            'wav_path': wav_path,
+            'transcript_path': transcript_path
+        })
+
+    output_path.write_text(json.dumps(manifest), encoding='utf8')
 
 
 def _duration_file_path(path):

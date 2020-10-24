@@ -95,7 +95,7 @@ def main():
     for csv_file in args.files_to_process:
         create_manifest(
             data_path=os.path.join(target_dir, os.path.splitext(csv_file)[0]),
-            output_name='commonvoice_' + os.path.splitext(csv_file)[0] + '_manifest.csv',
+            output_name='commonvoice_' + os.path.splitext(csv_file)[0] + '_manifest.json',
             manifest_path=args.manifest_dir,
             min_duration=args.min_duration,
             max_duration=args.max_duration,

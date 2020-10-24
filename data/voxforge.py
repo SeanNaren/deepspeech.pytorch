@@ -97,7 +97,7 @@ if __name__ == '__main__':
     print('Creating manifests...')
     create_manifest(
         data_path=target_dir,
-        output_name='voxforge_train_manifest.csv',
+        output_name='voxforge_train_manifest.json',
         manifest_path=args.manifest_dir,
         min_duration=args.min_duration,
         max_duration=args.max_duration,

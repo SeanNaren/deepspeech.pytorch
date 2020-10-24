@@ -97,13 +97,6 @@ data:
 python train.py +experiment=an4
 ```
 
-There is [Trains](https://github.com/allegroai/trains) support to visualize training. Once a server has been started, to use:
-
-```
-trains-init # Ensure you are connected to your running server, or it will default to the global Trains demo server
-python train.py visualization.trains=true
-```
-
 To see options available, check [here](./deepspeech_pytorch/configs/train_config.py).
 
 ### Multi-GPU Training

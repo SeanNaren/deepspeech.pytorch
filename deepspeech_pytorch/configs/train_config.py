@@ -105,7 +105,6 @@ class GCSCheckpointConfig(CheckpointConfig):
 
 @dataclass
 class VisualizationConfig:
-    trains: bool = False  # Turn on AllegroAI Trains Visualization Support
     project_name: str = 'DeepSpeech training'  # Name to use when visualizing/storing the run
     task_name: Optional[str] = field(default=None)  # The name of the experiment. Defaults to None.
 

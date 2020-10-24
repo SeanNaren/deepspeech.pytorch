@@ -4,9 +4,7 @@ soundfile
 python-levenshtein
 torch
 torchelastic
-pytorch-lightning==1.0.0rc5
-pytorch-lightning-bolts
-trains
+pytorch-lightning==1.0.2
 wget
 librosa
 tqdm
