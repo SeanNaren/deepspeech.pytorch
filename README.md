@@ -331,11 +331,11 @@ To build your own LM you need to use the KenLM repo found [here](https://github.
 ### Alternate Decoders
 By default, `test.py` and `transcribe.py` use a `GreedyDecoder` which picks the highest-likelihood output label at each timestep. Repeated and blank symbols are then filtered to give the final output.
 
-A beam search decoder can optionally be used with the installation of the `ctcdecode` library as described in the Installation section. The `test` and `transcribe` scripts have a `--decoder` argument. To use the beam decoder, add `--decoder beam`. The beam decoder enables additional decoding parameters:
-- **beam_width** how many beams to consider at each timestep
-- **lm_path** optional binary KenLM language model to use for decoding
-- **alpha** weight for language model
-- **beta** bonus weight for words
+A beam search decoder can optionally be used with the installation of the `ctcdecode` library as described in the Installation section. The `test` and `transcribe` scripts have a `decoder_type` argument. To use the beam decoder, add `lm.decoder_type=beam`. The beam decoder enables additional decoding parameters:
+- **lm.beam_width** how many beams to consider at each timestep
+- **lm.lm_path** optional binary KenLM language model to use for decoding
+- **lm.alpha** weight for language model
+- **lm.beta** bonus weight for words
 
 ### Time offsets
 
