@@ -32,7 +32,7 @@ def create_manifest(
     output_path.parent.mkdir(exist_ok=True, parents=True)
 
     manifest = {
-        'root_path': data_path,
+        'root_path': os.path.abspath(data_path),
         'samples': []
     }
     for wav_path in tqdm(file_paths, total=len(file_paths)):
