@@ -1,7 +1,5 @@
 from __future__ import print_function
 
-import fnmatch
-import io
 import json
 import os
 from multiprocessing import Pool
@@ -30,9 +28,9 @@ def create_manifest(
 
     output_path = Path(manifest_path) / output_name
     output_path.parent.mkdir(exist_ok=True, parents=True)
-
+    data_path = os.path.abspath(data_path)
     manifest = {
-        'root_path': os.path.abspath(data_path),
+        'root_path': data_path,
         'samples': []
     }
     for wav_path in tqdm(file_paths, total=len(file_paths)):
