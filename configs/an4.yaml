@@ -13,3 +13,4 @@ trainer:
 checkpoint:
   save_top_k: 1
   monitor: "wer"
+  verbose: True
