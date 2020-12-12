@@ -18,3 +18,4 @@ hydra-core
 google-cloud-storage
 jupyter
 git+https://github.com/romesco/hydra-lightning/#subdirectory=hydra-configs-lightning
+https://github.com/PyTorchLightning/fairscale/archive/pl_1.1.0.zip
