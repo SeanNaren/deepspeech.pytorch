@@ -9,6 +9,7 @@ trainer:
   precision: 16
   gradient_clip_val: 400  # Norm cutoff to prevent explosion of gradients
   accelerator: ddp
+  checkpoint_callback: True
 checkpoint:
   save_top_k: 1
   monitor: "wer"
