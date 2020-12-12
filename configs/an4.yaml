@@ -1,8 +1,14 @@
 # @package _global_
 data:
-  train_path: data/an4_train_manifest.csv
-  val_path: data/an4_val_manifest.csv
+  train_path: data/an4_train_manifest.json
+  val_path: data/an4_val_manifest.json
   batch_size: 8
-training:
+trainer:
+  max_epochs: 70
   gpus: 1
-  precision: half
+  precision: 16
+  gradient_clip_val: 400  # Norm cutoff to prevent explosion of gradients
+  accelerator: ddp
+checkpoint:
+  save_top_k: 1
+  monitor: "wer"

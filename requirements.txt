@@ -4,7 +4,7 @@ soundfile
 python-levenshtein
 torch
 torchelastic
-pytorch-lightning==1.0.2
+pytorch-lightning>=1.1
 wget
 librosa
 tqdm
@@ -14,6 +14,7 @@ sox
 sklearn
 soundfile
 pytest
-hydra-core==1.0.0rc1
+hydra-core
 google-cloud-storage
 jupyter
+git+https://github.com/romesco/hydra-lightning/#subdirectory=hydra-configs-lightning

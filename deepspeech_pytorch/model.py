@@ -1,5 +1,5 @@
 import math
-from typing import List
+from typing import List, Union
 
 import pytorch_lightning as pl
 import torch
@@ -10,9 +10,8 @@ from torch.cuda.amp import autocast
 from torch.nn import CTCLoss
 
 from deepspeech_pytorch.configs.train_config import SpectConfig, BiDirectionalConfig, OptimConfig, AdamConfig, \
-    SGDConfig
+    SGDConfig, UniDirectionalConfig
 from deepspeech_pytorch.decoder import GreedyDecoder
-from deepspeech_pytorch.enums import Precision
 from deepspeech_pytorch.validation import CharErrorRate, WordErrorRate
 
 
@@ -139,9 +138,9 @@ class Lookahead(nn.Module):
 class DeepSpeech(pl.LightningModule):
     def __init__(self,
                  labels: List,
-                 model_cfg: BiDirectionalConfig,
-                 precision: Precision,
-                 optim_cfg: OptimConfig,
+                 model_cfg: Union[UniDirectionalConfig, BiDirectionalConfig],
+                 precision: int,
+                 optim_cfg: Union[AdamConfig, SGDConfig],
                  spect_cfg: SpectConfig
                  ):
         super().__init__()
@@ -247,7 +246,7 @@ class DeepSpeech(pl.LightningModule):
         inputs, targets, input_percentages, target_sizes = batch
         input_sizes = input_percentages.mul_(int(inputs.size(3))).int()
         inputs = inputs.to(self.device)
-        with autocast(enabled=self.precision is Precision.half):
+        with autocast(enabled=self.precision is 16):
             out, output_sizes = self(inputs, input_sizes)
         decoded_output, _ = self.evaluation_decoder.decode(out, output_sizes)
         self.wer(
@@ -262,8 +261,8 @@ class DeepSpeech(pl.LightningModule):
             targets=targets,
             target_sizes=target_sizes
         )
-        self.log('wer', self.wer, prog_bar=True, on_epoch=True)
-        self.log('cer', self.cer, prog_bar=True, on_epoch=True)
+        self.log('wer', self.wer.compute(), prog_bar=True, on_epoch=True)
+        self.log('cer', self.cer.compute(), prog_bar=True, on_epoch=True)
 
     def configure_optimizers(self):
         if OmegaConf.get_type(self.optim_cfg) is SGDConfig:

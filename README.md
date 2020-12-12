@@ -112,8 +112,8 @@ python -m torchelastic.distributed.launch \
         --nproc_per_node=4 \
         train.py data.train_path=data/an4_train_manifest.csv \
                  data.val_path=data/an4_val_manifest.csv model.precision=half data.num_workers=8 \
-                 data.batch_size=8 training.epochs=70 checkpointing.checkpoint=true checkpointing.save_n_recent_models=3 \
-                 training.multigpu=distributed
+                 data.batch_size=8 trainer.max_epochs=70 checkpoint.checkpoint=true checkpointing.save_n_recent_models=3 \
+                 trainer.accelerator=ddp trainer.gpus=4
 ```
 
 You'll see the output for all the processes running on each individual GPU.
@@ -146,13 +146,13 @@ python -m torchelastic.distributed.launch \
         --rdzv_endpoint=$PUBLIC_HOST_NAME:4377 \
         train.py data.train_path=/share/data/an4_train_manifest.csv \
                  data.val_path=/share/data/an4_val_manifest.csv model.precision=half \
-                 data.num_workers=8 checkpointing.save_folder=/share/checkpoints/ \
-                 checkpointing.checkpoint=true checkpointing.load_auto_checkpoint=true checkpointing.save_n_recent_models=3 \
-                 data.batch_size=8 training.epochs=70 \
-                 training.multigpu=distributed
+                 data.num_workers=8 checkpoint.save_folder=/share/checkpoints/ \
+                 checkpoint.checkpoint=true checkpoint.load_auto_checkpoint=true checkpointing.save_n_recent_models=3 \
+                 data.batch_size=8 trainer.max_epochs=70 \
+                 trainer.accelerator=ddp trainer.gpus=4 trainer.num_nodes=2
 ```
 
-Using the `checkpointing.load_auto_checkpoint=true` flag and the `checkpointing.checkpoint_per_iteration` flag we can re-continue training from the latest saved checkpoint.
+Using the `load_auto_checkpoint=true` flag we can re-continue training from the latest saved checkpoint.
 
 Currently it is expected that there is an NFS drive/shared mount across all nodes within the cluster to load the latest checkpoint from.
 
@@ -161,7 +161,7 @@ Currently it is expected that there is an NFS drive/shared mount across all node
 If you are using NVIDIA volta cards or above to train your model, it's highly suggested to turn on mixed precision for speed/memory benefits. More information can be found [here](https://docs.nvidia.com/deeplearning/sdk/mixed-precision-training/index.html).
 
 ```
-python train.py data.train_manifest=data/train_manifest.csv data.val_manifest=data/val_manifest.csv training.precision=half
+python train.py data.train_manifest=data/train_manifest.csv data.val_manifest=data/val_manifest.csv trainer.precision=16
 ```
 
 Training a model in mixed-precision means you can use 32 bit float or half precision at runtime. Float32 is default, to use half precision (Which on V100s come with a speedup and better memory use) use the `model.precision=half` flag when testing or transcribing.

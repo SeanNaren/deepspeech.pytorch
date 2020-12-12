@@ -3,18 +3,16 @@ from pathlib import Path
 
 import hydra
 from google.cloud import storage
+from hydra_configs.pytorch_lightning.callbacks import ModelCheckpointConf
 from pytorch_lightning.callbacks import ModelCheckpoint
 from tqdm import tqdm
 
-from deepspeech_pytorch.configs.train_config import GCSCheckpointConfig, CheckpointConfig
+from deepspeech_pytorch.configs.train_config import GCSCheckpointConfig
 
 
 class CheckpointHandler(ModelCheckpoint):
 
-    def __init__(
-            self,
-            cfg: CheckpointConfig
-    ):
+    def __init__(self, cfg: ModelCheckpointConf):
         super().__init__(
             filepath=cfg.filepath,
             monitor=cfg.monitor,

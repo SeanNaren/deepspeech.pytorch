@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from deepspeech_pytorch.enums import DecoderType, Precision
+from deepspeech_pytorch.enums import DecoderType
 
 
 @dataclass
@@ -18,7 +18,7 @@ class LMConfig:
 
 @dataclass
 class ModelConfig:
-    precision: Precision = Precision.full  # Set to half to use mixed-precision for inference
+    precision: int = 32  # Set to 16 to use mixed-precision for inference
     cuda: bool = True
     model_path: str = ''
 

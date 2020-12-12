@@ -1,24 +1,17 @@
 from dataclasses import dataclass, field
-from typing import Any, List, Optional
+from typing import Any, List
 
-from deepspeech_pytorch.enums import MultiGPUType, SpectrogramWindow, RNNType, Precision
+from hydra_configs.pytorch_lightning.callbacks import ModelCheckpointConf
+from hydra_configs.pytorch_lightning.trainer import TrainerConf
 from omegaconf import MISSING
+
+from deepspeech_pytorch.enums import SpectrogramWindow, RNNType
 
 defaults = [
     {"optim": "adam"},
     {"model": "bidirectional"},
-    {"checkpointing": "file"}
+    {"checkpoint": "file"}
 ]
-
-
-@dataclass
-class TrainingConfig:
-    finetune: bool = False  # Fine-tune the model from checkpoint "continue_from"
-    seed: int = 123456  # Seed for generators
-    gpus: int = 1  # Number of GPUs to use for training
-    multigpu: MultiGPUType = MultiGPUType.disabled  # If using distribution, the lightning backend to be used
-    precision: Precision = Precision.full
-    epochs: int = 60  # Number of Training Epochs
 
 
 @dataclass
@@ -67,7 +60,6 @@ class OptimConfig:
     learning_rate: float = 1.5e-4  # Initial Learning Rate
     learning_anneal: float = 0.99  # Annealing applied to learning rate after each epoch
     weight_decay: float = 1e-5  # Initial Weight Decay
-    max_norm: float = 400  # Norm cutoff to prevent explosion of gradients
 
 
 @dataclass
@@ -82,31 +74,15 @@ class AdamConfig(OptimConfig):
 
 
 @dataclass
-class CheckpointConfig:
-    filepath: Optional[str] = None
-    monitor: Optional[str] = 'wer'
-    verbose: bool = False
-    save_last: Optional[bool] = None
-    save_top_k: int = 1
-    save_weights_only: bool = False
-    mode: str = "auto"
-    period: int = 1
-    prefix: str = ""
-    continue_from: str = ''  # Continue training from checkpoint model
-    load_auto_checkpoint: bool = False  # Automatically load the latest checkpoint from save folder
-
-
-@dataclass
-class GCSCheckpointConfig(CheckpointConfig):
+class GCSCheckpointConfig(ModelCheckpointConf):
     gcs_bucket: str = MISSING  # Bucket to store model checkpoints e.g bucket-name
     gcs_save_folder: str = MISSING  # Folder to store model checkpoints in bucket e.g models/
     local_save_file: str = './local_checkpoint.pth'  # Place to store temp file on disk
 
 
 @dataclass
-class VisualizationConfig:
-    project_name: str = 'DeepSpeech training'  # Name to use when visualizing/storing the run
-    task_name: Optional[str] = field(default=None)  # The name of the experiment. Defaults to None.
+class DeepSpeechTrainerConf(TrainerConf):
+    callbacks: Any = MISSING
 
 
 @dataclass
@@ -114,8 +90,9 @@ class DeepSpeechConfig:
     defaults: List[Any] = field(default_factory=lambda: defaults)
     optim: Any = MISSING
     model: Any = MISSING
-    checkpointing: Any = MISSING
-    training: TrainingConfig = TrainingConfig()
+    checkpoint: Any = MISSING
+    trainer: TrainerConf = DeepSpeechTrainerConf()
     data: DataConfig = DataConfig()
     augmentation: AugmentationConfig = AugmentationConfig()
-    viz: VisualizationConfig = VisualizationConfig()
+    seed: int = 123456  # Seed for generators
+    load_auto_checkpoint: bool = False  # Automatically load the latest checkpoint from save folder

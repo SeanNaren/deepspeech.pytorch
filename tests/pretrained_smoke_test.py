@@ -4,7 +4,7 @@ import unittest
 import wget
 
 from deepspeech_pytorch.configs.inference_config import LMConfig
-from deepspeech_pytorch.enums import DecoderType, Precision
+from deepspeech_pytorch.enums import DecoderType
 from tests.smoke_test import DatasetConfig, DeepSpeechSmokeTest
 
 pretrained_urls = [
@@ -20,9 +20,14 @@ class PretrainedSmokeTest(DeepSpeechSmokeTest):
 
     def test_pretrained_eval_inference(self):
         # Disabled GPU due to using TravisCI
-        cuda, precision = False, Precision.full
-        train_manifest, val_manifest, test_manifest = self.download_data(DatasetConfig(target_dir=self.target_dir,
-                                                                                       manifest_dir=self.manifest_dir))
+        cuda, precision = False, 32
+        train_manifest, val_manifest, test_manifest = self.download_data(
+            DatasetConfig(
+                target_dir=self.target_dir,
+                manifest_dir=self.manifest_dir
+            ),
+            folders=False
+        )
         wget.download(lm_path)
         for pretrained_url in pretrained_urls:
             print("Running Pre-trained Smoke test for: ", pretrained_url)

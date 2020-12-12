@@ -16,8 +16,8 @@ def create_manifest(
         manifest_path: str,
         num_workers: int,
         min_duration: Optional[float] = None,
-        max_duration: Optional[float] = None,
-):
+        max_duration: Optional[float] = None):
+    data_path = os.path.abspath(data_path)
     file_paths = list(Path(data_path).rglob('*.wav'))
     file_paths = order_and_prune_files(
         file_paths=file_paths,
@@ -28,7 +28,7 @@ def create_manifest(
 
     output_path = Path(manifest_path) / output_name
     output_path.parent.mkdir(exist_ok=True, parents=True)
-    data_path = os.path.abspath(data_path)
+
     manifest = {
         'root_path': data_path,
         'samples': []

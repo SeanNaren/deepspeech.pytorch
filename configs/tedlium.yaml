@@ -1,7 +1,13 @@
 # @package _global_
 data:
-  train_path: data/ted_train_manifest.csv
-  val_path: data/ted_val_manifest.csv
+  train_path: data/ted_train_manifest.json
+  val_path: data/ted_val_manifest.json
 training:
+  max_epochs: 16
   gpus: 1
   precision: half
+  gradient_clip_val: 400  # Norm cutoff to prevent explosion of gradients
+  accelerator: ddp
+checkpoint:
+  save_top_k: 1
+  monitor: "wer"

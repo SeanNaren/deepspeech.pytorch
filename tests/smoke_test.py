@@ -8,11 +8,13 @@ from pathlib import Path
 from data.an4 import download_an4
 from deepspeech_pytorch.configs.inference_config import EvalConfig, ModelConfig, TranscribeConfig, LMConfig
 from deepspeech_pytorch.configs.train_config import DeepSpeechConfig, AdamConfig, BiDirectionalConfig, \
-    DataConfig, TrainingConfig, CheckpointConfig
-from deepspeech_pytorch.enums import DecoderType, Precision
+    DataConfig
+from deepspeech_pytorch.enums import DecoderType
 from deepspeech_pytorch.inference import transcribe
 from deepspeech_pytorch.testing import evaluate
 from deepspeech_pytorch.training import train
+from hydra_configs.pytorch_lightning.callbacks import ModelCheckpointConf
+from hydra_configs.pytorch_lightning.trainer import TrainerConf
 
 
 @dataclass
@@ -41,7 +43,7 @@ class DeepSpeechSmokeTest(unittest.TestCase):
                                    epoch: int,
                                    batch_size: int,
                                    model_config: BiDirectionalConfig,
-                                   precision: Precision,
+                                   precision: int,
                                    gpus: int,
                                    folders: bool):
         cuda = gpus > 0
@@ -55,7 +57,7 @@ class DeepSpeechSmokeTest(unittest.TestCase):
         )
 
         train_cfg = self.create_training_config(
-            epoch=epoch,
+            max_epochs=epoch,
             batch_size=batch_size,
             train_path=train_path,
             val_path=val_path,
@@ -67,7 +69,8 @@ class DeepSpeechSmokeTest(unittest.TestCase):
         train(train_cfg)
 
         # Expected final model path after training
-        model_path = self.model_dir + '/epoch=0.ckpt'
+        print(os.listdir(self.model_dir))
+        model_path = self.model_dir + '/last.ckpt'
         assert os.path.exists(model_path)
 
         lm_configs = [
@@ -96,7 +99,7 @@ class DeepSpeechSmokeTest(unittest.TestCase):
                    model_path: str,
                    test_path: str,
                    cuda: bool,
-                   precision: Precision,
+                   precision: int,
                    lm_config: LMConfig):
         # Due to using TravisCI with no GPU support we have to disable cuda
         eval_cfg = EvalConfig(
@@ -114,7 +117,7 @@ class DeepSpeechSmokeTest(unittest.TestCase):
                   test_path: str,
                   model_path: str,
                   cuda: bool,
-                  precision: Precision,
+                  precision: int,
                   lm_config: LMConfig):
         # Select one file from our test manifest to run inference
         if os.path.isdir(test_path):
@@ -153,9 +156,9 @@ class DeepSpeechSmokeTest(unittest.TestCase):
             val_path = os.path.join(self.target_dir, 'val/')
             test_path = os.path.join(self.target_dir, 'test/')
         else:
-            train_path = os.path.join(self.manifest_dir, 'an4_train_manifest.csv')
-            val_path = os.path.join(self.manifest_dir, 'an4_val_manifest.csv')
-            test_path = os.path.join(self.manifest_dir, 'an4_test_manifest.csv')
+            train_path = os.path.join(self.manifest_dir, 'an4_train_manifest.json')
+            val_path = os.path.join(self.manifest_dir, 'an4_val_manifest.json')
+            test_path = os.path.join(self.manifest_dir, 'an4_test_manifest.json')
 
         # Assert manifest paths exists
         assert os.path.exists(train_path)
@@ -164,18 +167,19 @@ class DeepSpeechSmokeTest(unittest.TestCase):
         return train_path, val_path, test_path
 
     def create_training_config(self,
-                               epoch: int,
+                               max_epochs: int,
                                batch_size: int,
                                train_path: str,
                                val_path: str,
                                model_config: BiDirectionalConfig,
-                               precision: Precision,
+                               precision: int,
                                gpus: int):
         return DeepSpeechConfig(
-            training=TrainingConfig(
-                epochs=epoch,
+            trainer=TrainerConf(
+                max_epochs=max_epochs,
                 precision=precision,
-                gpus=gpus
+                gpus=gpus,
+                checkpoint_callback=True
             ),
             data=DataConfig(
                 train_path=train_path,
@@ -184,8 +188,9 @@ class DeepSpeechSmokeTest(unittest.TestCase):
             ),
             optim=AdamConfig(),
             model=model_config,
-            checkpointing=CheckpointConfig(
+            checkpoint=ModelCheckpointConf(
                 filepath=self.model_dir,
+                save_last=True,
                 verbose=True
             )
         )
@@ -203,7 +208,7 @@ class AN4SmokeTest(DeepSpeechSmokeTest):
             epoch=1,
             batch_size=10,
             model_config=model_cfg,
-            precision=Precision.full,
+            precision=32,
             gpus=0,
             folders=False
         )
@@ -219,7 +224,7 @@ class AN4SmokeTest(DeepSpeechSmokeTest):
             epoch=1,
             batch_size=10,
             model_config=model_cfg,
-            precision=Precision.full,
+            precision=32,
             gpus=0,
             folders=True
         )
