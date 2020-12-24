@@ -34,11 +34,11 @@ def create_manifest(
         'samples': []
     }
     for wav_path in tqdm(file_paths, total=len(file_paths)):
-        wav_path = str(wav_path.relative_to(data_path))
-        transcript_path = wav_path.replace('/wav/', '/txt/').replace('.wav', '.txt')
+        wav_path = wav_path.relative_to(data_path)
+        transcript_path = wav_path.parent.with_name("txt") / wav_path.with_suffix(".txt").name
         manifest['samples'].append({
-            'wav_path': wav_path,
-            'transcript_path': transcript_path
+            'wav_path': wav_path.as_posix(),
+            'transcript_path': transcript_path.as_posix()
         })
 
     output_path.write_text(json.dumps(manifest), encoding='utf8')
