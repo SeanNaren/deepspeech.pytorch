@@ -200,7 +200,7 @@ class DeepSpeech(pl.LightningModule):
             SequenceWise(fully_connected),
         )
         self.inference_softmax = InferenceBatchSoftmax()
-        self.criterion = CTCLoss(reduction='sum', zero_infinity=True)
+        self.criterion = CTCLoss(blank=self.labels.index('_'), reduction='sum', zero_infinity=True)
         self.evaluation_decoder = GreedyDecoder(self.labels)  # Decoder used for validation
         self.wer = WordErrorRate(
             decoder=self.evaluation_decoder,
