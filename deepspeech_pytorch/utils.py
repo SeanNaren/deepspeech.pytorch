@@ -46,7 +46,8 @@ def load_decoder(labels, cfg: LMConfig):
                                  cutoff_top_n=cfg.cutoff_top_n,
                                  cutoff_prob=cfg.cutoff_prob,
                                  beam_width=cfg.beam_width,
-                                 num_processes=cfg.lm_workers)
+                                 num_processes=cfg.lm_workers,
+                                 blank_index=labels.index('_'))
     else:
         decoder = GreedyDecoder(labels=labels,
                                 blank_index=labels.index('_'))
