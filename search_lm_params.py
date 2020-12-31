@@ -1,86 +1,109 @@
-import argparse
-import json
-import sys
-from multiprocessing.pool import Pool
+from dataclasses import dataclass
 
-import numpy as np
-from tqdm import tqdm
-
+import hydra
+from hydra.core.config_store import ConfigStore
+import optuna
 import torch
-from deepspeech_pytorch.decoder import BeamCTCDecoder
+
+from deepspeech_pytorch.configs.inference_config import SpectConfig
+from deepspeech_pytorch.configs.train_config import SpectConfig
+from deepspeech_pytorch.decoder import BeamCTCDecoder, GreedyDecoder
+from deepspeech_pytorch.loader.data_loader import AudioDataLoader, SpectrogramDataset
 from deepspeech_pytorch.utils import load_model
-
-parser = argparse.ArgumentParser(description='Tune an ARPA LM based on a pre-trained acoustic model output')
-parser.add_argument('--model-path', default='models/deepspeech_final.pth',
-                    help='Path to model file created by training')
-parser.add_argument('--saved-output', default="", type=str, help='Path to output from test.py')
-parser.add_argument('--num-workers', default=16, type=int, help='Number of parallel decodes to run')
-parser.add_argument('--output-path', default="tune_results.json", help="Where to save tuning results")
-parser.add_argument('--lm-alpha-from', default=0.0, type=float, help='Language model weight start tuning')
-parser.add_argument('--lm-alpha-to', default=3.0, type=float, help='Language model weight end tuning')
-parser.add_argument('--lm-beta-from', default=0.0, type=float,
-                    help='Language model word bonus (all words) start tuning')
-parser.add_argument('--lm-beta-to', default=0.5, type=float,
-                    help='Language model word bonus (all words) end tuning')
-parser.add_argument('--lm-num-alphas', default=45, type=float, help='Number of alpha candidates for tuning')
-parser.add_argument('--lm-num-betas', default=8, type=float, help='Number of beta candidates for tuning')
-parser.add_argument('--lm-path', default='3-gram.pruned.3e-7.arpa', type=str, help='Path to language model')
-parser.add_argument('--lm-workers', default=16, type=int, help='Number of parallel lm workers to run')
-parser.add_argument('--beam-width', default=128, type=int, help='Number of top tokens to consider while decoding')
-args = parser.parse_args()
-
-if args.lm_path is None:
-    print("error: LM must be provided for tuning")
-    sys.exit(1)
-
-model = load_model(
-    model_path=args.model_path,
-    device='cpu'
-)
-
-saved_output = torch.load(args.saved_output)
+from deepspeech_pytorch.validation import run_evaluation
 
 
-def init(beam_width, blank_index, lm_path):
-    global decoder
-    decoder = BeamCTCDecoder(model.labels, lm_path=lm_path, beam_width=beam_width, num_processes=args.lm_workers,
-                             blank_index=blank_index)
+@dataclass
+class OptimizerConfig:
+    model_path: str = ''
+    test_path: str = ''  # Path to test manifest or csv
+    is_character_based: bool = True  # Use CER or WER for finding optimal parameters
+    lm_path: str = ''
+    beam_width: int = 10
+    alpha_from: float = 0.0
+    alpha_to: float = 3.0
+    beta_from: float = 0.0
+    beta_to: float = 1.0
+    n_trials: int = 500  # Number of trials for optuna
+    n_jobs: int = 2      # Number of parallel jobs for optuna
+    precision: int = 16
+    batch_size: int = 1   # For dataloader
+    num_workers: int = 1  # For dataloader
+    spect_cfg: SpectConfig = SpectConfig()
+    
 
 
-def decode_dataset(params):
-    lm_alpha, lm_beta = params
-    global decoder
-    decoder._decoder.reset_params(lm_alpha, lm_beta)
-
-    total_cer, total_wer, num_tokens, num_chars = 0, 0, 0, 0
-    for out, sizes, target_strings in saved_output:
-        decoded_output, _, = decoder.decode(out, sizes)
-        for x in range(len(target_strings)):
-            transcript, reference = decoded_output[x][0], target_strings[x][0]
-            wer_inst = decoder.wer(transcript, reference)
-            cer_inst = decoder.cer(transcript, reference)
-            total_cer += cer_inst
-            total_wer += wer_inst
-            num_tokens += len(reference.split())
-            num_chars += len(reference.replace(' ', ''))
-
-    wer = float(total_wer) / num_tokens
-    cer = float(total_cer) / num_chars
-
-    return [lm_alpha, lm_beta, wer * 100, cer * 100]
+cs = ConfigStore.instance()
+cs.store(name="config", node=OptimizerConfig)
 
 
-if __name__ == '__main__':
-    p = Pool(args.num_workers, init, [args.beam_width, model.labels.index('_'), args.lm_path])
+class Objective(object):
+    def __init__(self, cfg):
+        self.cfg = cfg
 
-    cand_alphas = np.linspace(args.lm_alpha_from, args.lm_alpha_to, args.lm_num_alphas)
-    cand_betas = np.linspace(args.lm_beta_from, args.lm_beta_to, args.lm_num_betas)
-    params_grid = [(float(alpha), float(beta)) for alpha in cand_alphas
-                   for beta in cand_betas]
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.model = load_model(
+            self.device,
+            hydra.utils.to_absolute_path(self.cfg.model_path)
+        )
+        self.ckpt = torch.load(
+            hydra.utils.to_absolute_path(self.cfg.model_path),
+            map_location=self.device
+        )
+        self.labels = self.ckpt['hyper_parameters']['labels']
 
-    scores = []
-    for params in tqdm(p.imap(decode_dataset, params_grid), total=len(params_grid)):
-        scores.append(list(params))
-    print("Saving tuning results to: {}".format(args.output_path))
-    with open(args.output_path, "w") as fh:
-        json.dump(scores, fh)
+        self.decoder = BeamCTCDecoder(
+            labels=self.labels,
+            lm_path=hydra.utils.to_absolute_path(self.cfg.lm_path),
+            beam_width=self.cfg.beam_width,
+            num_processes=self.cfg.num_workers,
+            blank_index=self.labels.index('_')
+        )
+        self.target_decoder = GreedyDecoder(
+            labels=self.labels,
+            blank_index=self.labels.index('_')
+        )
+
+        test_dataset = SpectrogramDataset(
+            audio_conf=self.cfg.spect_cfg,
+            input_path=hydra.utils.to_absolute_path(cfg.test_path),
+            labels=self.labels,
+            normalize=True
+        )
+        self.test_loader = AudioDataLoader(
+            test_dataset,
+            batch_size=self.cfg.batch_size,
+            num_workers=self.cfg.num_workers
+        )
+
+    def __call__(self, trial):
+        alpha = trial.suggest_uniform('alpha', self.cfg.alpha_from, self.cfg.alpha_to)
+        beta = trial.suggest_uniform('beta', self.cfg.beta_from, self.cfg.beta_to)
+        self.decoder._decoder.reset_params(alpha, beta)
+
+        wer, cer = run_evaluation(
+            test_loader=self.test_loader,
+            device=self.device,
+            model=self.model,
+            decoder=self.decoder,
+            target_decoder=self.target_decoder,
+            precision=self.cfg.precision
+        )
+        return cer if self.cfg.is_character_based else wer
+
+
+@hydra.main(config_name="config")
+def main(cfg: OptimizerConfig) -> None:
+    study = optuna.create_study()
+    study.optimize(Objective(cfg),
+                   n_trials=cfg.n_trials,
+                   n_jobs=cfg.n_jobs,
+                   show_progress_bar=True)
+    print(f"Best Params\n"
+          f"alpha: {study.best_params['alpha']}\n"
+          f"beta: {study.best_params['beta']}\n"
+          f"{'cer' if cfg.is_character_based else 'wer'}: {study.best_value}")
+
+
+if __name__ == "__main__":
+    main()
