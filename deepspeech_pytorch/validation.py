@@ -152,7 +152,7 @@ def run_evaluation(test_loader,
         inputs, targets, input_percentages, target_sizes = batch
         input_sizes = input_percentages.mul_(int(inputs.size(3))).int()
         inputs = inputs.to(device)
-        with autocast(enabled=precision is 16):
+        with autocast(enabled=precision == 16):
             out, output_sizes = model(inputs, input_sizes)
         decoded_output, _ = decoder.decode(out, output_sizes)
         wer.update(
