@@ -85,7 +85,7 @@ def run_transcribe(audio_path: str,
     spect = spect.view(1, 1, spect.size(0), spect.size(1))
     spect = spect.to(device)
     input_sizes = torch.IntTensor([spect.size(3)]).int()
-    with autocast(enabled=precision is 16):
+    with autocast(enabled=precision == 16):
         out, output_sizes = model(spect, input_sizes)
     decoded_output, decoded_offsets = decoder.decode(out, output_sizes)
     return decoded_output, decoded_offsets
