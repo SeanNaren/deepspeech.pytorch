@@ -10,13 +10,13 @@ Implementation of DeepSpeech2 for PyTorch using [PyTorch Lightning](https://gith
 To use the image with a GPU you'll need to have [nvidia-docker](https://github.com/NVIDIA/nvidia-docker) installed.
 
 ```bash
-sudo docker run -ti --gpus all -v `pwd`/data:/workspace/data -p 8888:8888 --net=host --ipc=host seannaren/deepspeech.pytorch:latest # Opens a Jupyter notebook, mounting the /data drive in the container
+sudo docker run -ti --gpus all -v `pwd`/data:/workspace/data --tmpfs /tmp -p 8888:8888 --net=host --ipc=host seannaren/deepspeech.pytorch:latest # Opens a Jupyter notebook, mounting the /data drive in the container
 ```
 
 Optionally you can use the command line by changing the entrypoint:
 
 ```bash
-sudo docker run -ti --gpus all -v `pwd`/data:/workspace/data --entrypoint=/bin/bash --net=host --ipc=host seannaren/deepspeech.pytorch:latest
+sudo docker run -ti --gpus all -v `pwd`/data:/workspace/data --tmpfs /tmp --entrypoint=/bin/bash --net=host --ipc=host seannaren/deepspeech.pytorch:latest
 ```
 
 ### From Source
