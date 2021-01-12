@@ -16,6 +16,6 @@ sox
 sklearn
 soundfile
 pytest
-hydra-core==1.0.0rc1
+hydra-core
 google-cloud-storage
 jupyter
