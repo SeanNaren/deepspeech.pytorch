@@ -6,26 +6,24 @@ from tempfile import NamedTemporaryFile
 
 import librosa
 import numpy as np
-import soundfile as sf
 import sox
 import torch
 from torch.utils.data import Dataset, Sampler, DistributedSampler, DataLoader
+import torchaudio
 
 from deepspeech_pytorch.configs.train_config import SpectConfig, AugmentationConfig
 from deepspeech_pytorch.loader.spec_augment import spec_augment
 
+torchaudio.set_audio_backend("sox_io")
+
 
 def load_audio(path):
-    sound, sample_rate = sf.read(path, dtype='int16')
-    # TODO this should be 32768.0 to get twos-complement range.
-    # TODO the difference is negligible but should be fixed for new models.
-    sound = sound.astype('float32') / 32767  # normalize audio
-    if len(sound.shape) > 1:
-        if sound.shape[1] == 1:
-            sound = sound.squeeze()
-        else:
-            sound = sound.mean(axis=1)  # multiple channels, average
-    return sound
+    sound, sample_rate = torchaudio.load(path)
+    if sound.shape[0] == 1:
+        sound = sound.squeeze()
+    else:
+        sound = sound.mean(axis=0)  # multiple channels, average
+    return sound.numpy()
 
 
 class AudioParser(object):
