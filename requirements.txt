@@ -2,6 +2,7 @@ scipy
 numpy
 python-levenshtein
 torch
+torchaudio
 torchelastic
 pytorch-lightning>=1.1
 wget
