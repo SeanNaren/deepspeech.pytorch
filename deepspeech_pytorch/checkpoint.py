@@ -14,7 +14,8 @@ class CheckpointHandler(ModelCheckpoint):
 
     def __init__(self, cfg: ModelCheckpointConf):
         super().__init__(
-            filepath=cfg.filepath,
+            dirpath=cfg.dirpath,
+            filename=cfg.filename,
             monitor=cfg.monitor,
             verbose=cfg.verbose,
             save_last=cfg.save_last,

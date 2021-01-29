@@ -202,7 +202,7 @@ class DeepSpeechSmokeTest(unittest.TestCase):
             optim=AdamConfig(),
             model=model_config,
             checkpoint=ModelCheckpointConf(
-                filepath=self.model_dir,
+                dirpath=self.model_dir,
                 save_last=True,
                 verbose=True
             )
