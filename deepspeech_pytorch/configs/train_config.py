@@ -91,7 +91,7 @@ class DeepSpeechConfig:
     optim: Any = MISSING
     model: Any = MISSING
     checkpoint: Any = MISSING
-    trainer: TrainerConf = DeepSpeechTrainerConf()
+    trainer: DeepSpeechTrainerConf = DeepSpeechTrainerConf()
     data: DataConfig = DataConfig()
     augmentation: AugmentationConfig = AugmentationConfig()
     seed: int = 123456  # Seed for generators

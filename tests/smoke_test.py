@@ -1,3 +1,4 @@
+import json
 import os
 import shutil
 import tempfile
@@ -8,7 +9,7 @@ from pathlib import Path
 from data.an4 import download_an4
 from deepspeech_pytorch.configs.inference_config import EvalConfig, ModelConfig, TranscribeConfig, LMConfig
 from deepspeech_pytorch.configs.train_config import DeepSpeechConfig, AdamConfig, BiDirectionalConfig, \
-    DataConfig
+    DataConfig, DeepSpeechTrainerConf
 from deepspeech_pytorch.enums import DecoderType
 from deepspeech_pytorch.inference import transcribe
 from deepspeech_pytorch.testing import evaluate
@@ -40,6 +41,8 @@ class DeepSpeechSmokeTest(unittest.TestCase):
         shutil.rmtree(self.model_dir)
 
     def build_train_evaluate_model(self,
+                                   limit_train_batches: int,
+                                   limit_val_batches: int,
                                    epoch: int,
                                    batch_size: int,
                                    model_config: BiDirectionalConfig,
@@ -57,6 +60,8 @@ class DeepSpeechSmokeTest(unittest.TestCase):
         )
 
         train_cfg = self.create_training_config(
+            limit_train_batches=limit_train_batches,
+            limit_val_batches=limit_val_batches,
             max_epochs=epoch,
             batch_size=batch_size,
             train_path=train_path,
@@ -124,7 +129,11 @@ class DeepSpeechSmokeTest(unittest.TestCase):
             file_path = next(Path(test_path).rglob('*.wav'))
         else:
             with open(test_path) as f:
-                file_path = next(f).strip().split(',')[0]
+                # select a file to use for inference test
+                manifest = json.load(f)
+                file_name = manifest['samples'][0]['wav_path']
+                directory = manifest['root_path']
+                file_path = os.path.join(directory, file_name)
 
         transcribe_cfg = TranscribeConfig(
             model=ModelConfig(
@@ -167,6 +176,8 @@ class DeepSpeechSmokeTest(unittest.TestCase):
         return train_path, val_path, test_path
 
     def create_training_config(self,
+                               limit_train_batches: int,
+                               limit_val_batches: int,
                                max_epochs: int,
                                batch_size: int,
                                train_path: str,
@@ -175,11 +186,13 @@ class DeepSpeechSmokeTest(unittest.TestCase):
                                precision: int,
                                gpus: int):
         return DeepSpeechConfig(
-            trainer=TrainerConf(
+            trainer=DeepSpeechTrainerConf(
                 max_epochs=max_epochs,
                 precision=precision,
                 gpus=gpus,
-                checkpoint_callback=True
+                checkpoint_callback=True,
+                limit_train_batches=limit_train_batches,
+                limit_val_batches=limit_val_batches
             ),
             data=DataConfig(
                 train_path=train_path,
@@ -205,6 +218,8 @@ class AN4SmokeTest(DeepSpeechSmokeTest):
             hidden_layers=1
         )
         self.build_train_evaluate_model(
+            limit_train_batches=1,
+            limit_val_batches=1,
             epoch=1,
             batch_size=10,
             model_config=model_cfg,
@@ -221,6 +236,8 @@ class AN4SmokeTest(DeepSpeechSmokeTest):
             hidden_layers=1
         )
         self.build_train_evaluate_model(
+            limit_train_batches=1,
+            limit_val_batches=1,
             epoch=1,
             batch_size=10,
             model_config=model_cfg,

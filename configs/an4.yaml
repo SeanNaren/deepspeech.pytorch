@@ -4,8 +4,6 @@ data:
   val_path: data/an4_val_manifest.json
   batch_size: 8
   num_workers: 8
-  augmentation:
-    spec_augment: True
 trainer:
   max_epochs: 70
   gpus: 1

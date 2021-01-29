@@ -1,18 +1,16 @@
 import json
 
 import hydra
-from hydra.utils import to_absolute_path
-from omegaconf import OmegaConf
-from pytorch_lightning import seed_everything, Trainer
-
 from deepspeech_pytorch.checkpoint import CheckpointHandler, GCSCheckpointHandler
 from deepspeech_pytorch.configs.train_config import DeepSpeechConfig, GCSCheckpointConfig
 from deepspeech_pytorch.loader.data_module import DeepSpeechDataModule
 from deepspeech_pytorch.model import DeepSpeech
+from hydra.utils import to_absolute_path
+from omegaconf import OmegaConf
+from pytorch_lightning import seed_everything
 
 
 def train(cfg: DeepSpeechConfig):
-    # Set seeds for determinism
     seed_everything(cfg.seed)
 
     with open(to_absolute_path(cfg.data.labels_path)) as label_file:
@@ -48,7 +46,6 @@ def train(cfg: DeepSpeechConfig):
         spect_cfg=cfg.data.spect
     )
 
-    # Init Lightning Trainer
     trainer = hydra.utils.instantiate(
         config=cfg.trainer,
         replace_sampler_ddp=False,
