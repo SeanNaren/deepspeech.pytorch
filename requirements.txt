@@ -1,8 +1,8 @@
 scipy
 numpy
-soundfile
 python-levenshtein
 torch
+torchaudio
 torchelastic
 pytorch-lightning>=1.1
 wget
@@ -12,7 +12,6 @@ matplotlib
 flask
 sox
 sklearn
-soundfile
 pytest
 hydra-core
 google-cloud-storage
