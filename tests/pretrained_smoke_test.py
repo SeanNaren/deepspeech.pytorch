@@ -8,9 +8,9 @@ from deepspeech_pytorch.enums import DecoderType
 from tests.smoke_test import DatasetConfig, DeepSpeechSmokeTest
 
 pretrained_urls = [
-    'https://github.com/SeanNaren/deepspeech.pytorch/releases/download/V3/an4_pretrained_v3.ckpt',
-    'https://github.com/SeanNaren/deepspeech.pytorch/releases/download/V3/librispeech_pretrained_v3.ckpt',
-    'https://github.com/SeanNaren/deepspeech.pytorch/releases/download/V3/ted_pretrained_v3.ckpt'
+    'https://github.com/SeanNaren/deepspeech.pytorch/releases/download/V3.0/an4_pretrained_v3.ckpt',
+    'https://github.com/SeanNaren/deepspeech.pytorch/releases/download/V3.0/librispeech_pretrained_v3.ckpt',
+    'https://github.com/SeanNaren/deepspeech.pytorch/releases/download/V3.0/ted_pretrained_v3.ckpt'
 ]
 
 lm_path = 'http://www.openslr.org/resources/11/3-gram.pruned.3e-7.arpa.gz'
