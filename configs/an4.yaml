@@ -1,0 +1,18 @@
+# @package _global_
+data:
+  train_path: data/an4_train_manifest.json
+  val_path: data/an4_val_manifest.json
+  batch_size: 8
+  num_workers: 8
+trainer:
+  max_epochs: 70
+  gpus: 1
+  precision: 16
+  gradient_clip_val: 400  # Norm cutoff to prevent explosion of gradients
+  accelerator: ddp
+  plugins: ddp_sharded
+  checkpoint_callback: True
+checkpoint:
+  save_top_k: 1
+  monitor: "wer"
+  verbose: True

@@ -223,7 +223,7 @@ python model.py --model-path models/deepspeech.pth
 トレーニング済みのモデルをテスト用データセットで評価したい場合は以下のスクリプトを実行してください。もちろん、フォーマットはトレーニング用データセットと同様である必要があります。
 
 ```
-python test.py --model-path models/deepspeech.pth --test-manifest /path/to/test_manifest.csv --cuda
+python test.py --model-path models/deepspeech.pth --test-path /path/to/test_manifest.csv --cuda
 ```
 
 一つの音声の文字起こしをテストできるスクリプトも用意されています。

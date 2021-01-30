@@ -1,0 +1,19 @@
+# @package _global_
+data:
+  train_path: data/commonvoice_train_manifest.json
+  val_path: data/commonvoice_dev_manifest.json
+  num_workers: 8
+  augmentation:
+    spec_augment: True
+trainer:
+  max_epochs: 16
+  gpus: 1
+  precision: 16
+  gradient_clip_val: 400  # Norm cutoff to prevent explosion of gradients
+  accelerator: ddp
+  plugins: ddp_sharded
+  checkpoint_callback: True
+checkpoint:
+  save_top_k: 1
+  monitor: "wer"
+  verbose: True

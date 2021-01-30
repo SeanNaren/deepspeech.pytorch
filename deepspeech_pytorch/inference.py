@@ -1,7 +1,9 @@
 import json
 from typing import List
 
+import hydra
 import torch
+from torch.cuda.amp import autocast
 
 from deepspeech_pytorch.configs.inference_config import TranscribeConfig
 from deepspeech_pytorch.decoder import Decoder
@@ -42,25 +44,34 @@ def decode_results(decoded_output: List,
 def transcribe(cfg: TranscribeConfig):
     device = torch.device("cuda" if cfg.model.cuda else "cpu")
 
-    model = load_model(device=device,
-                       model_path=cfg.model.model_path,
-                       use_half=cfg.model.use_half)
+    model = load_model(
+        device=device,
+        model_path=cfg.model.model_path
+    )
 
-    decoder = load_decoder(labels=model.labels,
-                           cfg=cfg.lm)
+    decoder = load_decoder(
+        labels=model.labels,
+        cfg=cfg.lm
+    )
 
-    spect_parser = SpectrogramParser(audio_conf=model.audio_conf,
-                                     normalize=True)
+    spect_parser = SpectrogramParser(
+        audio_conf=model.spect_cfg,
+        normalize=True
+    )
 
-    decoded_output, decoded_offsets = run_transcribe(audio_path=cfg.audio_path,
-                                                     spect_parser=spect_parser,
-                                                     model=model,
-                                                     decoder=decoder,
-                                                     device=device,
-                                                     use_half=cfg.model.use_half)
-    results = decode_results(decoded_output=decoded_output,
-                             decoded_offsets=decoded_offsets,
-                             cfg=cfg)
+    decoded_output, decoded_offsets = run_transcribe(
+        audio_path=hydra.utils.to_absolute_path(cfg.audio_path),
+        spect_parser=spect_parser,
+        model=model,
+        decoder=decoder,
+        device=device,
+        precision=cfg.model.precision
+    )
+    results = decode_results(
+        decoded_output=decoded_output,
+        decoded_offsets=decoded_offsets,
+        cfg=cfg
+    )
     print(json.dumps(results))
 
 
@@ -69,13 +80,12 @@ def run_transcribe(audio_path: str,
                    model: DeepSpeech,
                    decoder: Decoder,
                    device: torch.device,
-                   use_half: bool):
+                   precision: int):
     spect = spect_parser.parse_audio(audio_path).contiguous()
     spect = spect.view(1, 1, spect.size(0), spect.size(1))
     spect = spect.to(device)
-    if use_half:
-        spect = spect.half()
     input_sizes = torch.IntTensor([spect.size(3)]).int()
-    out, output_sizes = model(spect, input_sizes)
+    with autocast(enabled=precision == 16):
+        out, output_sizes = model(spect, input_sizes)
     decoded_output, decoded_offsets = decoder.decode(out, output_sizes)
     return decoded_output, decoded_offsets

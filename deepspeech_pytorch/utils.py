@@ -27,13 +27,10 @@ def check_loss(loss, loss_value):
 
 
 def load_model(device,
-               model_path,
-               use_half):
-    model = DeepSpeech.load_model(hydra.utils.to_absolute_path(model_path))
+               model_path):
+    model = DeepSpeech.load_from_checkpoint(hydra.utils.to_absolute_path(model_path))
     model.eval()
     model = model.to(device)
-    if use_half:
-        model = model.half()
     return model
 
 
@@ -49,7 +46,8 @@ def load_decoder(labels, cfg: LMConfig):
                                  cutoff_top_n=cfg.cutoff_top_n,
                                  cutoff_prob=cfg.cutoff_prob,
                                  beam_width=cfg.beam_width,
-                                 num_processes=cfg.lm_workers)
+                                 num_processes=cfg.lm_workers,
+                                 blank_index=labels.index('_'))
     else:
         decoder = GreedyDecoder(labels=labels,
                                 blank_index=labels.index('_'))

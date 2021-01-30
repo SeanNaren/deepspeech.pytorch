@@ -33,9 +33,10 @@ if args.lm_path is None:
     print("error: LM must be provided for tuning")
     sys.exit(1)
 
-model = load_model(model_path=args.model_path,
-                   device='cpu',
-                   use_half=False)
+model = load_model(
+    model_path=args.model_path,
+    device='cpu'
+)
 
 saved_output = torch.load(args.saved_output)
 

@@ -18,7 +18,7 @@ class LMConfig:
 
 @dataclass
 class ModelConfig:
-    use_half: bool = True  # Use half precision. This is recommended when using mixed-precision at training time
+    precision: int = 32  # Set to 16 to use mixed-precision for inference
     cuda: bool = True
     model_path: str = ''
 
@@ -37,7 +37,7 @@ class TranscribeConfig(InferenceConfig):
 
 @dataclass
 class EvalConfig(InferenceConfig):
-    test_manifest: str = ''  # Path to validation manifest csv
+    test_path: str = ''  # Path to validation manifest csv or folder
     verbose: bool = True  # Print out decoded output and error of each sample
     save_output: str = ''  # Saves output of model from test to this file_path
     batch_size: int = 20  # Batch size for testing

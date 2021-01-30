@@ -1,15 +1,11 @@
 from enum import Enum
 
+from torch import nn
+
 
 class DecoderType(Enum):
     greedy: str = 'greedy'
     beam: str = 'beam'
-
-
-class DistributedBackend(Enum):
-    gloo = 'gloo'
-    mpi = 'mpi'
-    nccl = 'nccl'
 
 
 class SpectrogramWindow(Enum):
@@ -20,6 +16,6 @@ class SpectrogramWindow(Enum):
 
 
 class RNNType(Enum):
-    lstm = 'lstm'
-    rnn = 'rnn'
-    gru = 'gru'
+    lstm = nn.LSTM
+    rnn = nn.RNN
+    gru = nn.GRU

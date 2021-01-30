@@ -1,21 +1,18 @@
 import math
-from collections import OrderedDict
+from typing import List, Union
 
+import pytorch_lightning as pl
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-# Due to backwards compatibility we need to keep the below structure for mapping RNN type
 from omegaconf import OmegaConf
+from torch.cuda.amp import autocast
+from torch.nn import CTCLoss
 
-from deepspeech_pytorch.configs.train_config import SpectConfig
-from deepspeech_pytorch.enums import SpectrogramWindow
-
-supported_rnns = {
-    'lstm': nn.LSTM,
-    'rnn': nn.RNN,
-    'gru': nn.GRU
-}
-supported_rnns_inv = dict((v, k) for k, v in supported_rnns.items())
+from deepspeech_pytorch.configs.train_config import SpectConfig, BiDirectionalConfig, OptimConfig, AdamConfig, \
+    SGDConfig, UniDirectionalConfig
+from deepspeech_pytorch.decoder import GreedyDecoder
+from deepspeech_pytorch.validation import CharErrorRate, WordErrorRate
 
 
 class SequenceWise(nn.Module):
@@ -115,8 +112,15 @@ class Lookahead(nn.Module):
         self.context = context
         self.n_features = n_features
         self.pad = (0, self.context - 1)
-        self.conv = nn.Conv1d(self.n_features, self.n_features, kernel_size=self.context, stride=1,
-                              groups=self.n_features, padding=0, bias=None)
+        self.conv = nn.Conv1d(
+            self.n_features,
+            self.n_features,
+            kernel_size=self.context,
+            stride=1,
+            groups=self.n_features,
+            padding=0,
+            bias=False
+        )
 
     def forward(self, x):
         x = x.transpose(0, 1).transpose(1, 2)
@@ -131,20 +135,23 @@ class Lookahead(nn.Module):
                + ', context=' + str(self.context) + ')'
 
 
-class DeepSpeech(nn.Module):
-    def __init__(self, rnn_type, labels, rnn_hidden_size, nb_layers, audio_conf,
-                 bidirectional, context=20):
-        super(DeepSpeech, self).__init__()
+class DeepSpeech(pl.LightningModule):
+    def __init__(self,
+                 labels: List,
+                 model_cfg: Union[UniDirectionalConfig, BiDirectionalConfig],
+                 precision: int,
+                 optim_cfg: Union[AdamConfig, SGDConfig],
+                 spect_cfg: SpectConfig
+                 ):
+        super().__init__()
+        self.save_hyperparameters()
+        self.model_cfg = model_cfg
+        self.precision = precision
+        self.optim_cfg = optim_cfg
+        self.spect_cfg = spect_cfg
+        self.bidirectional = True if OmegaConf.get_type(model_cfg) is BiDirectionalConfig else False
 
-        self.hidden_size = rnn_hidden_size
-        self.hidden_layers = nb_layers
-        self.rnn_type = rnn_type
-        self.audio_conf = audio_conf
         self.labels = labels
-        self.bidirectional = bidirectional
-
-        sample_rate = self.audio_conf.sample_rate
-        window_size = self.audio_conf.window_size
         num_classes = len(self.labels)
 
         self.conv = MaskConv(nn.Sequential(
@@ -156,34 +163,53 @@ class DeepSpeech(nn.Module):
             nn.Hardtanh(0, 20, inplace=True)
         ))
         # Based on above convolutions and spectrogram size using conv formula (W - F + 2P)/ S+1
-        rnn_input_size = int(math.floor((sample_rate * window_size) / 2) + 1)
+        rnn_input_size = int(math.floor((self.spect_cfg.sample_rate * self.spect_cfg.window_size) / 2) + 1)
         rnn_input_size = int(math.floor(rnn_input_size + 2 * 20 - 41) / 2 + 1)
         rnn_input_size = int(math.floor(rnn_input_size + 2 * 10 - 21) / 2 + 1)
         rnn_input_size *= 32
 
-        rnns = []
-        rnn = BatchRNN(input_size=rnn_input_size, hidden_size=rnn_hidden_size, rnn_type=rnn_type,
-                       bidirectional=bidirectional, batch_norm=False)
-        rnns.append(('0', rnn))
-        for x in range(nb_layers - 1):
-            rnn = BatchRNN(input_size=rnn_hidden_size, hidden_size=rnn_hidden_size, rnn_type=rnn_type,
-                           bidirectional=bidirectional)
-            rnns.append(('%d' % (x + 1), rnn))
-        self.rnns = nn.Sequential(OrderedDict(rnns))
+        self.rnns = nn.Sequential(
+            BatchRNN(
+                input_size=rnn_input_size,
+                hidden_size=self.model_cfg.hidden_size,
+                rnn_type=self.model_cfg.rnn_type.value,
+                bidirectional=self.bidirectional,
+                batch_norm=False
+            ),
+            *(
+                BatchRNN(
+                    input_size=self.model_cfg.hidden_size,
+                    hidden_size=self.model_cfg.hidden_size,
+                    rnn_type=self.model_cfg.rnn_type.value,
+                    bidirectional=self.bidirectional
+                ) for x in range(self.model_cfg.hidden_layers - 1)
+            )
+        )
+
         self.lookahead = nn.Sequential(
             # consider adding batch norm?
-            Lookahead(rnn_hidden_size, context=context),
+            Lookahead(self.model_cfg.hidden_size, context=self.model_cfg.lookahead_context),
             nn.Hardtanh(0, 20, inplace=True)
-        ) if not bidirectional else None
+        ) if not self.bidirectional else None
 
         fully_connected = nn.Sequential(
-            nn.BatchNorm1d(rnn_hidden_size),
-            nn.Linear(rnn_hidden_size, num_classes, bias=False)
+            nn.BatchNorm1d(self.model_cfg.hidden_size),
+            nn.Linear(self.model_cfg.hidden_size, num_classes, bias=False)
         )
         self.fc = nn.Sequential(
             SequenceWise(fully_connected),
         )
         self.inference_softmax = InferenceBatchSoftmax()
+        self.criterion = CTCLoss(blank=self.labels.index('_'), reduction='sum', zero_infinity=True)
+        self.evaluation_decoder = GreedyDecoder(self.labels)  # Decoder used for validation
+        self.wer = WordErrorRate(
+            decoder=self.evaluation_decoder,
+            target_decoder=self.evaluation_decoder
+        )
+        self.cer = CharErrorRate(
+            decoder=self.evaluation_decoder,
+            target_decoder=self.evaluation_decoder
+        )
 
     def forward(self, x, lengths):
         lengths = lengths.cpu().int()
@@ -206,6 +232,64 @@ class DeepSpeech(nn.Module):
         x = self.inference_softmax(x)
         return x, output_lengths
 
+    def training_step(self, batch, batch_idx):
+        inputs, targets, input_percentages, target_sizes = batch
+        input_sizes = input_percentages.mul_(int(inputs.size(3))).int()
+        out, output_sizes = self(inputs, input_sizes)
+        out = out.transpose(0, 1)  # TxNxH
+        out = out.log_softmax(-1)
+
+        loss = self.criterion(out, targets, output_sizes, target_sizes)
+        return loss
+
+    def validation_step(self, batch, batch_idx):
+        inputs, targets, input_percentages, target_sizes = batch
+        input_sizes = input_percentages.mul_(int(inputs.size(3))).int()
+        inputs = inputs.to(self.device)
+        with autocast(enabled=self.precision == 16):
+            out, output_sizes = self(inputs, input_sizes)
+        decoded_output, _ = self.evaluation_decoder.decode(out, output_sizes)
+        self.wer(
+            preds=out,
+            preds_sizes=output_sizes,
+            targets=targets,
+            target_sizes=target_sizes
+        )
+        self.cer(
+            preds=out,
+            preds_sizes=output_sizes,
+            targets=targets,
+            target_sizes=target_sizes
+        )
+        self.log('wer', self.wer.compute(), prog_bar=True, on_epoch=True)
+        self.log('cer', self.cer.compute(), prog_bar=True, on_epoch=True)
+
+    def configure_optimizers(self):
+        if OmegaConf.get_type(self.optim_cfg) is SGDConfig:
+            optimizer = torch.optim.SGD(
+                params=self.parameters(),
+                lr=self.optim_cfg.learning_rate,
+                momentum=self.optim_cfg.momentum,
+                nesterov=True,
+                weight_decay=self.optim_cfg.weight_decay
+            )
+        elif OmegaConf.get_type(self.optim_cfg) is AdamConfig:
+            optimizer = torch.optim.AdamW(
+                params=self.parameters(),
+                lr=self.optim_cfg.learning_rate,
+                betas=self.optim_cfg.betas,
+                eps=self.optim_cfg.eps,
+                weight_decay=self.optim_cfg.weight_decay
+            )
+        else:
+            raise ValueError("Optimizer has not been specified correctly.")
+
+        scheduler = torch.optim.lr_scheduler.ExponentialLR(
+            optimizer=optimizer,
+            gamma=self.optim_cfg.learning_anneal
+        )
+        return [optimizer], [scheduler]
+
     def get_seq_lens(self, input_length):
         """
         Given a 1D Tensor or Variable containing integer sequence lengths, return a 1D tensor or variable
@@ -218,47 +302,3 @@ class DeepSpeech(nn.Module):
             if type(m) == nn.modules.conv.Conv2d:
                 seq_len = ((seq_len + 2 * m.padding[1] - m.dilation[1] * (m.kernel_size[1] - 1) - 1) // m.stride[1] + 1)
         return seq_len.int()
-
-    @classmethod
-    def load_model(cls, path):
-        package = torch.load(path, map_location=lambda storage, loc: storage)
-        model = DeepSpeech.load_model_package(package)
-        return model
-
-    @classmethod
-    def load_model_package(cls, package):
-        # TODO Added for backwards compatibility, should be remove for new release
-        if OmegaConf.get_type(package['audio_conf']) == dict:
-            audio_conf = package['audio_conf']
-            package['audio_conf'] = SpectConfig(sample_rate=audio_conf['sample_rate'],
-                                                window_size=audio_conf['window_size'],
-                                                window=SpectrogramWindow(audio_conf['window']))
-        model = cls(rnn_hidden_size=package['hidden_size'],
-                    nb_layers=package['hidden_layers'],
-                    labels=package['labels'],
-                    audio_conf=package['audio_conf'],
-                    rnn_type=supported_rnns[package['rnn_type']],
-                    bidirectional=package.get('bidirectional', True))
-        model.load_state_dict(package['state_dict'])
-        return model
-
-    def serialize_state(self):
-        return {
-            'hidden_size': self.hidden_size,
-            'hidden_layers': self.hidden_layers,
-            'rnn_type': supported_rnns_inv.get(self.rnn_type, self.rnn_type.__name__.lower()),
-            'audio_conf': self.audio_conf,
-            'labels': self.labels,
-            'state_dict': self.state_dict(),
-            'bidirectional': self.bidirectional,
-        }
-
-    @staticmethod
-    def get_param_size(model):
-        params = 0
-        for p in model.parameters():
-            tmp = 1
-            for x in p.size():
-                tmp *= x
-            params += tmp
-        return params

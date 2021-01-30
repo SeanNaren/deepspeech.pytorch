@@ -119,17 +119,27 @@ def main():
     prepare_dir(test_ted_dir)
     print('Creating manifests...')
 
-    create_manifest(data_path=train_ted_dir,
-                    output_name='ted_train_manifest.csv',
-                    manifest_path=args.manifest_dir,
-                    min_duration=args.min_duration,
-                    max_duration=args.max_duration)
-    create_manifest(data_path=val_ted_dir,
-                    output_name='ted_val_manifest.csv',
-                    manifest_path=args.manifest_dir)
-    create_manifest(data_path=test_ted_dir,
-                    output_name='ted_test_manifest.csv',
-                    manifest_path=args.manifest_dir)
+    create_manifest(
+        data_path=train_ted_dir,
+        output_name='ted_train_manifest.json',
+        manifest_path=args.manifest_dir,
+        min_duration=args.min_duration,
+        max_duration=args.max_duration,
+        num_workers=args.num_workers
+    )
+    create_manifest(
+        data_path=val_ted_dir,
+        output_name='ted_val_manifest.json',
+        manifest_path=args.manifest_dir,
+        num_workers=args.num_workers
+
+    )
+    create_manifest(
+        data_path=test_ted_dir,
+        output_name='ted_test_manifest.json',
+        manifest_path=args.manifest_dir,
+        num_workers=args.num_workers
+    )
 
 
 if __name__ == "__main__":

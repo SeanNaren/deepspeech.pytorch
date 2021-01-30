@@ -37,12 +37,14 @@ def transcribe_file():
         with NamedTemporaryFile(suffix=file_extension) as tmp_saved_audio_file:
             file.save(tmp_saved_audio_file.name)
             logging.info('Transcribing file...')
-            transcription, _ = run_transcribe(audio_path=tmp_saved_audio_file,
-                                              spect_parser=spect_parser,
-                                              model=model,
-                                              decoder=decoder,
-                                              device=device,
-                                              use_half=args.half)
+            transcription, _ = run_transcribe(
+                audio_path=tmp_saved_audio_file,
+                spect_parser=spect_parser,
+                model=model,
+                decoder=decoder,
+                device=device,
+                precision=config.model.precision
+            )
             logging.info('File transcribed')
             res['status'] = "OK"
             res['transcription'] = transcription
@@ -58,19 +60,32 @@ def main(cfg: ServerConfig):
     logging.info('Setting up server...')
     device = torch.device("cuda" if cfg.model.cuda else "cpu")
 
-    model = load_model(device=device,
-                       model_path=cfg.model.model_path,
-                       use_half=cfg.model.use_half)
+    model = load_model(
+        device=device,
+        model_path=cfg.model.model_path
+    )
 
-    decoder = load_decoder(labels=model.labels,
-                           cfg=cfg.lm)
+    decoder = load_decoder(
+        labels=model.labels,
+        cfg=cfg.lm
+    )
 
-    spect_parser = SpectrogramParser(audio_conf=model.audio_conf,
-                                     normalize=True)
+    spect_parser = SpectrogramParser(
+        audio_conf=model.audio_conf,
+        normalize=True
+    )
 
-    spect_parser = SpectrogramParser(model.audio_conf, normalize=True)
+    spect_parser = SpectrogramParser(
+        audio_conf=model.spect_cfg,
+        normalize=True
+    )
     logging.info('Server initialised')
-    app.run(host=cfg.host, port=cfg.port, debug=True, use_reloader=False)
+    app.run(
+        host=cfg.host,
+        port=cfg.port,
+        debug=True,
+        use_reloader=False
+    )
 
 
 if __name__ == "__main__":

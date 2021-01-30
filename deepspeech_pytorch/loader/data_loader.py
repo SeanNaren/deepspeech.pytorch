@@ -1,29 +1,29 @@
+import json
 import math
 import os
+from pathlib import Path
 from tempfile import NamedTemporaryFile
 
 import librosa
 import numpy as np
-import soundfile as sf
 import sox
 import torch
 from torch.utils.data import Dataset, Sampler, DistributedSampler, DataLoader
+import torchaudio
 
 from deepspeech_pytorch.configs.train_config import SpectConfig, AugmentationConfig
 from deepspeech_pytorch.loader.spec_augment import spec_augment
 
+torchaudio.set_audio_backend("sox_io")
+
 
 def load_audio(path):
-    sound, sample_rate = sf.read(path, dtype='int16')
-    # TODO this should be 32768.0 to get twos-complement range.
-    # TODO the difference is negligible but should be fixed for new models.
-    sound = sound.astype('float32') / 32767  # normalize audio
-    if len(sound.shape) > 1:
-        if sound.shape[1] == 1:
-            sound = sound.squeeze()
-        else:
-            sound = sound.mean(axis=1)  # multiple channels, average
-    return sound
+    sound, sample_rate = torchaudio.load(path)
+    if sound.shape[0] == 1:
+        sound = sound.squeeze()
+    else:
+        sound = sound.mean(axis=0)  # multiple channels, average
+    return sound.numpy()
 
 
 class AudioParser(object):
@@ -138,30 +138,27 @@ class SpectrogramParser(AudioParser):
 class SpectrogramDataset(Dataset, SpectrogramParser):
     def __init__(self,
                  audio_conf: SpectConfig,
-                 manifest_filepath: str,
+                 input_path: str,
                  labels: list,
                  normalize: bool = False,
-                 augmentation_conf: AugmentationConfig = None):
+                 aug_cfg: AugmentationConfig = None):
         """
         Dataset that loads tensors via a csv containing file paths to audio files and transcripts separated by
         a comma. Each new line is a different sample. Example below:
 
         /path/to/audio.wav,/path/to/audio.txt
         ...
-
+        You can also pass the directory of dataset.
         :param audio_conf: Config containing the sample rate, window and the window length/stride in seconds
-        :param manifest_filepath: Path to manifest csv as describe above
+        :param input_path: Path to input.
         :param labels: List containing all the possible characters to map to
         :param normalize: Apply standard mean and deviation normalization to audio tensor
         :param augmentation_conf(Optional): Config containing the augmentation parameters
         """
-        with open(manifest_filepath) as f:
-            ids = f.readlines()
-        ids = [x.strip().split(',') for x in ids]
-        self.ids = ids
-        self.size = len(ids)
+        self.ids = self._parse_input(input_path)
+        self.size = len(self.ids)
         self.labels_map = dict([(labels[i], i) for i in range(len(labels))])
-        super(SpectrogramDataset, self).__init__(audio_conf, normalize, augmentation_conf)
+        super(SpectrogramDataset, self).__init__(audio_conf, normalize, aug_cfg)
 
     def __getitem__(self, index):
         sample = self.ids[index]
@@ -169,6 +166,22 @@ class SpectrogramDataset(Dataset, SpectrogramParser):
         spect = self.parse_audio(audio_path)
         transcript = self.parse_transcript(transcript_path)
         return spect, transcript
+
+    def _parse_input(self, input_path):
+        ids = []
+        if os.path.isdir(input_path):
+            for wav_path in Path(input_path).rglob('*.wav'):
+                transcript_path = str(wav_path).replace('/wav/', '/txt/').replace('.wav', '.txt')
+                ids.append((wav_path, transcript_path))
+        else:
+            # Assume it is a manifest file
+            with open(input_path) as f:
+                manifest = json.load(f)
+            for sample in manifest['samples']:
+                wav_path = os.path.join(manifest['root_path'], sample['wav_path'])
+                transcript_path = os.path.join(manifest['root_path'], sample['transcript_path'])
+                ids.append((wav_path, transcript_path))
+        return ids
 
     def parse_transcript(self, transcript_path):
         with open(transcript_path, 'r', encoding='utf8') as transcript_file:
@@ -202,7 +215,7 @@ def _collate_fn(batch):
         input_percentages[x] = seq_length / float(max_seqlength)
         target_sizes[x] = len(target)
         targets.extend(target)
-    targets = torch.IntTensor(targets)
+    targets = torch.tensor(targets, dtype=torch.long)
     return inputs, targets, input_percentages, target_sizes
 
 
@@ -222,11 +235,12 @@ class DSRandomSampler(Sampler):
     This is essential since we support saving/loading state during an epoch.
     """
 
-    def __init__(self, dataset, batch_size=1, start_index=0):
+    def __init__(self, dataset, batch_size=1):
         super().__init__(data_source=dataset)
 
         self.dataset = dataset
-        self.start_index = start_index
+        self.start_index = 0
+        self.epoch = 0
         self.batch_size = batch_size
         ids = list(range(len(self.dataset)))
         self.bins = [ids[i:i + self.batch_size] for i in range(0, len(ids), self.batch_size)]
@@ -251,9 +265,6 @@ class DSRandomSampler(Sampler):
     def set_epoch(self, epoch):
         self.epoch = epoch
 
-    def reset_training_step(self, training_step):
-        self.start_index = training_step
-
 
 class DSElasticDistributedSampler(DistributedSampler):
     """
@@ -261,9 +272,9 @@ class DSElasticDistributedSampler(DistributedSampler):
     This is essential since we support saving/loading state during an epoch.
     """
 
-    def __init__(self, dataset, num_replicas=None, rank=None, start_index=0, batch_size=1):
+    def __init__(self, dataset, num_replicas=None, rank=None, batch_size=1):
         super().__init__(dataset=dataset, num_replicas=num_replicas, rank=rank)
-        self.start_index = start_index
+        self.start_index = 0
         self.batch_size = batch_size
         ids = list(range(len(dataset)))
         self.bins = [ids[i:i + self.batch_size] for i in range(0, len(ids), self.batch_size)]
@@ -296,13 +307,6 @@ class DSElasticDistributedSampler(DistributedSampler):
 
     def __len__(self):
         return self.num_samples
-
-    def reset_training_step(self, training_step):
-        self.start_index = training_step
-        self.num_samples = int(
-            math.ceil(float(len(self.bins) - self.start_index) / self.num_replicas)
-        )
-        self.total_size = self.num_samples * self.num_replicas
 
 
 def audio_with_sox(path, sample_rate, start_time, end_time):

@@ -95,8 +95,11 @@ if __name__ == '__main__':
     for f in tqdm(all_files, total=len(all_files)):
         prepare_sample(f.replace(".tgz", ""), VOXFORGE_URL_16kHz + f, target_dir)
     print('Creating manifests...')
-    create_manifest(data_path=target_dir,
-                    output_name='voxforge_train_manifest.csv',
-                    manifest_path=args.manifest_dir,
-                    min_duration=args.min_duration,
-                    max_duration=args.max_duration)
+    create_manifest(
+        data_path=target_dir,
+        output_name='voxforge_train_manifest.json',
+        manifest_path=args.manifest_dir,
+        min_duration=args.min_duration,
+        max_duration=args.max_duration,
+        num_workers=args.num_workers
+    )

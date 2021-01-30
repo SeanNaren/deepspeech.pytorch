@@ -1,86 +1,36 @@
 import os
-from abc import ABC
-from pathlib import Path, PosixPath
+from pathlib import Path
 
 import hydra
-import torch
-from deepspeech_pytorch.configs.train_config import GCSCheckpointConfig, CheckpointConfig, FileCheckpointConfig
-from deepspeech_pytorch.state import TrainingState
 from google.cloud import storage
+from hydra_configs.pytorch_lightning.callbacks import ModelCheckpointConf
+from pytorch_lightning.callbacks import ModelCheckpoint
+from tqdm import tqdm
+
+from deepspeech_pytorch.configs.train_config import GCSCheckpointConfig
 
 
-class CheckpointHandler(ABC):
+class CheckpointHandler(ModelCheckpoint):
 
-    def __init__(self,
-                 cfg: CheckpointConfig,
-                 save_location):
-        self.checkpoint_prefix = 'deepspeech_checkpoint_'  # TODO do we want to expose this?
-        self.save_location = save_location
-        self.checkpoint_per_iteration = cfg.checkpoint_per_iteration
-        self.save_n_recent_models = cfg.save_n_recent_models
-
-        if type(self.save_location) == PosixPath:
-            self.checkpoint_prefix_path = self.save_location / self.checkpoint_prefix
-            self.best_val_path = self.save_location / cfg.best_val_model_name
-        else:
-            self.checkpoint_prefix_path = self.save_location + self.checkpoint_prefix
-            self.best_val_path = self.save_location + cfg.best_val_model_name
-
-    def save_model(self,
-                   model_path: str,
-                   state: TrainingState,
-                   epoch: int,
-                   i: int = None):
-        raise NotImplementedError
+    def __init__(self, cfg: ModelCheckpointConf):
+        super().__init__(
+            dirpath=cfg.dirpath,
+            filename=cfg.filename,
+            monitor=cfg.monitor,
+            verbose=cfg.verbose,
+            save_last=cfg.save_last,
+            save_top_k=cfg.save_top_k,
+            save_weights_only=cfg.save_weights_only,
+            mode=cfg.mode,
+            period=cfg.period,
+            prefix=cfg.prefix
+        )
 
     def find_latest_checkpoint(self):
         raise NotImplementedError
 
-    def check_and_delete_oldest_checkpoint(self):
-        raise NotImplementedError
-
-    def save_checkpoint_model(self, epoch, state, i=None):
-        if self.save_n_recent_models > 0:
-            self.check_and_delete_oldest_checkpoint()
-        model_path = self._create_checkpoint_path(epoch=epoch,
-                                                  i=i)
-        self.save_model(model_path=model_path,
-                        state=state,
-                        epoch=epoch,
-                        i=i)
-
-    def save_iter_checkpoint_model(self, epoch, state, i):
-        if self.checkpoint_per_iteration > 0 and i > 0 and (i + 1) % self.checkpoint_per_iteration == 0:
-            self.save_checkpoint_model(epoch=epoch,
-                                       state=state,
-                                       i=i)
-
-    def save_best_model(self, epoch, state):
-        self.save_model(model_path=self.best_val_path,
-                        state=state,
-                        epoch=epoch)
-
-    def _create_checkpoint_path(self, epoch, i=None):
-        """
-        Creates path to save checkpoint.
-        We automatically iterate the epoch and iteration for readibility.
-        :param epoch: The epoch (index starts at 0).
-        :param i: The iteration (index starts at 0).
-        :return: The path to save the model
-        """
-        if i:
-            checkpoint_path = str(self.checkpoint_prefix_path) + 'epoch_%d_iter_%d.pth' % (epoch + 1, i + 1)
-        else:
-            checkpoint_path = str(self.checkpoint_prefix_path) + 'epoch_%d.pth' % (epoch + 1)
-        return checkpoint_path
-
 
 class FileCheckpointHandler(CheckpointHandler):
-    def __init__(self, cfg: FileCheckpointConfig):
-        self.save_folder = Path(hydra.utils.to_absolute_path(cfg.save_folder))
-        self.save_folder.mkdir(parents=True, exist_ok=True)  # Ensure save folder exists
-        super().__init__(cfg=cfg,
-                         save_location=self.save_folder)
 
     def find_latest_checkpoint(self):
         """
@@ -88,7 +38,7 @@ class FileCheckpointHandler(CheckpointHandler):
         If there are no checkpoints, returns None.
         :return: The latest checkpoint path, or None if no checkpoints are found.
         """
-        paths = list(self.save_folder.rglob(self.checkpoint_prefix + '*'))
+        paths = list(Path(self.dirpath).rglob(self.prefix + '*'))
         if paths:
             paths.sort(key=os.path.getctime)
             latest_checkpoint_path = paths[-1]
@@ -96,28 +46,15 @@ class FileCheckpointHandler(CheckpointHandler):
         else:
             return None
 
-    def check_and_delete_oldest_checkpoint(self):
-        paths = list(self.save_folder.rglob(self.checkpoint_prefix + '*'))
-        if paths and len(paths) >= self.save_n_recent_models:
-            paths.sort(key=os.path.getctime)
-            print("Deleting old checkpoint %s" % str(paths[0]))
-            os.remove(paths[0])
-
-    def save_model(self, model_path, state, epoch, i=None):
-        print("Saving model to %s" % model_path)
-        torch.save(obj=state.serialize_state(epoch=epoch,
-                                             iteration=i),
-                   f=model_path)
-
 
 class GCSCheckpointHandler(CheckpointHandler):
     def __init__(self, cfg: GCSCheckpointConfig):
         self.client = storage.Client()
         self.local_save_file = hydra.utils.to_absolute_path(cfg.local_save_file)
         self.gcs_bucket = cfg.gcs_bucket
+        self.gcs_save_folder = cfg.gcs_save_folder
         self.bucket = self.client.bucket(bucket_name=self.gcs_bucket)
-        super().__init__(cfg=cfg,
-                         save_location=cfg.gcs_save_folder)
+        super().__init__(cfg=cfg)
 
     def find_latest_checkpoint(self):
         """
@@ -126,7 +63,7 @@ class GCSCheckpointHandler(CheckpointHandler):
         If there are no checkpoints, returns None.
         :return: The latest checkpoint path, or None if no checkpoints are found.
         """
-        prefix = self.save_location + self.checkpoint_prefix
+        prefix = self.gcs_save_folder + self.prefix
         paths = list(self.client.list_blobs(self.gcs_bucket, prefix=prefix))
         if paths:
             paths.sort(key=lambda x: x.time_created)
@@ -136,20 +73,16 @@ class GCSCheckpointHandler(CheckpointHandler):
         else:
             return None
 
-    def check_and_delete_oldest_checkpoint(self):
-        prefix = self.save_location + self.checkpoint_prefix
-        paths = list(self.client.list_blobs(self.gcs_bucket, prefix=prefix))
-        if paths and len(paths) >= self.save_n_recent_models:
-            paths.sort(key=lambda x: x.time_created)
-            print("Deleting old checkpoint %s" % paths[0].name)
-            paths[0].delete()
+    def _save_model(self, filepath: str, trainer, pl_module):
 
-    def save_model(self, model_path, state, epoch, i=None):
-        print("Saving model to %s" % model_path)
-        torch.save(obj=state.serialize_state(epoch=epoch,
-                                             iteration=i),
-                   f=self.local_save_file)
-        self._save_file_to_gcs(model_path)
+        # in debugging, track when we save checkpoints
+        trainer.dev_debugger.track_checkpointing_history(filepath)
+
+        # make paths
+        if trainer.is_global_zero:
+            tqdm.write("Saving model to %s" % filepath)
+            trainer.save_checkpoint(filepath)
+            self._save_file_to_gcs(filepath)
 
     def _save_file_to_gcs(self, model_path):
         blob = self.bucket.blob(model_path)
