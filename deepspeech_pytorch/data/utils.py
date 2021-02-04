@@ -16,9 +16,10 @@ def create_manifest(
         manifest_path: str,
         num_workers: int,
         min_duration: Optional[float] = None,
-        max_duration: Optional[float] = None):
+        max_duration: Optional[float] = None,
+        file_extension: str = "wav"):
     data_path = os.path.abspath(data_path)
-    file_paths = list(Path(data_path).rglob('*.wav'))
+    file_paths = list(Path(data_path).rglob(f"*.{file_extension}"))
     file_paths = order_and_prune_files(
         file_paths=file_paths,
         min_duration=min_duration,
@@ -62,4 +63,6 @@ def order_and_prune_files(
         duration_file_paths = [(path, duration) for path, duration in duration_file_paths if
                                min_duration <= duration <= max_duration]
 
+    total_duration = sum([x[1] for x in duration_file_paths])
+    print(f"Total duration of split: {total_duration:.4f}s")
     return [x[0] for x in duration_file_paths]  # Remove durations
