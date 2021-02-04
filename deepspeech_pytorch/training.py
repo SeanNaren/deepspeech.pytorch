@@ -1,7 +1,7 @@
 import json
 
 import hydra
-from deepspeech_pytorch.checkpoint import CheckpointHandler, GCSCheckpointHandler
+from deepspeech_pytorch.checkpoint import GCSCheckpointHandler, FileCheckpointHandler
 from deepspeech_pytorch.configs.train_config import DeepSpeechConfig, GCSCheckpointConfig
 from deepspeech_pytorch.loader.data_module import DeepSpeechDataModule
 from deepspeech_pytorch.model import DeepSpeech
@@ -23,7 +23,7 @@ def train(cfg: DeepSpeechConfig):
             )
             cfg.trainer.callbacks = [checkpoint_callback]
         else:
-            checkpoint_callback = CheckpointHandler(
+            checkpoint_callback = FileCheckpointHandler(
                 cfg=cfg.checkpoint
             )
         if cfg.load_auto_checkpoint:
