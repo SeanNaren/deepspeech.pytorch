@@ -85,7 +85,7 @@ def main():
         tar.extractall(target_unpacked_dir)
         tar.close()
 
-    folder_path = os.path.join(target_unpacked_dir, VERSION + '/{}/'.format(language_dir))  # TODO expose the language flag
+    folder_path = os.path.join(target_unpacked_dir, VERSION + '/{}/'.format(language_dir))
 
     for csv_file in args.files_to_process:
         convert_to_wav(
