@@ -21,7 +21,6 @@ def train(cfg: DeepSpeechConfig):
             checkpoint_callback = GCSCheckpointHandler(
                 cfg=cfg.checkpoint
             )
-            cfg.trainer.callbacks = [checkpoint_callback]
         else:
             checkpoint_callback = FileCheckpointHandler(
                 cfg=cfg.checkpoint
