@@ -59,8 +59,7 @@ class MaskConv(nn.Module):
         for module in self.seq_module:
             x = module(x)
             mask = torch.BoolTensor(x.size()).fill_(0)
-            if x.is_cuda:
-                mask = mask.cuda()
+            mask = mask.type_as(x)
             for i, length in enumerate(lengths):
                 length = length.item()
                 if (mask[i].size(2) - length) > 0:
@@ -245,7 +244,6 @@ class DeepSpeech(pl.LightningModule):
     def validation_step(self, batch, batch_idx):
         inputs, targets, input_percentages, target_sizes = batch
         input_sizes = input_percentages.mul_(int(inputs.size(3))).int()
-        inputs = inputs.to(self.device)
         with autocast(enabled=self.precision == 16):
             out, output_sizes = self(inputs, input_sizes)
         decoded_output, _ = self.evaluation_decoder.decode(out, output_sizes)
