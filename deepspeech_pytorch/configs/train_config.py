@@ -90,7 +90,7 @@ class DeepSpeechConfig:
     defaults: List[Any] = field(default_factory=lambda: defaults)
     optim: Any = MISSING
     model: Any = MISSING
-    checkpoint: Any = MISSING
+    checkpoint: ModelCheckpointConf = MISSING
     trainer: DeepSpeechTrainerConf = DeepSpeechTrainerConf()
     data: DataConfig = DataConfig()
     augmentation: AugmentationConfig = AugmentationConfig()
