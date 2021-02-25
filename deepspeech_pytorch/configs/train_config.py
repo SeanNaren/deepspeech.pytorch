@@ -77,7 +77,6 @@ class AdamConfig(OptimConfig):
 class GCSCheckpointConfig(ModelCheckpointConf):
     gcs_bucket: str = MISSING  # Bucket to store model checkpoints e.g bucket-name
     gcs_save_folder: str = MISSING  # Folder to store model checkpoints in bucket e.g models/
-    local_save_file: str = './local_checkpoint.pth'  # Place to store temp file on disk
 
 
 @dataclass

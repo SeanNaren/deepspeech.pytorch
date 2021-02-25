@@ -50,7 +50,6 @@ class FileCheckpointHandler(CheckpointHandler):
 class GCSCheckpointHandler(CheckpointHandler):
     def __init__(self, cfg: GCSCheckpointConfig):
         self.client = storage.Client()
-        self.local_save_file = hydra.utils.to_absolute_path(cfg.local_save_file)
         self.gcs_bucket = cfg.gcs_bucket
         self.gcs_save_folder = cfg.gcs_save_folder
         self.bucket = self.client.bucket(bucket_name=self.gcs_bucket)
@@ -80,10 +79,11 @@ class GCSCheckpointHandler(CheckpointHandler):
 
         # make paths
         if trainer.is_global_zero:
-            tqdm.write("Saving model to %s" % filepath)
+            tqdm.write(f"Saving model to {filepath}")
             trainer.save_checkpoint(filepath)
-            self._save_file_to_gcs(filepath)
+            self._save_file_to_gcs(filepath, self.save_weights_only)
 
     def _save_file_to_gcs(self, model_path):
-        blob = self.bucket.blob(model_path)
-        blob.upload_from_filename(self.local_save_file)
+        tqdm.write(f"Saving model to gs://{self.gcs_bucket}/{self.gcs_save_folder}/{self.filename}{self.FILE_EXTENSION}")
+        blob = self.bucket.blob(f"{self.gcs_save_folder}/{self.filename}{self.FILE_EXTENSION}")
+        blob.upload_from_filename(model_path)
