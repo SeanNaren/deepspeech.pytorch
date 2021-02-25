@@ -15,6 +15,7 @@ parser = argparse.ArgumentParser(description='Downloads and processes Mozilla Co
 parser = add_data_opts(parser)
 parser.add_argument("--target-dir", default='CommonVoice_dataset/', type=str, help="Directory to store the dataset.")
 parser.add_argument("--tar-path", type=str, help="Path to the Common Voice *.tar file if downloaded (Optional).")
+parser.add_argument("--language-dir", default='en', type=str, help="Language dir to process.")
 parser.add_argument('--files-to-process', nargs='+', default=['test.tsv', 'dev.tsv', 'train.tsv'],
                     type=str, help='list of *.csv file names to process')
 args = parser.parse_args()
@@ -64,6 +65,8 @@ def convert_to_wav(csv_file, target_dir, num_workers):
 
 def main():
     target_dir = args.target_dir
+    language_dir = args.language_dir
+    
     os.makedirs(target_dir, exist_ok=True)
 
     target_unpacked_dir = os.path.join(target_dir, "CV_unpacked")
@@ -82,7 +85,7 @@ def main():
         tar.extractall(target_unpacked_dir)
         tar.close()
 
-    folder_path = os.path.join(target_unpacked_dir, VERSION + '/en/')  # TODO expose the language flag
+    folder_path = os.path.join(target_unpacked_dir, VERSION + '/{}/'.format(language_dir))
 
     for csv_file in args.files_to_process:
         convert_to_wav(
