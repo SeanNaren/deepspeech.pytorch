@@ -64,12 +64,11 @@ The first path is to the audio file, and the second path is to a text file conta
 
 #### Merging multiple manifest files
 
-To create bigger manifest files (to train/test on multiple datasets at once) we can merge manifest files together like below from a directory
-containing all the manifests you want to merge. You can also prune short and long clips out of the new manifest.
+To create bigger manifest files (to train/test on multiple datasets at once) we can merge manifest files together like below.
 
 ```
 cd data/
-python merge_manifests.py --output-path merged_manifest.csv --merge-dir all-manifests/ --min-duration 1 --max-duration 15 # durations in seconds
+python merge_manifests.py manifest_1.json manifest_2.json --out new_manifest_dir
 ```
 
 ### Training a Model
