@@ -58,13 +58,13 @@ class MaskConv(nn.Module):
         """
         for module in self.seq_module:
             x = module(x)
-            mask = torch.BoolTensor(x.size()).fill_(0)
+            mask = torch.gt(torch.zeros(x.size()), 0)
             if x.is_cuda:
                 mask = mask.cuda()
             for i, length in enumerate(lengths):
-                length = length.item()
-                if (mask[i].size(2) - length) > 0:
-                    mask[i].narrow(2, length, mask[i].size(2) - length).fill_(1)
+                result = torch.sub(mask[i].size(2), length)
+                if torch.gt(result, 0):
+                    mask[i].narrow(2, length, result).fill_(1)
             x = x.masked_fill(mask, 0)
         return x, lengths
 
@@ -135,6 +135,16 @@ class Lookahead(nn.Module):
                + ', context=' + str(self.context) + ')'
 
 
+class MultiSequential(nn.Sequential):
+    """A Sequential module that accepts multiple arguments in `forward()`.
+    See https://github.com/pytorch/pytorch/issues/19808 for more info.
+    """
+    def forward(self, x, out_lengths):
+        for module in self:
+            x = module(x, out_lengths)
+        return x
+
+
 class DeepSpeech(pl.LightningModule):
     def __init__(self,
                  labels: List,
@@ -157,10 +167,10 @@ class DeepSpeech(pl.LightningModule):
         self.conv = MaskConv(nn.Sequential(
             nn.Conv2d(1, 32, kernel_size=(41, 11), stride=(2, 2), padding=(20, 5)),
             nn.BatchNorm2d(32),
-            nn.Hardtanh(0, 20, inplace=True),
+            nn.Hardtanh(0.0, 20.0, inplace=True),
             nn.Conv2d(32, 32, kernel_size=(21, 11), stride=(2, 1), padding=(10, 5)),
             nn.BatchNorm2d(32),
-            nn.Hardtanh(0, 20, inplace=True)
+            nn.Hardtanh(0.0, 20.0, inplace=True)
         ))
         # Based on above convolutions and spectrogram size using conv formula (W - F + 2P)/ S+1
         rnn_input_size = int(math.floor((self.spect_cfg.sample_rate * self.spect_cfg.window_size) / 2) + 1)
@@ -168,7 +178,7 @@ class DeepSpeech(pl.LightningModule):
         rnn_input_size = int(math.floor(rnn_input_size + 2 * 10 - 21) / 2 + 1)
         rnn_input_size *= 32
 
-        self.rnns = nn.Sequential(
+        self.rnns = MultiSequential(
             BatchRNN(
                 input_size=rnn_input_size,
                 hidden_size=self.model_cfg.hidden_size,
@@ -182,7 +192,7 @@ class DeepSpeech(pl.LightningModule):
                     hidden_size=self.model_cfg.hidden_size,
                     rnn_type=self.model_cfg.rnn_type.value,
                     bidirectional=self.bidirectional
-                ) for x in range(self.model_cfg.hidden_layers - 1)
+                ) for _ in range(self.model_cfg.hidden_layers - 1)
             )
         )
 
@@ -190,7 +200,7 @@ class DeepSpeech(pl.LightningModule):
             # consider adding batch norm?
             Lookahead(self.model_cfg.hidden_size, context=self.model_cfg.lookahead_context),
             nn.Hardtanh(0, 20, inplace=True)
-        ) if not self.bidirectional else None
+        ) if not self.bidirectional else nn.Identity()
 
         fully_connected = nn.Sequential(
             nn.BatchNorm1d(self.model_cfg.hidden_size),
@@ -298,7 +308,8 @@ class DeepSpeech(pl.LightningModule):
         :return: 1D Tensor scaled by model
         """
         seq_len = input_length
-        for m in self.conv.modules():
-            if type(m) == nn.modules.conv.Conv2d:
-                seq_len = ((seq_len + 2 * m.padding[1] - m.dilation[1] * (m.kernel_size[1] - 1) - 1) // m.stride[1] + 1)
+        m = self.conv.seq_module[0]
+        seq_len = ((seq_len + 2 * m.padding[1] - m.dilation[1] * (m.kernel_size[1] - 1) - 1) // m.stride[1] + 1)
+        m = self.conv.seq_module[3]
+        seq_len = ((seq_len + 2 * m.padding[1] - m.dilation[1] * (m.kernel_size[1] - 1) - 1) // m.stride[1] + 1)
         return seq_len.int()
