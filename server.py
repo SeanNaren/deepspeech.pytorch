@@ -71,14 +71,10 @@ def main(cfg: ServerConfig):
     )
 
     spect_parser = SpectrogramParser(
-        audio_conf=model.audio_conf,
-        normalize=True
-    )
-
-    spect_parser = SpectrogramParser(
         audio_conf=model.spect_cfg,
         normalize=True
     )
+    
     logging.info('Server initialised')
     app.run(
         host=cfg.host,
