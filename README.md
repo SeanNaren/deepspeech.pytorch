@@ -3,23 +3,7 @@
 
 Implementation of DeepSpeech2 for PyTorch using [PyTorch Lightning](https://github.com/PyTorchLightning/pytorch-lightning). The repo supports training/testing and inference using the [DeepSpeech2](http://arxiv.org/pdf/1512.02595v1.pdf) model. Optionally a [kenlm](https://github.com/kpu/kenlm) language model can be used at inference time.
 
-## Installation
-
-### Docker
-
-To use the image with a GPU you'll need to have [nvidia-docker](https://github.com/NVIDIA/nvidia-docker) installed.
-
-```bash
-sudo docker run -ti --gpus all -v `pwd`/data:/workspace/data --tmpfs /tmp -p 8888:8888 --net=host --ipc=host seannaren/deepspeech.pytorch:latest # Opens a Jupyter notebook, mounting the /data drive in the container
-```
-
-Optionally you can use the command line by changing the entrypoint:
-
-```bash
-sudo docker run -ti --gpus all -v `pwd`/data:/workspace/data --tmpfs /tmp --entrypoint=/bin/bash --net=host --ipc=host seannaren/deepspeech.pytorch:latest
-```
-
-### From Source
+## Install
 
 Several libraries are needed to be installed for training to work. I will assume that everything is being installed in
 an Anaconda installation on Ubuntu, with PyTorch installed.
@@ -38,16 +22,63 @@ pip install -r requirements.txt
 pip install -e . # Dev install
 ```
 
-If you plan to use Multi-GPU/Multi-node training, you'll need etcd. Below is the command to install on Ubuntu.
+If you plan to use Multi-node training, you'll need etcd. Below is the command to install on Ubuntu.
 ```
 sudo apt-get install etcd
+```
+
+### Docker
+
+To use the image with a GPU you'll need to have [nvidia-docker](https://github.com/NVIDIA/nvidia-docker) installed.
+
+```bash
+sudo docker run -ti --gpus all -v `pwd`/data:/workspace/data --tmpfs /tmp -p 8888:8888 --net=host --ipc=host seannaren/deepspeech.pytorch:latest # Opens a Jupyter notebook, mounting the /data drive in the container
+```
+
+Optionally you can use the command line by changing the entrypoint:
+
+```bash
+sudo docker run -ti --gpus all -v `pwd`/data:/workspace/data --tmpfs /tmp --entrypoint=/bin/bash --net=host --ipc=host seannaren/deepspeech.pytorch:latest
 ```
 
 ## Training
 
 ### Datasets
 
-Currently supports AN4, TEDLIUM, Voxforge, Common Voice and LibriSpeech. Scripts will setup the dataset and create manifest files used in data-loading. The scripts can be found in the data/ folder. Many of the scripts allow you to download the raw datasets separately if you choose so.
+Currently supports [AN4](http://www.speech.cs.cmu.edu/databases/an4/), [TEDLIUM](https://www.openslr.org/51/), [Voxforge](http://www.voxforge.org/), [Common Voice](https://commonvoice.mozilla.org/en/datasets) and [LibriSpeech](https://www.openslr.org/12). Scripts will setup the dataset and create manifest files used in data-loading. The scripts can be found in the data/ folder. Many of the scripts allow you to download the raw datasets separately if you choose so.
+
+### Training Commands
+
+##### AN4
+
+```bash
+cd data/ && python an4.py && cd ..
+
+python train.py +configs=an4
+```
+
+##### LibriSpeech
+
+```bash
+cd data/ && python an4.py && cd ..
+
+python train.py +configs=librispeech
+```
+
+##### Common Voice
+
+```bash
+cd data/ && python an4.py && cd ..
+
+python train.py +configs=commonvoice
+```
+##### TEDlium
+
+```bash
+cd data/ && python an4.py && cd ..
+
+python train.py +configs=tedlium
+```
 
 #### Custom Dataset
 
@@ -71,7 +102,7 @@ cd data/
 python merge_manifests.py manifest_1.json manifest_2.json --out new_manifest_dir
 ```
 
-### Training a Model
+### Modifying Training Configs
 
 Configuration is done via [Hydra](https://github.com/facebookresearch/hydra).
 
@@ -100,23 +131,13 @@ To see options available, check [here](./deepspeech_pytorch/configs/train_config
 
 ### Multi-GPU Training
 
-We support multi-GPU training via [TorchElastic](https://pytorch.org/elastic/0.2.0/index.html).
+We support single-machine multi-GPU training via [PyTorch Lightning](https://github.com/PyTorchLightning/pytorch-lightning).
 
 Below is an example command when training on a machine with 4 local GPUs:
 
 ```
-python -m torchelastic.distributed.launch \
-        --standalone \
-        --nnodes=1 \
-        --nproc_per_node=4 \
-        train.py data.train_path=data/an4_train_manifest.csv \
-                 data.val_path=data/an4_val_manifest.csv model.precision=half data.num_workers=8 \
-                 data.batch_size=8 trainer.max_epochs=70 checkpoint.checkpoint=true checkpointing.save_n_recent_models=3 \
-                 trainer.accelerator=ddp trainer.gpus=4
+python train.py +configs=an4 trainer.gpus=4
 ```
-
-You'll see the output for all the processes running on each individual GPU.
-You can verify the model is being synchronized by the WER from all workers at validation time.
 
 ### Multi-Node Training
 
@@ -155,24 +176,6 @@ Using the `load_auto_checkpoint=true` flag we can re-continue training from the 
 
 Currently it is expected that there is an NFS drive/shared mount across all nodes within the cluster to load the latest checkpoint from.
 
-### Mixed Precision
-
-If you are using NVIDIA volta cards or above to train your model, it's highly suggested to turn on mixed precision for speed/memory benefits. More information can be found [here](https://docs.nvidia.com/deeplearning/sdk/mixed-precision-training/index.html).
-
-```
-python train.py data.train_manifest=data/train_manifest.csv data.val_manifest=data/val_manifest.csv trainer.precision=16
-```
-
-Training a model in mixed-precision means you can use 32 bit float or half precision at runtime. Float32 is default, to use half precision (Which on V100s come with a speedup and better memory use) use the `model.precision=half` flag when testing or transcribing.
-
-### Swapping to ADAMW Optimizer
-
-ADAMW may provide better convergence and stability when training than SGD. In the future this may replace SGD within this repo.
-
-```
-python train.py data.train_manifest=data/train_manifest.csv data.val_manifest=data/val_manifest.csv optim=adam 
-```
-
 ### Augmentation
 
 There is support for three different types of augmentations: SpecAugment, noise injection and random tempo/gain perturbations.
@@ -203,44 +206,28 @@ Applies small changes to the tempo and gain when loading audio to increase robus
 
 ### Checkpoints
 
-Training supports saving checkpoints of the model to continue training from should an error occur or early termination. 
+Typically checkpoints are stored in `lightning_logs/` in the current working directory of the script.
 
-To enable epoch checkpoints use:
-
-```
-python train.py checkpoint=true
-```
-
-To continue from a checkpoint model:
+This can be adjusted:
 
 ```
-python train.py checkpointing.continue_from=models/deepspeech_checkpoint_epoch_N_iter_N.pth
+python train.py checkpoint.file_path=save_dir/
+```
+
+To load a previously saved checkpoint:
+
+```
+python train.py trainer.resume_from_checkpoint=lightning_logs/deepspeech_checkpoint_epoch_N_iter_N.ckpt
 ```
 
 This continues from the same training state.
-
-If you would like to start from a previous checkpoint model but not continue training, add the `training.finetune=true` flag to restart training
-from the `checkpointing.continue_from` weights.
-
-### Choosing batch sizes
-
-Included is a script that can be used to benchmark whether training can occur on your hardware, and the limits on the size of the model/batch
-sizes you can use. To use:
-
-```
-python benchmark.py --batch-size 32
-```
-
-Use the flag `--help` to see other parameters that can be used with the script.
-
-To also note, there is no final softmax layer on the model as when trained, warp-ctc does this softmax internally. This will have to also be implemented in complex decoders if anything is built on top of the model, so take this into consideration!
 
 ## Testing/Inference
 
 To evaluate a trained model on a test set (has to be in the same format as the training set):
 
 ```
-python test.py model.model_path=models/deepspeech.pth test_path=/path/to/test_manifest.csv
+python test.py model.model_path=models/deepspeech.pth test_path=/path/to/test_manifest.json
 ```
 
 An example script to output a transcription has been provided:
