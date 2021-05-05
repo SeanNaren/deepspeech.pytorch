@@ -82,16 +82,28 @@ python train.py +configs=tedlium
 
 #### Custom Dataset
 
-To create a custom dataset you must create a CSV file containing the locations of the training data. This has to be in the format of:
+To create a custom dataset you must create a JSON file containing the locations of the training/testing data. This has to be in the format of:
+```json
+{
+  "root_path":"path/to",
+  "samples":[
+    {"wav_path":"audio.wav","transcript_path":"text.txt"},
+    {"wav_path":"audio2.wav","transcript_path":"text2.txt"},
+    ...
+  ]
+}
+```
+Where the `root_path` is the root directory, `wav_path` is to the audio file, and the `transcript_path` is to a text file containing the transcript on one line. This can then be used as stated below.
 
+##### Note on CSV files ...
+Up until release [V2.1](https://github.com/SeanNaren/deepspeech.pytorch/releases/tag/V2.1), deepspeech.pytorch used CSV manifest files instead of JSON.
+These manifest files are formatted similarly as a 2 column table:
 ```
 /path/to/audio.wav,/path/to/text.txt
 /path/to/audio2.wav,/path/to/text2.txt
 ...
 ```
-
-The first path is to the audio file, and the second path is to a text file containing the transcript on one line. This can then be used as stated below.
-
+Note that this format is incompatible [V3.0](https://github.com/SeanNaren/deepspeech.pytorch/releases/tag/V3.0) onwards.
 
 #### Merging multiple manifest files
 
@@ -109,7 +121,7 @@ Configuration is done via [Hydra](https://github.com/facebookresearch/hydra).
 Defaults can be seen in [config.py](deepspeech_pytorch/configs/train_config.py). Below is how you can override values set already:
 
 ```
-python train.py data.train_path=data/train_manifest.csv data.val_path=data/val_manifest.csv
+python train.py data.train_path=data/train_manifest.json data.val_path=data/val_manifest.json
 ```
 
 Use `python train.py --help` for all parameters and options.
@@ -119,8 +131,8 @@ You can also specify a config file to keep parameters stored in a yaml file like
 Create folder `experiment/` and file `experiment/an4.yaml`:
 ```yaml
 data:
-  train_path: data/an4_train_manifest.csv
-  val_path: data/an4_val_manifest.csv
+  train_path: data/an4_train_manifest.json
+  val_path: data/an4_val_manifest.json
 ```
 
 ```
@@ -164,8 +176,8 @@ python -m torchelastic.distributed.launch \
         --rdzv_id=123 \
         --rdzv_backend=etcd \
         --rdzv_endpoint=$PUBLIC_HOST_NAME:4377 \
-        train.py data.train_path=/share/data/an4_train_manifest.csv \
-                 data.val_path=/share/data/an4_val_manifest.csv model.precision=half \
+        train.py data.train_path=/share/data/an4_train_manifest.json \
+                 data.val_path=/share/data/an4_val_manifest.json model.precision=half \
                  data.num_workers=8 checkpoint.save_folder=/share/checkpoints/ \
                  checkpoint.checkpoint=true checkpoint.load_auto_checkpoint=true checkpointing.save_n_recent_models=3 \
                  data.batch_size=8 trainer.max_epochs=70 \
@@ -259,7 +271,7 @@ In addition download the latest pre-trained librispeech model from the releases 
 
 First we need to generate the acoustic output to be used to evaluate the model on LibriSpeech val.
 ```
-python test.py data.test_path=data/librispeech_val_manifest.csv model.model_path=librispeech_pretrained_v2.pth save_output=librispeech_val_output.npy
+python test.py data.test_path=data/librispeech_val_manifest.json model.model_path=librispeech_pretrained_v2.pth save_output=librispeech_val_output.npy
 ```
 
 We use a beam width of 128 which gives reasonable results. We suggest using a CPU intensive node to carry out the grid search.
