@@ -1,5 +1,5 @@
 # deepspeech.pytorch
-[![Build Status](https://travis-ci.com/SeanNaren/deepspeech.pytorch.svg?branch=master)](https://travis-ci.com/SeanNaren/deepspeech.pytorch)
+![Tests](https://github.com/SeanNaren/deepspeech.pytorch/actions/workflows/master.yaml/badge.svg)
 
 Implementation of DeepSpeech2 for PyTorch using [PyTorch Lightning](https://github.com/PyTorchLightning/pytorch-lightning). The repo supports training/testing and inference using the [DeepSpeech2](http://arxiv.org/pdf/1512.02595v1.pdf) model. Optionally a [kenlm](https://github.com/kpu/kenlm) language model can be used at inference time.
 
