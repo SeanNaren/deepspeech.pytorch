@@ -190,7 +190,7 @@ class DeepSpeechSmokeTest(unittest.TestCase):
                 max_epochs=max_epochs,
                 precision=precision,
                 gpus=gpus,
-                checkpoint_callback=True,
+                enable_checkpointing=True,
                 limit_train_batches=limit_train_batches,
                 limit_val_batches=limit_val_batches
             ),
