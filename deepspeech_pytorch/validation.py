@@ -2,11 +2,11 @@ from abc import ABC, abstractmethod
 
 import torch
 from torch.cuda.amp import autocast
+from torchmetrics import Metric
 from tqdm import tqdm
 
 from deepspeech_pytorch.decoder import Decoder, GreedyDecoder
 
-from pytorch_lightning.metrics import Metric
 import Levenshtein as Lev
 
 

@@ -2,9 +2,9 @@ from dataclasses import dataclass, field
 from typing import Any, List
 
 from hydra_configs.pytorch_lightning.callbacks import ModelCheckpointConf
-from hydra_configs.pytorch_lightning.trainer import TrainerConf
 from omegaconf import MISSING
 
+from deepspeech_pytorch.configs.lightning_config import TrainerConf
 from deepspeech_pytorch.enums import SpectrogramWindow, RNNType
 
 defaults = [
@@ -71,12 +71,6 @@ class SGDConfig(OptimConfig):
 class AdamConfig(OptimConfig):
     eps: float = 1e-8  # Adam eps
     betas: tuple = (0.9, 0.999)  # Adam betas
-
-
-@dataclass
-class GCSCheckpointConfig(ModelCheckpointConf):
-    gcs_bucket: str = MISSING  # Bucket to store model checkpoints e.g bucket-name
-    gcs_save_folder: str = MISSING  # Folder to store model checkpoints in bucket e.g models/
 
 
 @dataclass
