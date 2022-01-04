@@ -13,8 +13,6 @@ class ModelCheckpointConf:
     save_top_k: Optional[int] = 1
     save_weights_only: bool = False
     mode: str = "min"
-    period: int = 1
-    prefix: str = ""
     dirpath: Any = None  # Union[str, Path, NoneType]
     filename: Optional[str] = None
     auto_insert_metric_name: bool = True

@@ -6,16 +6,16 @@ import unittest
 from dataclasses import dataclass
 from pathlib import Path
 
+
 from data.an4 import download_an4
 from deepspeech_pytorch.configs.inference_config import EvalConfig, ModelConfig, TranscribeConfig, LMConfig
+from deepspeech_pytorch.configs.lightning_config import ModelCheckpointConf
 from deepspeech_pytorch.configs.train_config import DeepSpeechConfig, AdamConfig, BiDirectionalConfig, \
     DataConfig, DeepSpeechTrainerConf
 from deepspeech_pytorch.enums import DecoderType
 from deepspeech_pytorch.inference import transcribe
 from deepspeech_pytorch.testing import evaluate
 from deepspeech_pytorch.training import train
-from hydra_configs.pytorch_lightning.callbacks import ModelCheckpointConf
-from hydra_configs.pytorch_lightning.trainer import TrainerConf
 
 
 @dataclass
@@ -190,7 +190,7 @@ class DeepSpeechSmokeTest(unittest.TestCase):
                 max_epochs=max_epochs,
                 precision=precision,
                 gpus=gpus,
-                checkpoint_callback=True,
+                enable_checkpointing=True,
                 limit_train_batches=limit_train_batches,
                 limit_val_batches=limit_val_batches
             ),
