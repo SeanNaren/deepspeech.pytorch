@@ -9,19 +9,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
-      - uses: actions/checkout@v2
+        uses: actions/checkout@v2
       - name: Set up node
         uses: actions/setup-node@v1
-#      - name: Install dependencies
-#        run: |
-#          python --version
-#          python -m pip install --upgrade --user pip
-#          pip --version
-#          pip install -r requirements.txt --find-links https://download.pytorch.org/whl/cpu/torch_stable.html --upgrade
-#          apt-get update -y
-#          apt-get install -y git curl ca-certificates sox libsox-dev libsox-fmt-all
-#          git clone --recursive https://github.com/parlance/ctcdecode.git
-#          cd ctcdecode; pip install .
+      - name: Install dependencies
+        run: |
+          python --version
+          python -m pip install --upgrade --user pip
+          pip --version
+          pip install -r requirements.txt --find-links https://download.pytorch.org/whl/cpu/torch_stable.html --upgrade
+          apt-get update -y
+          apt-get install -y git curl ca-certificates sox libsox-dev libsox-fmt-all
+          git clone --recursive https://github.com/parlance/ctcdecode.git
+          cd ctcdecode; pip install .
         shell: bash
       - name: Run tests
         run: pytest tests/ -vv -s
