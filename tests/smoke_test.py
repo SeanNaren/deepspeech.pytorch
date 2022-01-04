@@ -6,10 +6,10 @@ import unittest
 from dataclasses import dataclass
 from pathlib import Path
 
-from hydra_configs.pytorch_lightning.callbacks import ModelCheckpointConf
 
 from data.an4 import download_an4
 from deepspeech_pytorch.configs.inference_config import EvalConfig, ModelConfig, TranscribeConfig, LMConfig
+from deepspeech_pytorch.configs.lightning_config import ModelCheckpointConf
 from deepspeech_pytorch.configs.train_config import DeepSpeechConfig, AdamConfig, BiDirectionalConfig, \
     DataConfig, DeepSpeechTrainerConf
 from deepspeech_pytorch.enums import DecoderType
