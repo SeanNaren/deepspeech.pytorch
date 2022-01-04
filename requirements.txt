@@ -1,6 +1,5 @@
 fairscale
 flask
-google-cloud-storage
 hydra-core
 jupyter
 librosa

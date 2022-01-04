@@ -8,7 +8,7 @@ cs = ConfigStore.instance()
 cs.store(name="config", node=TranscribeConfig)
 
 
-@hydra.main(config_name="config")
+@hydra.main(config_path='.', config_name="config")
 def hydra_main(cfg: TranscribeConfig):
     transcribe(cfg=cfg)
 

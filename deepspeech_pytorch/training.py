@@ -1,13 +1,13 @@
 import json
 
 import hydra
-from deepspeech_pytorch.checkpoint import GCSCheckpointHandler, FileCheckpointHandler
-from deepspeech_pytorch.configs.train_config import DeepSpeechConfig, GCSCheckpointConfig
+from hydra.utils import to_absolute_path
+from pytorch_lightning import seed_everything
+
+from deepspeech_pytorch.checkpoint import FileCheckpointHandler
+from deepspeech_pytorch.configs.train_config import DeepSpeechConfig
 from deepspeech_pytorch.loader.data_module import DeepSpeechDataModule
 from deepspeech_pytorch.model import DeepSpeech
-from hydra.utils import to_absolute_path
-from omegaconf import OmegaConf
-from pytorch_lightning import seed_everything
 
 
 def train(cfg: DeepSpeechConfig):
@@ -16,15 +16,10 @@ def train(cfg: DeepSpeechConfig):
     with open(to_absolute_path(cfg.data.labels_path)) as label_file:
         labels = json.load(label_file)
 
-    if cfg.trainer.checkpoint_callback:
-        if OmegaConf.get_type(cfg.checkpoint) is GCSCheckpointConfig:
-            checkpoint_callback = GCSCheckpointHandler(
-                cfg=cfg.checkpoint
-            )
-        else:
-            checkpoint_callback = FileCheckpointHandler(
-                cfg=cfg.checkpoint
-            )
+    if cfg.trainer.enable_checkpointing:
+        checkpoint_callback = FileCheckpointHandler(
+            cfg=cfg.checkpoint
+        )
         if cfg.load_auto_checkpoint:
             resume_from_checkpoint = checkpoint_callback.find_latest_checkpoint()
             if resume_from_checkpoint:
@@ -48,6 +43,6 @@ def train(cfg: DeepSpeechConfig):
     trainer = hydra.utils.instantiate(
         config=cfg.trainer,
         replace_sampler_ddp=False,
-        callbacks=[checkpoint_callback] if cfg.trainer.checkpoint_callback else None,
+        callbacks=[checkpoint_callback] if cfg.trainer.enable_checkpointing else None,
     )
     trainer.fit(model, data_loader)

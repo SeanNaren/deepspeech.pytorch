@@ -11,7 +11,7 @@ trainer:
   gradient_clip_val: 400  # Norm cutoff to prevent explosion of gradients
   accelerator: ddp
   plugins: ddp_sharded
-  checkpoint_callback: True
+  enable_checkpointing: True
 checkpoint:
   save_top_k: 1
   monitor: "wer"
