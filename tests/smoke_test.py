@@ -6,6 +6,7 @@ import unittest
 from dataclasses import dataclass
 from pathlib import Path
 
+from pytorch_lightning.utilities import _module_available
 
 from data.an4 import download_an4
 from deepspeech_pytorch.configs.inference_config import EvalConfig, ModelConfig, TranscribeConfig, LMConfig
@@ -78,12 +79,14 @@ class DeepSpeechSmokeTest(unittest.TestCase):
         model_path = self.model_dir + '/last.ckpt'
         assert os.path.exists(model_path)
 
-        lm_configs = [
-            LMConfig(),  # Test Greedy
-            LMConfig(
-                decoder_type=DecoderType.beam
-            )  # Test Beam Decoder
-        ]
+        lm_configs = [LMConfig()]
+
+        if _module_available('ctcdecode'):
+            lm_configs.append(
+                LMConfig(
+                    decoder_type=DecoderType.beam
+                )
+            )
         print("Running Inference Smoke Tests")
         for lm_config in lm_configs:
             self.eval_model(
