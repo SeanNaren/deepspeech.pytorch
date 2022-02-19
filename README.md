@@ -60,7 +60,7 @@ python train.py +configs=an4
 ##### LibriSpeech
 
 ```bash
-cd data/ && python an4.py && cd ..
+cd data/ && python librispeech.py && cd ..
 
 python train.py +configs=librispeech
 ```
@@ -68,14 +68,14 @@ python train.py +configs=librispeech
 ##### Common Voice
 
 ```bash
-cd data/ && python an4.py && cd ..
+cd data/ && python common_voice.py && cd ..
 
 python train.py +configs=commonvoice
 ```
 ##### TEDlium
 
 ```bash
-cd data/ && python an4.py && cd ..
+cd data/ && python ted.py && cd ..
 
 python train.py +configs=tedlium
 ```
