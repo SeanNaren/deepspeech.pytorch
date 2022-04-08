@@ -1,6 +1,5 @@
 fairscale
 flask
-hydra-core
 jupyter
 librosa
 matplotlib
@@ -17,4 +16,4 @@ torchaudio
 torchelastic
 tqdm
 wget
-git+https://github.com/romesco/hydra-lightning/#subdirectory=hydra-configs-pytorch-lightning
+jsonargparse[signatures]

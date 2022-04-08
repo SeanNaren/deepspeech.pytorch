@@ -7,8 +7,8 @@ import tarfile
 from sklearn.model_selection import train_test_split
 import wget
 
-from deepspeech_pytorch.data.data_opts import add_data_opts
-from deepspeech_pytorch.data.utils import create_manifest
+from deepspeech_pytorch.data_utils.data_opts import add_data_opts
+from deepspeech_pytorch.data_utils.utils import create_manifest
 
 
 def _format_training_data(root_path,

@@ -8,8 +8,8 @@ from sox import Transformer
 import tqdm
 import wget
 
-from deepspeech_pytorch.data.data_opts import add_data_opts
-from deepspeech_pytorch.data.utils import create_manifest
+from deepspeech_pytorch.data_utils.data_opts import add_data_opts
+from deepspeech_pytorch.data_utils.utils import create_manifest
 
 parser = argparse.ArgumentParser(description='Downloads and processes Mozilla Common Voice dataset.')
 parser = add_data_opts(parser)

@@ -2,8 +2,8 @@ import hydra
 import torch
 
 from deepspeech_pytorch.configs.inference_config import EvalConfig
+from deepspeech_pytorch.data.data_loader import SpectrogramDataset, AudioDataLoader
 from deepspeech_pytorch.decoder import GreedyDecoder
-from deepspeech_pytorch.loader.data_loader import SpectrogramDataset, AudioDataLoader
 from deepspeech_pytorch.utils import load_model, load_decoder
 from deepspeech_pytorch.validation import run_evaluation
 

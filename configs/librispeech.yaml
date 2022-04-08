@@ -1,19 +1,31 @@
-# @package _global_
 data:
-  train_path: data/libri_train_manifest.json
-  val_path: data/libri_val_manifest.json
-  num_workers: 8
-  augmentation:
-    spec_augment: True
+  labels: [ "_", "'", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S",
+            "T", "U", "V", "W", "X", "Y", "Z", " " ]
+  config:
+    train_path: data/libri_train_manifest.json
+    val_path: data/libri_val_manifest.json
+    batch_size: 8
+    num_workers: 8
+    augmentation:
+      spec_augment: True
 trainer:
   max_epochs: 16
   gpus: 1
   precision: 16
   gradient_clip_val: 400  # Norm cutoff to prevent explosion of gradients
-  accelerator: ddp
-  plugins: ddp_sharded
+  strategy: ddp_sharded
   enable_checkpointing: True
 checkpoint:
   save_top_k: 1
   monitor: "wer"
   verbose: True
+optimizer:
+  class_path: torch.optim.AdamW
+  init_args:
+    lr: 1.5e-4
+    eps: 1e-8
+    weight_decay: 1e-5
+lr_scheduler:
+  class_path: torch.optim.lr_scheduler.ExponentialLR
+  init_args:
+    gamma: 0.99

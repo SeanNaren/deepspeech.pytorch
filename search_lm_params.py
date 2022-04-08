@@ -5,9 +5,9 @@ from hydra.core.config_store import ConfigStore
 import optuna
 import torch
 
-from deepspeech_pytorch.configs.train_config import SpectConfig
+from deepspeech_pytorch.data.config import SpectConfig
+from deepspeech_pytorch.data.data_loader import AudioDataLoader, SpectrogramDataset
 from deepspeech_pytorch.decoder import BeamCTCDecoder, GreedyDecoder
-from deepspeech_pytorch.loader.data_loader import AudioDataLoader, SpectrogramDataset
 from deepspeech_pytorch.utils import load_model
 from deepspeech_pytorch.validation import run_evaluation
 

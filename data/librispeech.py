@@ -4,11 +4,11 @@ import tarfile
 import argparse
 import subprocess
 
-from deepspeech_pytorch.data.data_opts import add_data_opts
 from tqdm import tqdm
 import shutil
 
-from deepspeech_pytorch.data.utils import create_manifest
+from deepspeech_pytorch.data_utils.data_opts import add_data_opts
+from deepspeech_pytorch.data_utils.utils import create_manifest
 
 parser = argparse.ArgumentParser(description='Processes and downloads LibriSpeech dataset.')
 parser = add_data_opts(parser)

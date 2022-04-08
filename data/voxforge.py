@@ -9,8 +9,8 @@ import tarfile
 import io
 from tqdm import tqdm
 
-from deepspeech_pytorch.data.data_opts import add_data_opts
-from deepspeech_pytorch.data.utils import create_manifest
+from deepspeech_pytorch.data_utils.data_opts import add_data_opts
+from deepspeech_pytorch.data_utils.utils import create_manifest
 
 VOXFORGE_URL_16kHz = 'http://www.repository.voxforge1.org/downloads/SpeechCorpus/Trunk/Audio/Main/16kHz_16bit/'
 

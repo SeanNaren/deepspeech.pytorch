@@ -6,10 +6,10 @@ import subprocess
 import unicodedata
 import io
 
-from deepspeech_pytorch.data.data_opts import add_data_opts
 from tqdm import tqdm
 
-from deepspeech_pytorch.data.utils import create_manifest
+from deepspeech_pytorch.data_utils.data_opts import add_data_opts
+from deepspeech_pytorch.data_utils.utils import create_manifest
 
 parser = argparse.ArgumentParser(description='Processes and downloads TED-LIUMv2 dataset.')
 parser = add_data_opts(parser)

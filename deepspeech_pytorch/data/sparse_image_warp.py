@@ -177,7 +177,7 @@ def solve_interpolation(train_points, train_values, order, regularization_weight
     rhs = torch.cat((f, rhs_zeros), 1)  # [b, n + d + 1, k]
 
     # Then, solve the linear system and unpack the results.
-    X, LU = torch.solve(rhs, lhs)
+    X = torch.linalg.solve(lhs, rhs)
     w = X[:, :n, :]
     v = X[:, n:, :]
 
@@ -297,7 +297,7 @@ def dense_image_warp(image, flow):
     # The flow is defined on the image grid. Turn the flow into a list of query
     # points in the grid space.
     grid_x, grid_y = torch.meshgrid(
-        torch.arange(width), torch.arange(height))
+        torch.arange(width), torch.arange(height), indexing='ij')
 
     stacked_grid = torch.stack((grid_y, grid_x), dim=2).float()
 

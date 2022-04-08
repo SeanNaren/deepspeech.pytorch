@@ -1,11 +1,9 @@
 import argparse
-import io
 import json
 import os
 from pathlib import Path
 
 from tqdm import tqdm
-
 
 parser = argparse.ArgumentParser(description="Merges all manifest files in specified folder.")
 parser.add_argument("manifests", metavar="m", nargs="+", help="Path to all manifest files you want to merge.")
