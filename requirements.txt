@@ -1,4 +1,3 @@
-fairscale
 flask
 hydra-core
 jupyter
@@ -17,4 +16,3 @@ torchaudio
 torchelastic
 tqdm
 wget
-git+https://github.com/romesco/hydra-lightning/#subdirectory=hydra-configs-pytorch-lightning

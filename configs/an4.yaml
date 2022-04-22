@@ -6,11 +6,11 @@ data:
   num_workers: 8
 trainer:
   max_epochs: 70
-  gpus: 1
+  accelerator: 'auto'
+  devices: 1
   precision: 16
   gradient_clip_val: 400  # Norm cutoff to prevent explosion of gradients
-  accelerator: ddp
-  plugins: ddp_sharded
+  strategy: ddp
   enable_checkpointing: True
 checkpoint:
   save_top_k: 1

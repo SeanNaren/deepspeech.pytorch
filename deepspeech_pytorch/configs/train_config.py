@@ -1,10 +1,9 @@
 from dataclasses import dataclass, field
 from typing import Any, List
 
-from hydra_configs.pytorch_lightning.callbacks import ModelCheckpointConf
 from omegaconf import MISSING
 
-from deepspeech_pytorch.configs.lightning_config import TrainerConf
+from deepspeech_pytorch.configs.lightning_config import TrainerConf, ModelCheckpointConf
 from deepspeech_pytorch.enums import SpectrogramWindow, RNNType
 
 defaults = [
