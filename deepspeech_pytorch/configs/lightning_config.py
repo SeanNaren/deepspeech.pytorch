@@ -83,4 +83,3 @@ class TrainerConf:
     reload_dataloaders_every_n_epochs: int = 0
     multiple_trainloader_mode: str = "max_size_cycle"
     stochastic_weight_avg: bool = False
-    terminate_on_nan: Optional[bool] = None

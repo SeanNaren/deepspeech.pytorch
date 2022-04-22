@@ -1,4 +1,3 @@
-fairscale
 flask
 hydra-core
 jupyter

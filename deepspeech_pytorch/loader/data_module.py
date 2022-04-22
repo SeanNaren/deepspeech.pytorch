@@ -11,8 +11,7 @@ class DeepSpeechDataModule(pl.LightningDataModule):
     def __init__(self,
                  labels: list,
                  data_cfg: DataConfig,
-                 normalize: bool,
-                 is_distributed: bool):
+                 normalize: bool):
         super().__init__()
         self.train_path = to_absolute_path(data_cfg.train_path)
         self.val_path = to_absolute_path(data_cfg.val_path)
@@ -21,7 +20,10 @@ class DeepSpeechDataModule(pl.LightningDataModule):
         self.spect_cfg = data_cfg.spect
         self.aug_cfg = data_cfg.augmentation
         self.normalize = normalize
-        self.is_distributed = is_distributed
+
+    @property
+    def is_distributed(self):
+        return self.trainer.devices > 1
 
     def train_dataloader(self):
         train_dataset = self._create_dataset(self.train_path)

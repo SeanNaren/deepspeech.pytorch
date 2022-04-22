@@ -29,7 +29,6 @@ def train(cfg: DeepSpeechConfig):
         labels=labels,
         data_cfg=cfg.data,
         normalize=True,
-        is_distributed=cfg.trainer.gpus > 1
     )
 
     model = DeepSpeech(
