@@ -157,8 +157,6 @@ class DeepSpeechSmokeTest(unittest.TestCase):
             manifest_dir=cfg.manifest_dir,
             min_duration=cfg.min_duration,
             max_duration=cfg.max_duration,
-            val_fraction=cfg.val_fraction,
-            sample_rate=cfg.sample_rate,
             num_workers=cfg.num_workers
         )
 
