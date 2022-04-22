@@ -1,4 +1,6 @@
-FROM pytorch/pytorch:latest
+FROM nvcr.io/nvidia/pytorch:22.03-py3
+ENV DEBIAN_FRONTEND=noninteractive
+
 ENV LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
 
 WORKDIR /workspace/
