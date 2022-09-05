@@ -1,6 +1,13 @@
 from dataclasses import dataclass
 from typing import Any
 from typing import Optional
+from packaging.version import Version
+
+from pytorch_lightning.callbacks.progress.tqdm_progress import TQDMProgressBar
+import pytorch_lightning
+
+
+_PL_GREATER_THAN_EQUAL_1_7_0 = Version(pytorch_lightning.__version__) >= Version("0.7.0")
 
 
 @dataclass
@@ -27,10 +34,13 @@ class TrainerConf:
     _target_: str = "pytorch_lightning.trainer.Trainer"
     logger: Any = True  # Union[LightningLoggerBase, Iterable[LightningLoggerBase], bool]
     enable_checkpointing: bool = True
-    callbacks: Any = None  # Optional[List[Callback]]
     default_root_dir: Optional[str] = None
     gradient_clip_val: float = 0
-    process_position: int = 0
+    if _PL_GREATER_THAN_EQUAL_1_7_0:
+        callbacks: Any = [TQDMProgressBar(process_position=0)]
+    else:
+        callbacks: Any = None  # Optional[List[Callback]]
+        process_position: int = 0
     num_nodes: int = 1
     num_processes: int = 1
     gpus: Any = None  # Union[int, str, List[int], NoneType]
