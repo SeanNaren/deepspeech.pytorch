@@ -10,11 +10,6 @@ import pytorch_lightning
 from pytorch_lightning.callbacks.stochastic_weight_avg import StochasticWeightAveraging
 
 
-_PL_GREATER_THAN_EQUAL_1_7_0 = Version(pytorch_lightning.__version__) >= Version(
-    "0.7.0"
-)
-
-
 @dataclass
 class ModelCheckpointConf:
     _target_: str = "pytorch_lightning.callbacks.ModelCheckpoint"
@@ -43,24 +38,14 @@ class TrainerConf:
     enable_checkpointing: bool = True
     default_root_dir: Optional[str] = None
     gradient_clip_val: float = 0
-    if _PL_GREATER_THAN_EQUAL_1_7_0:
-        callbacks: Any = field(
-            default_factory=lambda: [
-                TQDMProgressBar(process_position=0, refresh_rate=1),
-                DeviceStatsMonitor(),
-                ModelSummary(),
-                StochasticWeightAveraging(swa_lrs=1e-2),
-            ]
-        )
-    else:
-        callbacks: Any = None  # Optional[List[Callback]]
-        process_position: int = 0
-        progress_bar_refresh_rate: int = 1
-        log_gpu_memory: Optional[str] = None
-        flush_logs_every_n_steps: int = 100
-        weights_summary: Optional[str] = "top"
-        prepare_data_per_node: bool = True
-        stochastic_weight_avg: bool = False
+    callbacks: Any = field(
+        default_factory=lambda: [
+            TQDMProgressBar(process_position=0, refresh_rate=1),
+            DeviceStatsMonitor(),
+            ModelSummary(),
+            StochasticWeightAveraging(swa_lrs=1e-2),
+        ]
+    )
     num_nodes: int = 1
     num_processes: int = 1
     gpus: Any = None  # Union[int, str, List[int], NoneType]
