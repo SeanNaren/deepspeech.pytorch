@@ -1,13 +1,6 @@
 from dataclasses import dataclass, field
 from typing import Any
 from typing import Optional
-from packaging.version import Version
-from pytorch_lightning.callbacks.device_stats_monitor import DeviceStatsMonitor
-from pytorch_lightning.callbacks.model_summary import ModelSummary
-
-from pytorch_lightning.callbacks.progress.tqdm_progress import TQDMProgressBar
-import pytorch_lightning
-from pytorch_lightning.callbacks.stochastic_weight_avg import StochasticWeightAveraging
 
 
 @dataclass
@@ -31,21 +24,14 @@ class ModelCheckpointConf:
 
 @dataclass
 class TrainerConf:
-    _target_: str = "pytorch_lightning.Trainer"
+    _target_: str = "pytorch_lightning.trainer.Trainer"
     logger: Any = (
         True  # Union[LightningLoggerBase, Iterable[LightningLoggerBase], bool]
     )
     enable_checkpointing: bool = True
     default_root_dir: Optional[str] = None
     gradient_clip_val: float = 0
-    callbacks: Any = field(
-        default_factory=lambda: [
-            TQDMProgressBar(process_position=0, refresh_rate=1),
-            DeviceStatsMonitor(),
-            ModelSummary(),
-            StochasticWeightAveraging(swa_lrs=1e-2),
-        ]
-    )
+    callbacks: Any = None
     num_nodes: int = 1
     num_processes: int = 1
     gpus: Any = None  # Union[int, str, List[int], NoneType]
