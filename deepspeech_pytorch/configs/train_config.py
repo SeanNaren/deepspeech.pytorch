@@ -40,6 +40,7 @@ class DataConfig:
     labels_path: str = 'labels.json'  # Contains tokens for model output
     spect: SpectConfig = SpectConfig()
     augmentation: AugmentationConfig = AugmentationConfig()
+    prepare_data_per_node: bool = True
 
 
 @dataclass

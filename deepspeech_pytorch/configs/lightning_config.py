@@ -1,13 +1,18 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 from typing import Optional
 from packaging.version import Version
+from pytorch_lightning.callbacks.device_stats_monitor import DeviceStatsMonitor
+from pytorch_lightning.callbacks.model_summary import ModelSummary
 
 from pytorch_lightning.callbacks.progress.tqdm_progress import TQDMProgressBar
 import pytorch_lightning
+from pytorch_lightning.callbacks.stochastic_weight_avg import StochasticWeightAveraging
 
 
-_PL_GREATER_THAN_EQUAL_1_7_0 = Version(pytorch_lightning.__version__) >= Version("0.7.0")
+_PL_GREATER_THAN_EQUAL_1_7_0 = Version(pytorch_lightning.__version__) >= Version(
+    "0.7.0"
+)
 
 
 @dataclass
@@ -31,23 +36,36 @@ class ModelCheckpointConf:
 
 @dataclass
 class TrainerConf:
-    _target_: str = "pytorch_lightning.trainer.Trainer"
-    logger: Any = True  # Union[LightningLoggerBase, Iterable[LightningLoggerBase], bool]
+    _target_: str = "pytorch_lightning.Trainer"
+    logger: Any = (
+        True  # Union[LightningLoggerBase, Iterable[LightningLoggerBase], bool]
+    )
     enable_checkpointing: bool = True
     default_root_dir: Optional[str] = None
     gradient_clip_val: float = 0
     if _PL_GREATER_THAN_EQUAL_1_7_0:
-        callbacks: Any = [TQDMProgressBar(process_position=0)]
+        callbacks: Any = field(
+            default_factory=lambda: [
+                TQDMProgressBar(process_position=0, refresh_rate=1),
+                DeviceStatsMonitor(),
+                ModelSummary(),
+                StochasticWeightAveraging(swa_lrs=1e-2),
+            ]
+        )
     else:
         callbacks: Any = None  # Optional[List[Callback]]
         process_position: int = 0
+        progress_bar_refresh_rate: int = 1
+        log_gpu_memory: Optional[str] = None
+        flush_logs_every_n_steps: int = 100
+        weights_summary: Optional[str] = "top"
+        prepare_data_per_node: bool = True
+        stochastic_weight_avg: bool = False
     num_nodes: int = 1
     num_processes: int = 1
     gpus: Any = None  # Union[int, str, List[int], NoneType]
     auto_select_gpus: bool = False
     tpu_cores: Any = None  # Union[int, str, List[int], NoneType]
-    log_gpu_memory: Optional[str] = None
-    progress_bar_refresh_rate: int = 1
     overfit_batches: Any = 0.0  # Union[int, float]
     track_grad_norm: Any = -1  # Union[int, float, str]
     check_val_every_n_epoch: int = 1
@@ -55,18 +73,14 @@ class TrainerConf:
     accumulate_grad_batches: Any = 1  # Union[int, Dict[int, int], List[list]]
     max_epochs: int = 1000
     min_epochs: int = 1
-    max_steps: Optional[int] = None
-    min_steps: Optional[int] = None
     limit_train_batches: Any = 1.0  # Union[int, float]
     limit_val_batches: Any = 1.0  # Union[int, float]
     limit_test_batches: Any = 1.0  # Union[int, float]
     val_check_interval: Any = 1.0  # Union[int, float]
-    flush_logs_every_n_steps: int = 100
     log_every_n_steps: int = 50
     accelerator: Any = None  # Union[str, Accelerator, NoneType]
     sync_batchnorm: bool = False
     precision: int = 32
-    weights_summary: Optional[str] = "top"
     weights_save_path: Optional[str] = None
     num_sanity_val_steps: int = 2
     resume_from_checkpoint: Any = None  # Union[str, Path, NoneType]
@@ -77,7 +91,6 @@ class TrainerConf:
     replace_sampler_ddp: bool = True
     detect_anomaly: bool = False
     auto_scale_batch_size: Any = False  # Union[str, bool]
-    prepare_data_per_node: bool = True
     plugins: Any = None  # Union[str, list, NoneType]
     amp_backend: str = "native"
     amp_level: Any = None
@@ -92,4 +105,3 @@ class TrainerConf:
     enable_model_summary: bool = True
     reload_dataloaders_every_n_epochs: int = 0
     multiple_trainloader_mode: str = "max_size_cycle"
-    stochastic_weight_avg: bool = False
