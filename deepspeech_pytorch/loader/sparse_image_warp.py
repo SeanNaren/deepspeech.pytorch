@@ -177,7 +177,7 @@ def solve_interpolation(train_points, train_values, order, regularization_weight
     rhs = torch.cat((f, rhs_zeros), 1)  # [b, n + d + 1, k]
 
     # Then, solve the linear system and unpack the results.
-    X, LU = torch.solve(rhs, lhs)
+    X = torch.linalg.solve(lhs, rhs)
     w = X[:, :n, :]
     v = X[:, n:, :]
 
