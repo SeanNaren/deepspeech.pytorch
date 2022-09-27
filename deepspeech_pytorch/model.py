@@ -91,15 +91,15 @@ class BatchRNN(nn.Module):
     def flatten_parameters(self):
         self.rnn.flatten_parameters()
 
-    def forward(self, x, output_lengths):
+    def forward(self, x, output_lengths, h=None):
         if self.batch_norm is not None:
             x = self.batch_norm(x)
         x = nn.utils.rnn.pack_padded_sequence(x, output_lengths)
-        x, h = self.rnn(x)
+        x, h = self.rnn(x, h)
         x, _ = nn.utils.rnn.pad_packed_sequence(x)
         if self.bidirectional:
             x = x.view(x.size(0), x.size(1), 2, -1).sum(2).view(x.size(0), x.size(1), -1)  # (TxNxH*2) -> (TxNxH) by sum
-        return x
+        return x, h
 
 
 class Lookahead(nn.Module):
@@ -211,7 +211,7 @@ class DeepSpeech(pl.LightningModule):
             target_decoder=self.evaluation_decoder
         )
 
-    def forward(self, x, lengths):
+    def forward(self, x, lengths, hs=None):
         lengths = lengths.cpu().int()
         output_lengths = self.get_seq_lens(lengths)
         x, _ = self.conv(x, output_lengths)
@@ -220,8 +220,14 @@ class DeepSpeech(pl.LightningModule):
         x = x.view(sizes[0], sizes[1] * sizes[2], sizes[3])  # Collapse feature dimension
         x = x.transpose(1, 2).transpose(0, 1).contiguous()  # TxNxH
 
-        for rnn in self.rnns:
-            x = rnn(x, output_lengths)
+        # if hs is None, create a list of None values corresponding to the number of rnn layers
+        if hs is None:
+            hs = [None] * len(self.rnns)
+
+        new_hs = []
+        for i, rnn in enumerate(self.rnns):
+            x, h = rnn(x, output_lengths, hs[i])
+            new_hs.append(h)
 
         if not self.bidirectional:  # no need for lookahead layer in bidirectional
             x = self.lookahead(x)
@@ -230,7 +236,7 @@ class DeepSpeech(pl.LightningModule):
         x = x.transpose(0, 1)
         # identity in training mode, softmax in eval mode
         x = self.inference_softmax(x)
-        return x, output_lengths
+        return x, output_lengths, new_hs
 
     def training_step(self, batch, batch_idx):
         inputs, targets, input_percentages, target_sizes = batch
