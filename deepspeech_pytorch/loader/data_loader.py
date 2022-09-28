@@ -27,6 +27,20 @@ def load_audio(path):
 
 
 class AudioParser(object):
+    def __init__(self,
+                 audio_conf: SpectConfig,
+                 normalize: bool = False):
+        """
+        Parses audio file into spectrogram with optional normalization and various augmentations
+        :param audio_conf: Dictionary containing the sample rate, window and the window length/stride in seconds
+        :param normalize(default False):  Apply standard mean and deviation normalization to audio tensor
+        """
+        self.window_stride = audio_conf.window_stride
+        self.window_size = audio_conf.window_size
+        self.sample_rate = audio_conf.sample_rate
+        self.window = audio_conf.window.value
+        self.normalize = normalize
+
     def parse_transcript(self, transcript_path):
         """
         :param transcript_path: Path where transcript is stored from the manifest file
@@ -40,6 +54,43 @@ class AudioParser(object):
         :return: Audio in training/testing format
         """
         raise NotImplementedError
+
+    def get_chunks(self, y, chunk_size_seconds):
+        """
+        :param y: Audio signal as an array of float numbers
+        :param chunk_size_seconds: Chunk size in seconds
+        :return: Chunk from the give audio signal of duration `chunk_size_seconds`
+        """
+        total_duration_seconds = math.ceil(len(y) / self.sample_rate)
+        num_of_chunks = math.ceil(total_duration_seconds / chunk_size_seconds)
+        for i in range(num_of_chunks):
+            chunk_start = int(i * chunk_size_seconds * self.sample_rate)
+            chunk_end = chunk_start + int(chunk_size_seconds * self.sample_rate)
+            chunk = y[chunk_start:chunk_end]
+            yield chunk
+
+    def compute_spectrogram(self, y):
+        """
+        :param y: Audio signal as an array of float numbers
+        :return: Spectrogram of the signal
+        """
+        n_fft = int(self.sample_rate * self.window_size)
+        win_length = n_fft
+        hop_length = int(self.sample_rate * self.window_stride)
+        # STFT
+        D = librosa.stft(y, n_fft=n_fft, hop_length=hop_length,
+                         win_length=win_length, window=self.window)
+        spect, phase = librosa.magphase(D)
+        # S = log(S+1)
+        spect = np.log1p(spect)
+        spect = torch.FloatTensor(spect)
+        if self.normalize:
+            mean = spect.mean()
+            std = spect.std()
+            spect.add_(-mean)
+            spect.div_(std)
+
+        return spect
 
 
 class NoiseInjection(object):
@@ -87,12 +138,7 @@ class SpectrogramParser(AudioParser):
         :param normalize(default False):  Apply standard mean and deviation normalization to audio tensor
         :param augmentation_conf(Optional): Config containing the augmentation parameters
         """
-        super(SpectrogramParser, self).__init__()
-        self.window_stride = audio_conf.window_stride
-        self.window_size = audio_conf.window_size
-        self.sample_rate = audio_conf.sample_rate
-        self.window = audio_conf.window.value
-        self.normalize = normalize
+        super(SpectrogramParser, self).__init__(audio_conf, normalize)
         self.aug_conf = augmentation_conf
         if augmentation_conf and augmentation_conf.noise_dir:
             self.noise_injector = NoiseInjection(path=augmentation_conf.noise_dir,
@@ -110,22 +156,8 @@ class SpectrogramParser(AudioParser):
             add_noise = np.random.binomial(1, self.aug_conf.noise_prob)
             if add_noise:
                 y = self.noise_injector.inject_noise(y)
-        n_fft = int(self.sample_rate * self.window_size)
-        win_length = n_fft
-        hop_length = int(self.sample_rate * self.window_stride)
-        # STFT
-        D = librosa.stft(y, n_fft=n_fft, hop_length=hop_length,
-                         win_length=win_length, window=self.window)
-        spect, phase = librosa.magphase(D)
-        # S = log(S+1)
-        spect = np.log1p(spect)
-        spect = torch.FloatTensor(spect)
-        if self.normalize:
-            mean = spect.mean()
-            std = spect.std()
-            spect.add_(-mean)
-            spect.div_(std)
 
+        spect = self.compute_spectrogram(y)
         if self.aug_conf and self.aug_conf.spec_augment:
             spect = spec_augment(spect)
 

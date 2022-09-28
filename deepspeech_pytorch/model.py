@@ -241,7 +241,7 @@ class DeepSpeech(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         inputs, targets, input_percentages, target_sizes = batch
         input_sizes = input_percentages.mul_(int(inputs.size(3))).int()
-        out, output_sizes = self(inputs, input_sizes)
+        out, output_sizes, hs = self(inputs, input_sizes)
         out = out.transpose(0, 1)  # TxNxH
         out = out.log_softmax(-1)
 
@@ -253,7 +253,7 @@ class DeepSpeech(pl.LightningModule):
         input_sizes = input_percentages.mul_(int(inputs.size(3))).int()
         inputs = inputs.to(self.device)
         with autocast(enabled=self.precision == 16):
-            out, output_sizes = self(inputs, input_sizes)
+            out, output_sizes, hs = self(inputs, input_sizes)
         decoded_output, _ = self.evaluation_decoder.decode(out, output_sizes)
         self.wer(
             preds=out,
