@@ -167,6 +167,24 @@ class SpectrogramParser(AudioParser):
         raise NotImplementedError
 
 
+class ChunkSpectrogramParser(AudioParser):
+    def __init__(self,
+                 audio_conf: SpectConfig,
+                 normalize: bool = False):
+        """
+        Parses audio file into spectrogram with optional normalization and various augmentations
+        :param audio_conf: Dictionary containing the sample rate, window and the window length/stride in seconds
+        :param normalize(default False):  Apply standard mean and deviation normalization to audio tensor
+        """
+        super(ChunkSpectrogramParser, self).__init__(audio_conf, normalize)
+
+    def parse_audio(self, audio_path, chunk_size_seconds=5):
+        y = load_audio(audio_path)
+        for y_chunk in self.get_chunks(y, chunk_size_seconds):
+            spect = self.compute_spectrogram(y_chunk)
+            yield spect
+
+
 class SpectrogramDataset(Dataset, SpectrogramParser):
     def __init__(self,
                  audio_conf: SpectConfig,
