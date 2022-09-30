@@ -55,13 +55,14 @@ class AudioParser(object):
         """
         raise NotImplementedError
 
-    def get_chunks(self, y, chunk_size_seconds):
+    def get_chunks(self, y, chunk_size_seconds=-1):
         """
         :param y: Audio signal as an array of float numbers
         :param chunk_size_seconds: Chunk size in seconds
         :return: Chunk from the give audio signal of duration `chunk_size_seconds`
         """
         total_duration_seconds = math.ceil(len(y) / self.sample_rate)
+        chunk_size_seconds = total_duration_seconds if chunk_size_seconds <= 0 else chunk_size_seconds
         num_of_chunks = math.ceil(total_duration_seconds / chunk_size_seconds)
         for i in range(num_of_chunks):
             chunk_start = int(i * chunk_size_seconds * self.sample_rate)
@@ -178,7 +179,7 @@ class ChunkSpectrogramParser(AudioParser):
         """
         super(ChunkSpectrogramParser, self).__init__(audio_conf, normalize)
 
-    def parse_audio(self, audio_path, chunk_size_seconds=5):
+    def parse_audio(self, audio_path, chunk_size_seconds=-1):
         y = load_audio(audio_path)
         for y_chunk in self.get_chunks(y, chunk_size_seconds):
             spect = self.compute_spectrogram(y_chunk)
