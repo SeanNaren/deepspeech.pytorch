@@ -33,6 +33,7 @@ class InferenceConfig:
 class TranscribeConfig(InferenceConfig):
     audio_path: str = ''  # Audio file to predict on
     offsets: bool = False  # Returns time offset information
+    chunk_size_seconds: float = -1 # default value to transcribe the whole audio at once
 
 
 @dataclass

@@ -245,10 +245,14 @@ python test.py model.model_path=models/deepspeech.pth test_path=/path/to/test_ma
 An example script to output a transcription has been provided:
 
 ```
-python transcribe.py model.model_path=models/deepspeech.pth audio_path=/path/to/audio.wav
+python transcribe.py \
+       model.model_path=models/deepspeech.pth \
+       model.cuda=True \
+       chunk_size_seconds=-1 \
+       audio_path=audio_path=/path/to/audio.wav
 ```
 
-If you used mixed-precision or half precision when training the model, you can use the `model.precision=half` for a speed/memory benefit.
+If you used mixed-precision or half precision when training the model, you can use the `model.precision=half` for a speed/memory benefit. If you want to transcribe a long audio file that does not fit in the GPU, change the value of `chunk_size_seconds` to a positive number which represents the chunk size in seconds that will be used to segment the long audio file based on it.
 
 ## Inference Server
 
