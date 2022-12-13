@@ -155,8 +155,8 @@ class SpectrogramParser(AudioParser):
             y = load_audio(audio_path)
 
         # Effectively just add AA filter at 4KHz
-        y = torchaudio.functional.resample(y, 16000, 8000)
-        y = torchaudio.functional.resample(y, 8000, 16000)
+        #y = torchaudio.functional.resample(y, 16000, 8000)
+        #y = torchaudio.functional.resample(y, 8000, 16000)
 
         if self.noise_injector:
             add_noise = np.random.binomial(1, self.aug_conf.noise_prob)
