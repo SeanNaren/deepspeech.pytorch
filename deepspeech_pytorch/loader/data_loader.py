@@ -23,7 +23,7 @@ def load_audio(path):
         sound = sound.squeeze()
     else:
         sound = sound.mean(axis=0)  # multiple channels, average
-    return sound.numpy()
+    return sound
 
 
 class AudioParser(object):
@@ -153,6 +153,11 @@ class SpectrogramParser(AudioParser):
             y = load_randomly_augmented_audio(audio_path, self.sample_rate)
         else:
             y = load_audio(audio_path)
+
+        # Effectively just add AA filter at 4KHz
+        y = torchaudio.functional.resample(y, 16000, 8000)
+        y = torchaudio.functional.resample(y, 8000, 16000)
+
         if self.noise_injector:
             add_noise = np.random.binomial(1, self.aug_conf.noise_prob)
             if add_noise:
@@ -244,25 +249,87 @@ class SpectrogramDataset(Dataset, SpectrogramParser):
         return self.size
 
 
+class AudioDataset(Dataset):
+    def __init__(
+            self,
+            input_path: str,
+            labels: list,
+        ):
+        """
+        Dataset that loads tensors via a csv containing file paths to audio files and transcripts separated by
+        a comma. Each new line is a different sample. Example below:
+
+        /path/to/audio.wav,/path/to/audio.txt
+        ...
+        You can also pass the directory of dataset.
+        :param input_path: Path to input.
+        :param labels: List containing all the possible characters to map to
+        :param normalize: Apply standard mean and deviation normalization to audio tensor
+        :param augmentation_conf(Optional): Config containing the augmentation parameters
+        """
+        self.ids = self._parse_input(input_path)
+        self.size = len(self.ids)
+        self.labels_map = dict([(labels[i], i) for i in range(len(labels))])
+        super(AudioDataset, self).__init__()
+
+    def __getitem__(self, index):
+        sample = self.ids[index]
+        audio_path, transcript_path = sample[0], sample[1]
+        audio = self.parse_audio(audio_path)
+        transcript = self.parse_transcript(transcript_path)
+        return audio, transcript
+
+    def parse_audio(self, audio_path):
+        y = load_audio(audio_path)
+        # Effectively just add AA filter at 4KHz
+        y = torchaudio.functional.resample(y, 16000, 8000)
+        y = torchaudio.functional.resample(y, 8000, 16000)
+        return y.numpy()
+
+    def _parse_input(self, input_path):
+        ids = []
+        if os.path.isdir(input_path):
+            for wav_path in Path(input_path).rglob('*.wav'):
+                transcript_path = str(wav_path).replace('/wav/', '/txt/').replace('.wav', '.txt')
+                ids.append((wav_path, transcript_path))
+        else:
+            # Assume it is a manifest file
+            with open(input_path) as f:
+                manifest = json.load(f)
+            for sample in manifest['samples']:
+                wav_path = os.path.join(manifest['root_path'], sample['wav_path'])
+                transcript_path = os.path.join(manifest['root_path'], sample['transcript_path'])
+                ids.append((wav_path, transcript_path))
+        return ids
+
+    def parse_transcript(self, transcript_path):
+        with open(transcript_path, 'r', encoding='utf8') as transcript_file:
+            transcript = transcript_file.read().replace('\n', '')
+        transcript = list(filter(None, [self.labels_map.get(x) for x in list(transcript)]))
+        return transcript
+
+    def __len__(self):
+        return self.size
+
+
 def _collate_fn(batch):
     def func(p):
-        return p[0].size(1)
+        return p[0].shape[0]
 
-    batch = sorted(batch, key=lambda sample: sample[0].size(1), reverse=True)
+    batch = sorted(batch, key=lambda sample: sample[0].shape[0], reverse=True)
     longest_sample = max(batch, key=func)[0]
-    freq_size = longest_sample.size(0)
+    max_seqlength = longest_sample.shape[0]
     minibatch_size = len(batch)
-    max_seqlength = longest_sample.size(1)
-    inputs = torch.zeros(minibatch_size, 1, freq_size, max_seqlength)
+    inputs = torch.zeros(minibatch_size, 1, max_seqlength)
     input_percentages = torch.FloatTensor(minibatch_size)
     target_sizes = torch.IntTensor(minibatch_size)
     targets = []
     for x in range(minibatch_size):
         sample = batch[x]
-        tensor = sample[0]
+        tensor = torch.Tensor(sample[0])
         target = sample[1]
-        seq_length = tensor.size(1)
-        inputs[x][0].narrow(1, 0, seq_length).copy_(tensor)
+        seq_length = tensor.shape[0]
+        inputs[x][0].narrow(0, 0, seq_length).copy_(tensor)
         input_percentages[x] = seq_length / float(max_seqlength)
         target_sizes[x] = len(target)
         targets.extend(target)

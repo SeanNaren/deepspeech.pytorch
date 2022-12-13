@@ -13,6 +13,7 @@ from deepspeech_pytorch.configs.train_config import SpectConfig, BiDirectionalCo
     SGDConfig, UniDirectionalConfig
 from deepspeech_pytorch.decoder import GreedyDecoder
 from deepspeech_pytorch.validation import CharErrorRate, WordErrorRate
+from deepspeech_pytorch.efficientleaf import EfficientLeaf
 
 
 class SequenceWise(nn.Module):
@@ -154,6 +155,19 @@ class DeepSpeech(pl.LightningModule):
         self.labels = labels
         num_classes = len(self.labels)
 
+        self.frontend = EfficientLeaf(
+            n_filters=40,
+            num_groups=8,
+            min_freq=0.,
+            max_freq=8000.,
+            sample_rate=16000,
+            window_len=64.,
+            window_stride=10.,
+            compression="pcen",
+            init_filter="linear_double",
+            trainable=True
+        )
+
         self.conv = MaskConv(nn.Sequential(
             nn.Conv2d(1, 32, kernel_size=(41, 11), stride=(2, 2), padding=(20, 5)),
             nn.BatchNorm2d(32),
@@ -167,6 +181,8 @@ class DeepSpeech(pl.LightningModule):
         rnn_input_size = int(math.floor(rnn_input_size + 2 * 20 - 41) / 2 + 1)
         rnn_input_size = int(math.floor(rnn_input_size + 2 * 10 - 21) / 2 + 1)
         rnn_input_size *= 32
+        rnn_input_size=320
+        self.model_cfg.hidden_size=256
 
         self.rnns = nn.Sequential(
             BatchRNN(
@@ -212,8 +228,12 @@ class DeepSpeech(pl.LightningModule):
         )
 
     def forward(self, x, lengths, hs=None):
-        lengths = lengths.cpu().int()
+        # from audio -> TF representation
+        x = self.frontend(x)
+        lengths = ((lengths / max(lengths)) * x.shape[-1]).to(torch.device('cpu'), dtype=torch.int64)
         output_lengths = self.get_seq_lens(lengths)
+
+        # convolutional layers
         x, _ = self.conv(x, output_lengths)
 
         sizes = x.size()
@@ -240,7 +260,7 @@ class DeepSpeech(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         inputs, targets, input_percentages, target_sizes = batch
-        input_sizes = input_percentages.mul_(int(inputs.size(3))).int()
+        input_sizes = input_percentages.mul_(int(inputs.shape[2]))
         out, output_sizes, hs = self(inputs, input_sizes)
         out = out.transpose(0, 1)  # TxNxH
         out = out.log_softmax(-1)
@@ -250,7 +270,7 @@ class DeepSpeech(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         inputs, targets, input_percentages, target_sizes = batch
-        input_sizes = input_percentages.mul_(int(inputs.size(3))).int()
+        input_sizes = input_percentages.mul_(int(inputs.shape[2]))
         inputs = inputs.to(self.device)
         with autocast(enabled=self.precision == 16):
             out, output_sizes, hs = self(inputs, input_sizes)

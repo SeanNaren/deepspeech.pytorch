@@ -2,7 +2,7 @@ import pytorch_lightning as pl
 from hydra.utils import to_absolute_path
 
 from deepspeech_pytorch.configs.train_config import DataConfig
-from deepspeech_pytorch.loader.data_loader import SpectrogramDataset, DSRandomSampler, AudioDataLoader, \
+from deepspeech_pytorch.loader.data_loader import AudioDataset, SpectrogramDataset, DSRandomSampler, AudioDataLoader, \
     DSElasticDistributedSampler
 
 
@@ -23,7 +23,7 @@ class DeepSpeechDataModule(pl.LightningDataModule):
 
     @property
     def is_distributed(self):
-        return self.trainer.devices > 1
+        return self.trainer.num_devices > 1
 
     def train_dataloader(self):
         train_dataset = self._create_dataset(self.train_path)
@@ -49,16 +49,13 @@ class DeepSpeechDataModule(pl.LightningDataModule):
         val_loader = AudioDataLoader(
             dataset=val_dataset,
             num_workers=self.data_cfg.num_workers,
-            batch_size=self.data_cfg.batch_size
+            batch_size=8#self.data_cfg.batch_size
         )
         return val_loader
 
     def _create_dataset(self, input_path):
-        dataset = SpectrogramDataset(
-            audio_conf=self.spect_cfg,
+        dataset = AudioDataset(
             input_path=input_path,
             labels=self.labels,
-            normalize=True,
-            aug_cfg=self.aug_cfg
         )
         return dataset
