@@ -52,7 +52,7 @@ class TrainerConf:
     accelerator: Any = None  # Union[str, Accelerator, NoneType]
     sync_batchnorm: bool = False
     precision: int = 32
-    weights_save_path: Optional[str] = None
+    #weights_save_path: Optional[str] = None
     num_sanity_val_steps: int = 2
     resume_from_checkpoint: Any = None  # Union[str, Path, NoneType]
     profiler: Any = None  # Union[BaseProfiler, bool, str, NoneType]
